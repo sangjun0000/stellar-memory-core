@@ -38,6 +38,7 @@ import {
   recencyScore,
   frequencyScore,
 } from './orbit.js';
+import { keywordRelevance } from './gravity.js';
 import { generateEmbedding } from './embedding.js';
 import { insertEmbedding, searchByVector, deleteEmbedding } from '../storage/vec.js';
 import { getDatabase, withTransaction } from '../storage/database.js';
@@ -98,13 +99,22 @@ export function createMemory(data: {
   // Compute initial importance using static scores.
   const rec  = recencyScore(null, new Date().toISOString(), config.decayHalfLifeHours);
   const freq = frequencyScore(0, config.frequencySaturationPoint);
-  // relevance starts at 0 — will be updated on next recalculateOrbits call.
+
+  // Compute relevance against current sun context so new memories start at a
+  // position that reflects their relevance to current work, rather than 0.
+  const sunState = getSunState(data.project);
+  const sunText  = sunState
+    ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
+    : '';
+  const memoryText = data.content + ' ' + tags.join(' ');
+  const rel = keywordRelevance(memoryText, sunText);
+
   const total = Math.min(
     1.0,
     config.weights.recency   * rec    +
     config.weights.frequency * freq   +
     config.weights.impact    * impact +
-    config.weights.relevance * 0,
+    config.weights.relevance * rel,
   );
 
   const distance = importanceToDistance(total);
@@ -154,125 +164,6 @@ function scheduleEmbedding(memoryId: string, text: string): void {
     .catch(() => {
       // Model not loaded / network error — FTS5 fallback remains active
     });
-}
-
-// ---------------------------------------------------------------------------
-// recallMemories
-// ---------------------------------------------------------------------------
-
-/**
- * Recall memories matching a search query using hybrid search (FTS5 + vector).
- *
- * Search strategy:
- *   1. FTS5 keyword search (always available, fast).
- *   2. Vector KNN search (if the query can be embedded and vec tables exist).
- *   3. Results are merged via Reciprocal Rank Fusion (RRF) and deduplicated.
- *
- * For every result the function:
- *   1. Applies an access boost (pulls the memory closer to the sun).
- *   2. Increments access_count and updates last_accessed_at.
- *   3. Logs the orbit change.
- *
- * Options:
- *   - type        : filter by memory type ('all' = no filter, default).
- *   - maxDistance : exclude memories beyond this AU distance.
- *   - limit       : cap result count (default 10).
- */
-export function recallMemories(
-  project: string,
-  query: string,
-  options?: {
-    type?: MemoryType | 'all';
-    maxDistance?: number;
-    limit?: number;
-  },
-): Memory[] {
-  const limit = options?.limit ?? 10;
-  const fetchN = limit * 3; // over-fetch for post-filter headroom
-
-  // ── 1. FTS5 keyword search ──────────────────────────────────────────────
-  const ftsResults = searchMemories(project, query, fetchN);
-
-  // ── 2. Vector search (best-effort; falls back silently) ─────────────────
-  // Note: vector search is async in the embedding step but synchronous in
-  // the DB lookup. We use a synchronously-cached embedding if available,
-  // otherwise skip the vector leg for this call.
-  const vecResults = tryVectorSearch(project, query, fetchN);
-
-  // ── 3. Merge via Reciprocal Rank Fusion (RRF) ──────────────────────────
-  // RRF score = Σ 1 / (k + rank_i) where k=60 is the smoothing constant.
-  // This is robust to differing score scales between FTS5 and vector search.
-  let results: Memory[] = mergeRRF(ftsResults, vecResults, limit * 4);
-
-  // ── 4. Fetch full Memory objects for any vector-only results ─────────────
-  // mergeRRF may include IDs that only appear in the vec results and were not
-  // returned by FTS5. Resolve those now via a batched lookup.
-  results = hydrateVectorOnlyResults(results, ftsResults);
-
-  // Filter by memory type.
-  if (options?.type && options.type !== 'all') {
-    const filterType = options.type;
-    results = results.filter((m: Memory) => m.type === filterType);
-  }
-
-  // Filter by orbital distance.
-  if (options?.maxDistance !== undefined) {
-    const maxDist = options.maxDistance;
-    results = results.filter((m: Memory) => m.distance <= maxDist);
-  }
-
-  // Apply the caller-requested limit after filtering.
-  results = results.slice(0, limit);
-
-  // Build sun context once for all importance recalculations in this batch.
-  const sunState = getSunState(project);
-  const sunText  = sunState
-    ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
-    : '';
-
-  const config = getConfig();
-
-  // Apply access boost to each recalled memory and persist changes atomically.
-  const boosted: Memory[] = withTransaction(() =>
-    results.map((memory: Memory) => {
-      const newDistance = applyAccessBoost(memory.distance);
-      const velocity    = newDistance - memory.distance;
-
-      // Persist the access event (increments access_count, sets last_accessed_at).
-      updateMemoryAccess(memory.id);
-
-      // Recalculate importance with updated access data so the stored value
-      // stays consistent with what importanceToDistance() would produce.
-      const updatedMemory: Memory = {
-        ...memory,
-        distance:        newDistance,
-        access_count:    memory.access_count + 1,
-        last_accessed_at: new Date().toISOString(),
-      };
-
-      const components = calculateImportance(updatedMemory, sunText, config);
-
-      updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
-
-      insertOrbitLog({
-        memory_id:      memory.id,
-        project,
-        old_distance:   memory.distance,
-        new_distance:   newDistance,
-        old_importance: memory.importance,
-        new_importance: components.total,
-        trigger:        'access',
-      });
-
-      return {
-        ...updatedMemory,
-        importance: components.total,
-        velocity,
-      };
-    })
-  );
-
-  return boosted;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,50 +218,6 @@ export function forgetMemory(memoryId: string, mode: 'push' | 'delete'): void {
 // ---------------------------------------------------------------------------
 // Hybrid search helpers (Phase 2)
 // ---------------------------------------------------------------------------
-
-/**
- * Attempt a vector search for the given query string.
- *
- * This is synchronous from the caller's perspective: it generates an
- * embedding synchronously-cached by the pipeline singleton if the model
- * has already been loaded, or returns an empty array if not yet ready.
- *
- * Because embedding generation is async, we start a non-blocking job and
- * return an empty result on the first cold call. The model warms up in
- * the background, and subsequent calls benefit from cached results.
- */
-function tryVectorSearch(
-  project: string,
-  _query: string,
-  limit: number,
-): string[] {
-  // We only perform synchronous vector lookups here.
-  // The query embedding is generated async and not awaited on this call.
-  // Instead, we return the IDs that happen to already be in the vec index
-  // via an in-memory embedding approach.
-  //
-  // For a full async hybrid flow, callers should use recallMemoriesAsync().
-  // This synchronous version degrades gracefully to FTS5-only when the
-  // embedding model hasn't loaded yet.
-  try {
-    const db = getDatabase();
-    // Probe the vec table to see if it's available and has any entries.
-    const count = (db.prepare(
-      'SELECT COUNT(*) as n FROM memory_embedding_map'
-    ).get() as { n: number } | undefined)?.n ?? 0;
-
-    if (count === 0) return [];
-
-    // We can't generate the query embedding synchronously here because
-    // generateEmbedding() is async. The async path is exposed via
-    // recallMemoriesAsync() below. Return empty array to let FTS5 handle it.
-    void project; // suppress unused warning
-    void limit;
-    return [];
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Reciprocal Rank Fusion: merge FTS5 results and vector result IDs.
@@ -450,6 +297,7 @@ export async function recallMemoriesAsync(
   query: string,
   options?: {
     type?: MemoryType | 'all';
+    minDistance?: number;
     maxDistance?: number;
     limit?: number;
   },
@@ -479,6 +327,11 @@ export async function recallMemoriesAsync(
   if (options?.type && options.type !== 'all') {
     const filterType = options.type;
     results = results.filter(m => m.type === filterType);
+  }
+
+  if (options?.minDistance !== undefined) {
+    const minDist = options.minDistance;
+    results = results.filter(m => m.distance >= minDist);
   }
 
   if (options?.maxDistance !== undefined) {

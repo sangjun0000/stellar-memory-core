@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { setupTestDb, teardownTestDb } from './setup.js';
-import { createMemory, recallMemories, forgetMemory } from '../src/engine/planet.js';
+import { createMemory, recallMemoriesAsync, forgetMemory } from '../src/engine/planet.js';
 import { getMemoryById, getMemoriesByProject } from '../src/storage/queries.js';
 
 describe('planet — memory management', () => {
@@ -79,52 +79,52 @@ describe('planet — memory management', () => {
     });
   });
 
-  describe('recallMemories', () => {
-    it('finds memories by content search', () => {
+  describe('recallMemoriesAsync', () => {
+    it('finds memories by content search', async () => {
       createMemory({ project: 'test', content: 'PostgreSQL database migration' });
       createMemory({ project: 'test', content: 'React component styling' });
 
-      const results = recallMemories('test', 'PostgreSQL');
+      const results = await recallMemoriesAsync('test', 'PostgreSQL');
       expect(results.length).toBe(1);
       expect(results[0].content).toContain('PostgreSQL');
     });
 
-    it('applies access boost (pulls memory closer)', () => {
+    it('applies access boost (pulls memory closer)', async () => {
       const m = createMemory({ project: 'test', content: 'authentication module' });
       const originalDistance = m.distance;
 
-      const results = recallMemories('test', 'authentication');
+      const results = await recallMemoriesAsync('test', 'authentication');
       expect(results.length).toBe(1);
       expect(results[0].distance).toBeLessThan(originalDistance);
     });
 
-    it('increments access count', () => {
+    it('increments access count', async () => {
       createMemory({ project: 'test', content: 'unique search term xyzzy' });
 
-      recallMemories('test', 'xyzzy');
+      await recallMemoriesAsync('test', 'xyzzy');
       const after = getMemoriesByProject('test')[0];
       expect(after.access_count).toBe(1);
     });
 
-    it('filters by type', () => {
+    it('filters by type', async () => {
       createMemory({ project: 'test', content: 'decision about auth', type: 'decision' });
       createMemory({ project: 'test', content: 'error in auth module', type: 'error' });
 
-      const decisions = recallMemories('test', 'auth', { type: 'decision' });
+      const decisions = await recallMemoriesAsync('test', 'auth', { type: 'decision' });
       expect(decisions.every(m => m.type === 'decision')).toBe(true);
     });
 
-    it('respects limit', () => {
+    it('respects limit', async () => {
       for (let i = 0; i < 5; i++) {
         createMemory({ project: 'test', content: `memory about testing item ${i}` });
       }
-      const results = recallMemories('test', 'testing', { limit: 2 });
+      const results = await recallMemoriesAsync('test', 'testing', { limit: 2 });
       expect(results.length).toBeLessThanOrEqual(2);
     });
 
-    it('returns empty array for no matches', () => {
+    it('returns empty array for no matches', async () => {
       createMemory({ project: 'test', content: 'database stuff' });
-      const results = recallMemories('test', 'nonexistentterm');
+      const results = await recallMemoriesAsync('test', 'nonexistentterm');
       expect(results).toEqual([]);
     });
   });

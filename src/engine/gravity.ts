@@ -51,14 +51,15 @@ export function keywordRelevance(memoryText: string, sunText: string): number {
   const sunSet = new Set(sunTokens);
   const memoryTokens = tokenize(memoryText);
 
+  const memorySet = new Set(memoryTokens);
   let overlap = 0;
-  for (const token of memoryTokens) {
+  for (const token of memorySet) {
     if (sunSet.has(token)) {
       overlap++;
     }
   }
 
-  const denominator = Math.max(3, sunTokens.length * 0.3);
+  const denominator = Math.max(5, sunTokens.length * 0.3);
   return Math.min(1.0, overlap / denominator);
 }
 
@@ -112,9 +113,7 @@ export function vectorRelevance(
   sunEmbedding:   Float32Array | null | undefined,
 ): number {
   if (!memoryEmbedding || !sunEmbedding) return 0;
-  const sim = cosineSimilarity(memoryEmbedding, sunEmbedding);
-  // Already in [0, 1] for normalized vecs, but apply the rescale for safety.
-  return (sim + 1) / 2;
+  return Math.max(0, cosineSimilarity(memoryEmbedding, sunEmbedding));
 }
 
 /**

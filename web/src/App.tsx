@@ -405,15 +405,115 @@ export default function App() {
             Loading...
           </div>
         ) : (
-          <SolarSystem
-            memories={visibleMemories}
-            sun={sun}
-            selectedId={selectedId}
-            onSelectMemory={(m) => setDetail(m ? { type: 'memory', memory: m } : null)}
-            onSelectSun={() => setDetail({ type: 'sun' })}
-            onDragEnd={handleDragEnd}
-            totalCount={memories.length}
-          />
+          <>
+            <SolarSystem
+              memories={visibleMemories}
+              sun={sun}
+              selectedId={selectedId}
+              onSelectMemory={(m) => setDetail(m ? { type: 'memory', memory: m } : null)}
+              onSelectSun={() => setDetail({ type: 'sun' })}
+              onDragEnd={handleDragEnd}
+              totalCount={memories.length}
+            />
+            {memories.length === 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  zIndex: 10,
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: 420,
+                    padding: '32px 36px',
+                    background: 'rgba(10, 22, 40, 0.82)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '16px',
+                    backdropFilter: 'blur(20px)',
+                    boxShadow: '0 8px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                    textAlign: 'center',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      margin: '0 auto 16px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle at 40% 35%, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.08) 60%, transparent)',
+                      border: '1px solid rgba(251, 191, 36, 0.35)',
+                      boxShadow: '0 0 24px rgba(251, 191, 36, 0.2)',
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: '#e5e7eb',
+                      letterSpacing: '0.05em',
+                      marginBottom: 12,
+                    }}
+                  >
+                    STELLAR MEMORY IS EMPTY
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#9ca3af',
+                      lineHeight: 1.7,
+                      marginBottom: 20,
+                    }}
+                  >
+                    Memories are created automatically as you work with Claude,
+                    or you can scan a directory to import existing files.
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: '#6b7280',
+                      lineHeight: 1.7,
+                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                      paddingTop: 14,
+                    }}
+                  >
+                    <div style={{ marginBottom: 6, color: '#7c8db5', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                      ORBIT ZONES
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'Corona', color: '#fbbf24', desc: 'Critical' },
+                        { label: 'Inner',  color: '#f97316', desc: 'Important' },
+                        { label: 'Habitable', color: '#22c55e', desc: 'Active' },
+                        { label: 'Outer',  color: '#60a5fa', desc: 'Reference' },
+                        { label: 'Kuiper', color: '#a78bfa', desc: 'Archived' },
+                        { label: 'Oort',   color: '#9ca3af', desc: 'Fading' },
+                      ].map((z) => (
+                        <div key={z.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              background: z.color,
+                              boxShadow: `0 0 6px ${z.color}88`,
+                            }}
+                          />
+                          <span style={{ color: z.color, opacity: 0.85 }}>{z.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

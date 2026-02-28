@@ -1,3 +1,4 @@
+import { useEffect, useState, useRef } from 'react';
 import type { ZoneStat, OrbitZone } from '../api/client';
 
 // ---------------------------------------------------------------------------
@@ -12,6 +13,41 @@ const ZONE_COLORS: Record<OrbitZone, string> = {
   kuiper:    '#a78bfa',
   oort:      '#9ca3af',
 };
+
+const ZONE_ORDER: OrbitZone[] = ['corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'];
+
+// ---------------------------------------------------------------------------
+// CSS — once per page
+// ---------------------------------------------------------------------------
+
+const STATS_CSS = `
+@keyframes statsbar-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes statsbar-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes statsbar-gradient-slide {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes statsbar-count-pop {
+  0%   { transform: scale(0.85); opacity: 0.6; }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+`;
+
+function injectStatsCss() {
+  if (document.getElementById('statsbar-css')) return;
+  const el = document.createElement('style');
+  el.id = 'statsbar-css';
+  el.textContent = STATS_CSS;
+  document.head.appendChild(el);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,12 +70,230 @@ function formatRelative(iso: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 interface StatsBarProps {
-  totalMemories: number;
-  zones: ZoneStat[];
-  lastOrbitAt?: string | null;
+  totalMemories:  number;
+  zones:          ZoneStat[];
+  lastOrbitAt?:   string | null;
   lastUpdatedAt?: number | null;
-  onRefresh: () => void;
+  onRefresh:      () => void;
+  isRefreshing:   boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Zone pill badge
+// ---------------------------------------------------------------------------
+
+function ZonePill({ zone, count }: { zone: ZoneStat; count: number }) {
+  const color = ZONE_COLORS[zone.zone];
+  const [hovered, setHovered] = useState(false);
+
+  if (count === 0) return null;
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={`${zone.label}: avg importance ${(zone.avg_importance * 100).toFixed(0)}%`}
+      style={{
+        display:      'inline-flex',
+        alignItems:   'center',
+        gap:          '5px',
+        padding:      '2px 8px 2px 6px',
+        borderRadius: '999px',
+        background:   hovered ? `${color}28` : `${color}14`,
+        border:       `1px solid ${color}${hovered ? '66' : '33'}`,
+        boxShadow:    hovered ? `0 0 10px ${color}44` : 'none',
+        cursor:       'default',
+        transition:   'all 0.18s ease',
+        userSelect:   'none',
+      }}
+    >
+      {/* Zone dot */}
+      <span
+        style={{
+          width:        '5px',
+          height:       '5px',
+          borderRadius: '50%',
+          background:   color,
+          boxShadow:    `0 0 ${hovered ? '6px' : '3px'} ${color}`,
+          flexShrink:   0,
+          transition:   'box-shadow 0.18s ease',
+        }}
+      />
+      <span
+        style={{
+          fontSize:  '10px',
+          color:     hovered ? color : `${color}cc`,
+          fontWeight: 500,
+          transition: 'color 0.18s ease',
+          textTransform: 'capitalize',
+        }}
+      >
+        {zone.zone}
+      </span>
+      <span
+        style={{
+          fontSize:   '10px',
+          fontFamily: 'monospace',
+          color:      hovered ? '#e5e7eb' : '#9ca3af',
+          fontWeight: 700,
+          transition: 'color 0.18s ease',
+        }}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Premium refresh button
+// ---------------------------------------------------------------------------
+
+function RefreshButton({
+  onClick,
+  isRefreshing,
+}: {
+  onClick:      () => void;
   isRefreshing: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={isRefreshing}
+      aria-label="Refresh data"
+      style={{
+        display:        'flex',
+        alignItems:     'center',
+        gap:            '5px',
+        padding:        '3px 10px',
+        borderRadius:   '8px',
+        border:         '1px solid rgba(255,255,255,0.1)',
+        background:     isRefreshing
+          ? 'rgba(96,165,250,0.12)'
+          : 'rgba(255,255,255,0.04)',
+        color:          isRefreshing ? '#60a5fa' : '#6b7280',
+        fontSize:       '11px',
+        cursor:         isRefreshing ? 'not-allowed' : 'pointer',
+        boxShadow:      isRefreshing ? '0 0 10px rgba(96,165,250,0.2)' : 'none',
+        transition:     'all 0.2s ease',
+        letterSpacing:  '0.02em',
+      }}
+      onMouseEnter={(e) => {
+        if (isRefreshing) return;
+        const el = e.currentTarget as HTMLElement;
+        el.style.background  = 'rgba(96,165,250,0.12)';
+        el.style.borderColor = 'rgba(96,165,250,0.35)';
+        el.style.color       = '#93c5fd';
+        el.style.boxShadow   = '0 0 12px rgba(96,165,250,0.25)';
+      }}
+      onMouseLeave={(e) => {
+        if (isRefreshing) return;
+        const el = e.currentTarget as HTMLElement;
+        el.style.background  = 'rgba(255,255,255,0.04)';
+        el.style.borderColor = 'rgba(255,255,255,0.1)';
+        el.style.color       = '#6b7280';
+        el.style.boxShadow   = 'none';
+      }}
+    >
+      <span
+        style={{
+          display:     'inline-block',
+          fontSize:    '13px',
+          animation:   isRefreshing ? 'statsbar-spin 0.8s linear infinite' : 'none',
+          lineHeight:  1,
+        }}
+        aria-hidden="true"
+      >
+        ⟳
+      </span>
+      {isRefreshing ? 'Syncing…' : 'Refresh'}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Animated memory count
+// ---------------------------------------------------------------------------
+
+function MemoryCount({ count }: { count: number }) {
+  const [displayCount, setDisplayCount] = useState(count);
+  const [animKey, setAnimKey] = useState(0);
+  const prevRef = useRef(count);
+
+  useEffect(() => {
+    if (count !== prevRef.current) {
+      prevRef.current = count;
+      setAnimKey((k) => k + 1);
+      // Briefly animate the count ticking up/down
+      const start   = displayCount;
+      const end     = count;
+      const diff    = end - start;
+      const steps   = Math.min(Math.abs(diff), 12);
+      if (steps === 0) return;
+      let step = 0;
+      const id = setInterval(() => {
+        step++;
+        setDisplayCount(Math.round(start + (diff * step) / steps));
+        if (step >= steps) clearInterval(id);
+      }, 40);
+      return () => clearInterval(id);
+    }
+  }, [count]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div
+      style={{
+        display:    'flex',
+        alignItems: 'baseline',
+        gap:        '5px',
+      }}
+    >
+      <span
+        style={{
+          fontSize:   '10px',
+          color:      '#4b5563',
+          fontWeight: 500,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+        }}
+      >
+        Memories
+      </span>
+      <span
+        key={animKey}
+        style={{
+          fontSize:   '16px',
+          fontFamily: 'monospace',
+          fontWeight: 800,
+          color:      '#f3f4f6',
+          textShadow: '0 0 16px rgba(96,165,250,0.5)',
+          animation:  'statsbar-count-pop 0.35s ease-out both',
+          lineHeight: 1,
+        }}
+      >
+        {displayCount}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Divider
+// ---------------------------------------------------------------------------
+
+function HudDivider() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display:   'inline-block',
+        width:     '1px',
+        height:    '14px',
+        background: 'linear-gradient(180deg, transparent, rgba(255,255,255,0.15), transparent)',
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -54,69 +308,123 @@ export function StatsBar({
   onRefresh,
   isRefreshing,
 }: StatsBarProps) {
+  injectStatsCss();
+
   const updatedLabel = lastUpdatedAt
     ? formatRelative(new Date(lastUpdatedAt).toISOString())
     : null;
 
+  // Sort zones by canonical order, filter out zero-count
+  const sortedZones = ZONE_ORDER
+    .map((z) => zones.find((s) => s.zone === z))
+    .filter((z): z is ZoneStat => z != null && z.count > 0);
+
   return (
-    <div className="flex-shrink-0 flex items-center gap-4 px-4 py-1.5 bg-space-900 border-b border-gray-800 text-xs text-gray-400 overflow-x-auto">
-      {/* Total memories */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-gray-600">Memories</span>
-        <span className="font-mono text-gray-200 font-semibold">{totalMemories}</span>
-      </div>
+    <div
+      style={{
+        flexShrink:  0,
+        position:    'relative',
+        overflow:    'hidden',
+      }}
+    >
+      {/* Main HUD bar */}
+      <div
+        style={{
+          display:         'flex',
+          alignItems:      'center',
+          gap:             '10px',
+          padding:         '6px 14px',
+          background:      'linear-gradient(90deg, rgba(5,10,20,0.98), rgba(7,14,28,0.98))',
+          borderBottom:    '1px solid rgba(255,255,255,0.06)',
+          overflowX:       'auto',
+          scrollbarWidth:  'none',
+        }}
+      >
+        {/* Memory count — prominent HUD readout */}
+        <MemoryCount count={totalMemories} />
 
-      <span className="text-gray-700" aria-hidden="true">|</span>
+        <HudDivider />
 
-      {/* Zone breakdown */}
-      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-        {zones.map((z) => (
-          <div key={z.zone} className="flex items-center gap-1">
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: ZONE_COLORS[z.zone] }}
-              aria-hidden="true"
-            />
-            <span className="capitalize text-gray-500">{z.zone}</span>
-            <span className="font-mono text-gray-300">{z.count}</span>
+        {/* Zone pills */}
+        {sortedZones.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'nowrap' }}>
+            {sortedZones.map((z) => (
+              <ZonePill key={z.zone} zone={z} count={z.count} />
+            ))}
           </div>
-        ))}
-      </div>
-
-      {/* Orbit recalc timestamp */}
-      {lastOrbitAt !== undefined && (
-        <>
-          <span className="text-gray-700 shrink-0" aria-hidden="true">|</span>
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-gray-600">Orbit recalc:</span>
-            <span className="text-gray-400">{formatRelative(lastOrbitAt)}</span>
-          </div>
-        </>
-      )}
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Last updated + manual refresh */}
-      <div className="flex items-center gap-2 shrink-0">
-        {updatedLabel && (
-          <span className="text-gray-600">Updated {updatedLabel}</span>
         )}
-        <button
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          aria-label="Refresh data"
-        >
-          <span
-            className={isRefreshing ? 'animate-spin inline-block' : 'inline-block'}
-            aria-hidden="true"
+
+        {/* Orbit recalc */}
+        {lastOrbitAt !== undefined && (
+          <>
+            <HudDivider />
+            <div
+              style={{
+                display:    'flex',
+                alignItems: 'center',
+                gap:        '4px',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: '10px', color: '#374151' }}>Orbit</span>
+              <span style={{ fontSize: '10px', color: '#4b5563', fontFamily: 'monospace' }}>
+                {formatRelative(lastOrbitAt)}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Last updated with blinking live dot */}
+        {updatedLabel && (
+          <div
+            style={{
+              display:    'flex',
+              alignItems: 'center',
+              gap:        '5px',
+              flexShrink: 0,
+            }}
           >
-            &#8635;
-          </span>
-          Refresh
-        </button>
+            {/* Blinking live indicator */}
+            <span
+              style={{
+                display:      'inline-block',
+                width:        '5px',
+                height:       '5px',
+                borderRadius: '50%',
+                background:   isRefreshing ? '#60a5fa' : '#22c55e',
+                boxShadow:    isRefreshing
+                  ? '0 0 6px #60a5fa'
+                  : '0 0 5px #22c55e',
+                animation:    'statsbar-blink 1.4s ease-in-out infinite',
+                flexShrink:   0,
+              }}
+            />
+            <span style={{ fontSize: '10px', color: '#374151' }}>Updated</span>
+            <span style={{ fontSize: '10px', color: '#4b5563', fontFamily: 'monospace' }}>
+              {updatedLabel}
+            </span>
+          </div>
+        )}
+
+        <HudDivider />
+
+        {/* Refresh button */}
+        <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
       </div>
+
+      {/* Animated gradient accent line at the bottom */}
+      <div
+        style={{
+          height:            '1.5px',
+          background:        'linear-gradient(90deg, #020408, #2563eb55, #7c3aed55, #eab30855, #16a34a55, #020408)',
+          backgroundSize:    '300% 100%',
+          animation:         'statsbar-gradient-slide 6s ease infinite',
+        }}
+        aria-hidden="true"
+      />
     </div>
   );
 }

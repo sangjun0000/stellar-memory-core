@@ -29,8 +29,16 @@ initDatabase(config.dbPath);
 
 const app = new Hono();
 
-// CORS — allow all origins for local development
-app.use('/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
+// CORS — restrict to localhost origins only
+app.use('/*', cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:21547',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:21547',
+  ],
+  allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
 
 // Health check
 app.get('/api/health', (c) => c.json({ name: 'stellar-memory-api', version: '0.4.0', status: 'ok' }));

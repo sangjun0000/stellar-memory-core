@@ -137,7 +137,7 @@ export const api = {
   ) =>
     get<{ data: Memory[]; total: number; query: string }>(
       '/api/memories/search',
-      { query, project, type, zone } as Record<string, string | undefined>,
+      { q: query, project, type, zone } as Record<string, string | undefined>,
     ),
 
   createMemory: (body: {
@@ -156,7 +156,7 @@ export const api = {
     ),
 
   forgetMemory: (id: string) =>
-    del<{ success: boolean; id: string }>(`/api/memories/${id}`),
+    del<{ ok: boolean; id: string }>(`/api/memories/${id}`),
 
   getSun: (project?: string) =>
     get<{ data: SunState | null }>('/api/sun', { project }),

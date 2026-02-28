@@ -2,41 +2,250 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────
+   KEYFRAMES — GPU-accelerated (transform/opacity)
+───────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 0.06; }
+  90%  { opacity: 0.06; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────
+   BASE LAYER
+───────────────────────────────────────────── */
 @layer base {
   * {
     box-sizing: border-box;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-space-950 text-gray-100;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     margin: 0;
+    /* Subtle noise grain overlay via pseudo-element approach */
+    position: relative;
   }
 
+  /* Selection color */
+  ::selection {
+    background-color: rgba(59, 130, 246, 0.35);
+    color: #e2e8f0;
+  }
+
+  /* ── Scrollbar ── */
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-space-900;
+    @apply bg-space-950;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-600 rounded;
+    background: rgba(99, 116, 146, 0.45);
+    border-radius: 9999px;
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 130, 200, 0.75);
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+  }
+
+  /* ── Focus states ── */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 0 12px rgba(59, 130, 246, 0.2);
+  }
+
+  /* ── Smooth transitions on interactive elements ── */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role='button'] {
+    transition: color 0.15s ease, background-color 0.15s ease,
+                border-color 0.15s ease, box-shadow 0.15s ease,
+                opacity 0.15s ease;
   }
 }
 
+/* ─────────────────────────────────────────────
+   COMPONENT LAYER
+───────────────────────────────────────────── */
 @layer components {
+
+  /* ── Panel — glassmorphism base ── */
   .panel {
-    @apply bg-space-800 border border-gray-700 rounded-lg;
+    background: rgba(10, 22, 40, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 0.75rem;
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.3),
+      0 4px 24px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
+  /* ── Panel header — gradient underline ── */
   .panel-header {
-    @apply px-4 py-3 border-b border-gray-700 text-xs font-semibold uppercase tracking-widest text-gray-400;
+    @apply px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-400;
+    position: relative;
+    /* Gradient underline instead of a plain border */
+    border-bottom: 1px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .panel-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 1rem;
+    right: 1rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(59, 130, 246, 0.4) 30%,
+      rgba(139, 92, 246, 0.35) 70%,
+      transparent 100%
+    );
+  }
+
+  /* ── Glass — standalone glassmorphism card ── */
+  .glass {
+    background: rgba(10, 22, 40, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ── Glow border ── */
+  .glow-border {
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    box-shadow:
+      0 0 0 1px rgba(59, 130, 246, 0.12),
+      0 0 12px rgba(59, 130, 246, 0.15),
+      inset 0 0 12px rgba(59, 130, 246, 0.04);
+  }
+
+  /* ── Neon text ── */
+  .neon-text {
+    color: #93c5fd;
+    text-shadow:
+      0 0 8px rgba(59, 130, 246, 0.8),
+      0 0 20px rgba(59, 130, 246, 0.4),
+      0 0 40px rgba(59, 130, 246, 0.15);
+  }
+
+  /* ── Shimmer bar — animated progress indicator ── */
+  .shimmer-bar {
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 9999px;
+  }
+
+  .shimmer-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      transparent 100%
+    );
+    animation: shimmer 1.8s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  /* ── Badge — tag-like label ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .badge:hover {
+    border-color: rgba(99, 130, 200, 0.4);
+    color: #cbd5e1;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.15);
+  }
+
+  /* ── Scan line overlay (decorative, low-key) ── */
+  .scan-overlay {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 9999;
+  }
+
+  .scan-overlay::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(59, 130, 246, 0.06) 50%,
+      transparent 100%
+    );
+    animation: scan-line 8s linear infinite;
+    will-change: transform;
   }
 }
 
-/* 3D Canvas */
+/* ─────────────────────────────────────────────
+   3D CANVAS
+───────────────────────────────────────────── */
 canvas {
   outline: none !important;
 }

@@ -19,8 +19,10 @@
 
 import { createLogger } from '../utils/logger.js';
 import { recalculateOrbits } from '../engine/orbit.js';
+import { createMemory } from '../engine/planet.js';
 import { getConfig } from '../utils/config.js';
-import { getMemoriesInZone, softDeleteMemory } from '../storage/queries.js';
+import { getMemoriesInZone, softDeleteMemory, getAllDataSources } from '../storage/queries.js';
+import { StellarScanner } from '../scanner/index.js';
 import type { CloudConnector } from '../scanner/cloud/types.js';
 
 const log = createLogger('scheduler');
@@ -243,9 +245,34 @@ export class StellarScheduler {
   }
 
   private async scanLocalFiles(): Promise<void> {
-    // Local file scanner is a separate subsystem (scanner/local/).
-    // This stub logs intent; integrate scanner.scan() once that module exists.
-    log.info('Local file scan triggered (scanner not yet connected)');
+    const sources = getAllDataSources();
+    const localSources = sources.filter((ds) => ds.type === 'local' && ds.status !== 'error');
+
+    if (localSources.length === 0) {
+      log.debug('No local data sources registered — skipping scan');
+      return;
+    }
+
+    log.info('Local file scan triggered', { sources: localSources.length });
+
+    for (const ds of localSources) {
+      try {
+        const scanner = new StellarScanner({ paths: [ds.path] });
+        const result  = await scanner.scan();
+        log.info('Local scan complete', {
+          path:    ds.path,
+          created: result.createdMemories,
+          skipped: result.skippedFiles,
+          errors:  result.errorFiles,
+        });
+      } catch (err) {
+        // Failure in one source must not prevent others from being scanned
+        log.error(
+          `Local scan failed for ${ds.path}`,
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    }
   }
 
   private async syncCloudSources(): Promise<void> {
@@ -253,6 +280,9 @@ export class StellarScheduler {
       log.debug('No cloud connectors registered — skipping sync');
       return;
     }
+
+    const cfg  = getConfig();
+    const proj = this.config.project;
 
     for (const connector of this.connectors) {
       if (!connector.isAuthenticated()) {
@@ -263,9 +293,32 @@ export class StellarScheduler {
       try {
         log.info('Syncing cloud connector', { connector: connector.type });
         const docs = await connector.fetchDocuments();
-        log.info('Cloud sync complete', { connector: connector.type, docs: docs.length });
-        // Conversion to memories is handled by the caller (MCP stellar_sync tool)
-        // to keep the scheduler free of storage dependencies beyond queries.ts.
+        let created = 0;
+
+        for (const doc of docs) {
+          try {
+            const input = connector.toMemory(doc);
+            createMemory({
+              project: proj,
+              content: input.content,
+              summary: input.summary,
+              type:    input.type,
+              tags:    input.tags,
+            });
+            created++;
+          } catch (memErr) {
+            log.warn('Failed to create memory from doc', {
+              connector: connector.type,
+              docId:     doc.id,
+            });
+          }
+        }
+
+        log.info('Cloud sync complete', {
+          connector: connector.type,
+          fetched:   docs.length,
+          created,
+        });
       } catch (err) {
         // Failure in one connector must not affect others (isolation principle)
         log.error(
@@ -274,6 +327,10 @@ export class StellarScheduler {
         );
       }
     }
+
+    // cfg is read above; suppress unused-variable warning if getConfig was only
+    // needed for future use. Reference it so TS doesn't complain.
+    void cfg;
   }
 
   private async cleanupOortCloud(): Promise<void> {

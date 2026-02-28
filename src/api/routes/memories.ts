@@ -3,16 +3,13 @@ import {
   getMemoriesByProject,
   getMemoryById,
   softDeleteMemory,
-  insertMemory,
 } from '../../storage/queries.js';
 import { ORBIT_ZONES } from '../../engine/types.js';
 import type { OrbitZone, MemoryType } from '../../engine/types.js';
-import { IMPACT_DEFAULTS } from '../../engine/types.js';
-import { importanceToDistance, distanceToImportance } from '../../engine/orbit.js';
+import { distanceToImportance } from '../../engine/orbit.js';
 import { updateMemoryOrbit, insertOrbitLog } from '../../storage/queries.js';
 import type { OrbitChange } from '../../engine/types.js';
-import { recallMemoriesAsync } from '../../engine/planet.js';
-import { forgetMemory } from '../../engine/planet.js';
+import { createMemory, recallMemoriesAsync, forgetMemory } from '../../engine/planet.js';
 
 const app = new Hono();
 
@@ -66,10 +63,20 @@ app.get('/search', async (c) => {
   const project  = c.req.query('project') ?? 'default';
   const q        = c.req.query('q') ?? '';
   const type     = c.req.query('type') as MemoryType | 'all' | undefined;
+  const zone     = c.req.query('zone') as import('../../engine/types.js').OrbitZone | undefined;
   const maxAuRaw = c.req.query('max_au');
   const limitRaw = c.req.query('limit');
 
-  const maxDistance = maxAuRaw ? parseFloat(maxAuRaw) : undefined;
+  // Zone → distance range mapping
+  const ZONE_RANGE: Record<string, { min: number; max: number }> = {
+    corona: { min: 0.1, max: 1.0 }, inner: { min: 1.0, max: 5.0 },
+    habitable: { min: 5.0, max: 15.0 }, outer: { min: 15.0, max: 40.0 },
+    kuiper: { min: 40.0, max: 70.0 }, oort: { min: 70.0, max: 100.0 },
+  };
+  const zoneRange = zone && ZONE_RANGE[zone] ? ZONE_RANGE[zone] : undefined;
+  const minDistance = zoneRange ? zoneRange.min : undefined;
+  const maxDistance = maxAuRaw ? parseFloat(maxAuRaw)
+    : zoneRange ? zoneRange.max : undefined;
   const limit       = limitRaw ? parseInt(limitRaw, 10) : 10;
 
   if (!q.trim()) {
@@ -79,6 +86,7 @@ app.get('/search', async (c) => {
   try {
     const memories = await recallMemoriesAsync(project, q.trim(), {
       type:        type ?? 'all',
+      minDistance: minDistance,
       maxDistance: maxDistance,
       limit:       limit > 0 ? limit : 10,
     });
@@ -111,29 +119,18 @@ app.post('/', async (c) => {
     return c.json({ ok: false, error: 'Invalid JSON body' }, 400);
   }
 
-  const content  = body.content as string | undefined;
-  const summary  = body.summary as string | undefined;
-  const type     = (body.type as MemoryType | undefined) ?? 'observation';
-  const project  = (body.project as string | undefined) ?? 'default';
-  const tags     = (body.tags as string[] | undefined) ?? [];
-  const impact   = (body.impact as number | undefined) ?? IMPACT_DEFAULTS[type] ?? 0.5;
-  const importance = impact;
-  const distance = importanceToDistance(importance);
+  const content = body.content as string | undefined;
+  const summary = body.summary as string | undefined;
+  const type    = body.type as MemoryType | undefined;
+  const project = (body.project as string | undefined) ?? 'default';
+  const tags    = body.tags as string[] | undefined;
+  const impact  = body.impact as number | undefined;
 
   if (!content || !content.trim()) {
     return c.json({ ok: false, error: 'content is required' }, 400);
   }
 
-  const memory = insertMemory({
-    project,
-    content,
-    summary: summary ?? content.slice(0, 100),
-    type,
-    tags,
-    impact,
-    importance,
-    distance,
-  });
+  const memory = createMemory({ project, content, summary, type, impact, tags });
 
   return c.json({ ok: true, data: memory }, 201);
 });

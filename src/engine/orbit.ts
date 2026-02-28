@@ -10,7 +10,7 @@
 
 import type { Memory, ImportanceComponents, OrbitChange, StellarConfig } from './types.js';
 import { ORBIT_ZONES } from './types.js';
-import { keywordRelevance } from './gravity.js';
+import { keywordRelevance, hybridRelevance } from './gravity.js';
 import {
   getMemoriesByProject,
   updateMemoryOrbit,
@@ -18,6 +18,7 @@ import {
   getSunState,
   cleanupOrbitLog,
 } from '../storage/queries.js';
+import { getDatabase } from '../storage/database.js';
 
 // ---------------------------------------------------------------------------
 // Scoring primitives
@@ -92,8 +93,46 @@ export function calculateImportance(
   const rec  = recencyScore(memory.last_accessed_at, memory.created_at, config.decayHalfLifeHours);
   const freq = frequencyScore(memory.access_count, config.frequencySaturationPoint);
   const imp  = memory.impact;
+
   // Combine content + tags so tags act as relevance boosters.
-  const rel  = keywordRelevance(memory.content + ' ' + memory.tags.join(' '), sunText);
+  const memoryText = memory.content + ' ' + memory.tags.join(' ');
+
+  // Attempt to load embeddings synchronously from the vec table for hybrid relevance.
+  // Falls back to keyword-only if embeddings are unavailable.
+  let rel: number;
+  try {
+    const db = getDatabase();
+    const memRow = db.prepare(
+      'SELECT embedding FROM memory_vec WHERE memory_id = ?'
+    ).get(memory.id) as { embedding: Buffer } | undefined;
+
+    const sunState = getSunState(memory.project);
+    const sunText2 = sunState
+      ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
+      : sunText;
+
+    if (memRow?.embedding) {
+      const memEmbedding = new Float32Array(memRow.embedding.buffer, memRow.embedding.byteOffset, memRow.embedding.byteLength / 4);
+
+      // Look up the sun embedding via the most-recent sun memory, if available.
+      const sunRow = db.prepare(
+        `SELECT mv.embedding FROM memory_vec mv
+         JOIN memories m ON m.id = mv.memory_id
+         WHERE m.project = ? AND m.deleted_at IS NULL
+         ORDER BY m.importance DESC LIMIT 1`
+      ).get(memory.project) as { embedding: Buffer } | undefined;
+
+      const sunEmbedding = sunRow?.embedding
+        ? new Float32Array(sunRow.embedding.buffer, sunRow.embedding.byteOffset, sunRow.embedding.byteLength / 4)
+        : undefined;
+
+      rel = hybridRelevance(memoryText, sunText2, memEmbedding, sunEmbedding);
+    } else {
+      rel = keywordRelevance(memoryText, sunText);
+    }
+  } catch {
+    rel = keywordRelevance(memoryText, sunText);
+  }
 
   const total =
     config.weights.recency   * rec  +
