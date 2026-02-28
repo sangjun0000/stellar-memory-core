@@ -15,7 +15,7 @@
  *   Reciprocal Rank Fusion (RRF), then deduplicates and re-ranks.
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type { Memory, MemoryType } from './types.js';
 import { IMPACT_DEFAULTS } from './types.js';
 import {
@@ -28,6 +28,7 @@ import {
   getMemoryById,
   getSunState,
   getMemoryByIds,
+  getMemoryByContentHash,
 } from '../storage/queries.js';
 import { getConfig } from '../utils/config.js';
 import {
@@ -39,7 +40,10 @@ import {
 } from './orbit.js';
 import { generateEmbedding } from './embedding.js';
 import { insertEmbedding, searchByVector, deleteEmbedding } from '../storage/vec.js';
-import { getDatabase } from '../storage/database.js';
+import { getDatabase, withTransaction } from '../storage/database.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('planet');
 
 // ---------------------------------------------------------------------------
 // createMemory
@@ -78,6 +82,19 @@ export function createMemory(data: {
     ? data.summary
     : raw.slice(0, 50).trimEnd() + (raw.length > 50 ? '…' : '');
 
+  // Content-hash deduplication: return the existing memory if identical content
+  // has already been stored in this project.
+  const contentHash = createHash('sha256').update(data.content).digest('hex');
+  const existing = getMemoryByContentHash(data.project, contentHash);
+  if (existing) {
+    log.debug('Duplicate content detected — returning existing memory', {
+      id: existing.id,
+      project: data.project,
+      content_hash: contentHash,
+    });
+    return existing;
+  }
+
   // Compute initial importance using static scores.
   const rec  = recencyScore(null, new Date().toISOString(), config.decayHalfLifeHours);
   const freq = frequencyScore(0, config.frequencySaturationPoint);
@@ -107,6 +124,7 @@ export function createMemory(data: {
     access_count:    0,
     last_accessed_at: null,
     metadata:        {},
+    content_hash:    contentHash,
     created_at:      now,
     updated_at:      now,
     deleted_at:      null,
@@ -214,43 +232,45 @@ export function recallMemories(
 
   const config = getConfig();
 
-  // Apply access boost to each recalled memory and persist changes.
-  const boosted: Memory[] = results.map((memory: Memory) => {
-    const newDistance = applyAccessBoost(memory.distance);
-    const velocity    = newDistance - memory.distance;
+  // Apply access boost to each recalled memory and persist changes atomically.
+  const boosted: Memory[] = withTransaction(() =>
+    results.map((memory: Memory) => {
+      const newDistance = applyAccessBoost(memory.distance);
+      const velocity    = newDistance - memory.distance;
 
-    // Persist the access event (increments access_count, sets last_accessed_at).
-    updateMemoryAccess(memory.id);
+      // Persist the access event (increments access_count, sets last_accessed_at).
+      updateMemoryAccess(memory.id);
 
-    // Recalculate importance with updated access data so the stored value
-    // stays consistent with what importanceToDistance() would produce.
-    const updatedMemory: Memory = {
-      ...memory,
-      distance:        newDistance,
-      access_count:    memory.access_count + 1,
-      last_accessed_at: new Date().toISOString(),
-    };
+      // Recalculate importance with updated access data so the stored value
+      // stays consistent with what importanceToDistance() would produce.
+      const updatedMemory: Memory = {
+        ...memory,
+        distance:        newDistance,
+        access_count:    memory.access_count + 1,
+        last_accessed_at: new Date().toISOString(),
+      };
 
-    const components = calculateImportance(updatedMemory, sunText, config);
+      const components = calculateImportance(updatedMemory, sunText, config);
 
-    updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
+      updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
 
-    insertOrbitLog({
-      memory_id:      memory.id,
-      project,
-      old_distance:   memory.distance,
-      new_distance:   newDistance,
-      old_importance: memory.importance,
-      new_importance: components.total,
-      trigger:        'access',
-    });
+      insertOrbitLog({
+        memory_id:      memory.id,
+        project,
+        old_distance:   memory.distance,
+        new_distance:   newDistance,
+        old_importance: memory.importance,
+        new_importance: components.total,
+        trigger:        'access',
+      });
 
-    return {
-      ...updatedMemory,
-      importance: components.total,
-      velocity,
-    };
-  });
+      return {
+        ...updatedMemory,
+        importance: components.total,
+        velocity,
+      };
+    })
+  );
 
   return boosted;
 }
@@ -475,32 +495,34 @@ export async function recallMemoriesAsync(
     : '';
   const config = getConfig();
 
-  return results.map(memory => {
-    const newDistance = applyAccessBoost(memory.distance);
-    const velocity    = newDistance - memory.distance;
+  return withTransaction(() =>
+    results.map(memory => {
+      const newDistance = applyAccessBoost(memory.distance);
+      const velocity    = newDistance - memory.distance;
 
-    updateMemoryAccess(memory.id);
+      updateMemoryAccess(memory.id);
 
-    const updatedMemory: Memory = {
-      ...memory,
-      distance:         newDistance,
-      access_count:     memory.access_count + 1,
-      last_accessed_at: new Date().toISOString(),
-    };
+      const updatedMemory: Memory = {
+        ...memory,
+        distance:         newDistance,
+        access_count:     memory.access_count + 1,
+        last_accessed_at: new Date().toISOString(),
+      };
 
-    const components = calculateImportance(updatedMemory, sunText, config);
-    updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
+      const components = calculateImportance(updatedMemory, sunText, config);
+      updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
 
-    insertOrbitLog({
-      memory_id:      memory.id,
-      project,
-      old_distance:   memory.distance,
-      new_distance:   newDistance,
-      old_importance: memory.importance,
-      new_importance: components.total,
-      trigger:        'access',
-    });
+      insertOrbitLog({
+        memory_id:      memory.id,
+        project,
+        old_distance:   memory.distance,
+        new_distance:   newDistance,
+        old_importance: memory.importance,
+        new_importance: components.total,
+        trigger:        'access',
+      });
 
-    return { ...updatedMemory, importance: components.total, velocity };
-  });
+      return { ...updatedMemory, importance: components.total, velocity };
+    })
+  );
 }

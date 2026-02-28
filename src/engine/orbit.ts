@@ -16,6 +16,7 @@ import {
   updateMemoryOrbit,
   insertOrbitLog,
   getSunState,
+  cleanupOrbitLog,
 } from '../storage/queries.js';
 
 // ---------------------------------------------------------------------------
@@ -43,9 +44,10 @@ export function recencyScore(
   const normalized = /[Zz]$|[+-]\d{2}:\d{2}$/.test(referenceTime)
     ? referenceTime
     : referenceTime + 'Z';
-  const refDate = new Date(normalized);
+  const refMs = new Date(normalized).getTime();
+  if (isNaN(refMs)) throw new Error(`Invalid reference date: "${referenceTime}"`);
   const now = new Date();
-  const hoursSince = (now.getTime() - refDate.getTime()) / (1000 * 60 * 60);
+  const hoursSince = (now.getTime() - refMs) / (1000 * 60 * 60);
   return Math.pow(0.5, Math.max(0, hoursSince) / halfLifeHours);
 }
 
@@ -62,6 +64,7 @@ export function frequencyScore(
   accessCount: number,
   saturationPoint: number = 20,
 ): number {
+  if (saturationPoint <= 0) throw new Error('saturationPoint must be positive');
   return Math.min(1.0, Math.log(1 + accessCount) / Math.log(1 + saturationPoint));
 }
 
@@ -80,6 +83,12 @@ export function calculateImportance(
   sunText: string,
   config: StellarConfig,
 ): ImportanceComponents {
+  const weights = config.weights;
+  const weightSum = weights.recency + weights.frequency + weights.impact + weights.relevance;
+  if (Math.abs(weightSum - 1.0) > 0.01) {
+    throw new Error(`Weights must sum to 1.0, got ${weightSum.toFixed(3)}`);
+  }
+
   const rec  = recencyScore(memory.last_accessed_at, memory.created_at, config.decayHalfLifeHours);
   const freq = frequencyScore(memory.access_count, config.frequencySaturationPoint);
   const imp  = memory.impact;
@@ -215,6 +224,9 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
     insertOrbitLog(change);
     changes.push(change);
   }
+
+  // Prune orbit log entries older than 90 days to prevent unbounded growth.
+  cleanupOrbitLog(90);
 
   return changes;
 }

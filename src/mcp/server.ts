@@ -82,7 +82,7 @@ function formatMemoryLine(m: Memory): string {
 export function createStellarServer(): McpServer {
   const server = new McpServer({
     name: 'stellar-memory',
-    version: '0.2.0',
+    version: '0.3.0',
   });
 
   // -------------------------------------------------------------------------
@@ -95,7 +95,8 @@ export function createStellarServer(): McpServer {
     {
       description:
         'Current working context (the Sun). Contains active project state, recent decisions, and next steps. ' +
-        'Read this at the start of every session to restore context.',
+        'Read this at the start of every session to restore context.\n\n' +
+        '[AUTO-TRIGGER] Read this resource at the very beginning of every conversation before any other action.',
       mimeType: 'text/plain',
     },
     (uri) => {
@@ -120,7 +121,8 @@ export function createStellarServer(): McpServer {
     'status',
     'View the current state of your stellar memory system. Shows memories grouped by orbital zone ' +
     '(corona = actively working, oort = nearly forgotten), and optionally lists registered data sources. ' +
-    'Use this to get a snapshot of what the system knows.',
+    'Use this to get a snapshot of what the system knows.\n\n' +
+    '[AUTO-TRIGGER] Call at the start of every session alongside recall to restore full context.',
     {
       zone: z
         .enum(['all', 'corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'])
@@ -163,7 +165,25 @@ export function createStellarServer(): McpServer {
                   return zoneKey === effectiveZone;
                 });
 
+          // Build zone grouping first so we can show counts in summary line.
+          const byZone: Partial<Record<OrbitZone, Memory[]>> = {};
+          for (const m of filtered) {
+            const zoneKey = labelToZoneKey(getOrbitZone(m.distance));
+            const bucket = byZone[zoneKey] ?? [];
+            bucket.push(m);
+            byZone[zoneKey] = bucket;
+          }
+          const zoneOrder: OrbitZone[] = ['corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'];
+
           lines.push(`☀ Project: ${proj} | ${filtered.length} memories`);
+
+          // Zone count summary line — always shown so users can scan at a glance.
+          if (filtered.length > 0) {
+            const zoneCounts = zoneOrder
+              .map((z) => `${z}: ${(byZone[z] ?? []).length}`)
+              .join('  ');
+            lines.push(`  ${zoneCounts}`);
+          }
 
           if (filtered.length === 0) {
             lines.push(
@@ -173,17 +193,6 @@ export function createStellarServer(): McpServer {
             );
           } else {
             lines.push('');
-
-            // Group by zone
-            const byZone: Partial<Record<OrbitZone, Memory[]>> = {};
-            for (const m of filtered) {
-              const zoneKey = labelToZoneKey(getOrbitZone(m.distance));
-              const bucket = byZone[zoneKey] ?? [];
-              bucket.push(m);
-              byZone[zoneKey] = bucket;
-            }
-
-            const zoneOrder: OrbitZone[] = ['corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'];
 
             for (const zoneName of zoneOrder) {
               const zoneMemories = byZone[zoneName];
@@ -240,7 +249,9 @@ export function createStellarServer(): McpServer {
   server.tool(
     'commit',
     'Save the current session state into the Sun (working context). Call this at the end of each session ' +
-    'or when switching tasks to preserve your progress. The Sun is automatically available as a resource next session.',
+    'or when switching tasks to preserve your progress. The Sun is automatically available as a resource next session.\n\n' +
+    '[AUTO-TRIGGER] Call automatically before a conversation ends. Include current_work, decisions, next_steps, and errors. ' +
+    'This is the most critical auto-trigger — a good commit means the next session starts with full context.',
     {
       current_work: z
         .string()
@@ -316,7 +327,9 @@ export function createStellarServer(): McpServer {
     'recall',
     'Search memories by content and pull relevant ones closer to the Sun (increasing their importance). ' +
     'Uses hybrid FTS5 + vector search for best results. ' +
-    'Use this to surface forgotten context that is relevant to your current work.',
+    'Use this to surface forgotten context that is relevant to your current work.\n\n' +
+    '[AUTO-TRIGGER] Call at session start with keywords from the user\'s first message. ' +
+    'Also call whenever the conversation topic changes significantly to surface relevant past context.',
     {
       query: z
         .string()
@@ -400,7 +413,10 @@ export function createStellarServer(): McpServer {
   server.tool(
     'remember',
     'Store a new memory in the stellar system. Memories are automatically placed in an orbital zone ' +
-    'based on their type and impact. High-impact decisions orbit closer; low-impact observations orbit further.',
+    'based on their type and impact. High-impact decisions orbit closer; low-impact observations orbit further.\n\n' +
+    '[AUTO-TRIGGER] Call immediately when: (1) an architecture/design decision is made, ' +
+    '(2) a bug is found or error resolved, (3) a feature milestone is reached, ' +
+    '(4) important technical context is discovered. Do not wait — store memories as they happen.',
     {
       content: z
         .string()
@@ -477,7 +493,8 @@ export function createStellarServer(): McpServer {
     'orbit',
     'Force a recalculation of all orbital positions for the project. Memories decay over time ' +
     '(drifting outward) and are pulled inward by access and relevance. ' +
-    'Run this to apply pending orbital physics without committing a new session.',
+    'Run this to apply pending orbital physics without committing a new session.\n\n' +
+    '[AUTO-TRIGGER] Call after storing 5+ memories in a single session. Also runs automatically during commit.',
     {},
     async () => {
       try {
@@ -851,6 +868,95 @@ export function createStellarServer(): McpServer {
       } catch (err) {
         if (err instanceof McpError) throw err;
         throw new McpError(ErrorCode.InternalError, `daemon failed: ${String(err)}`);
+      }
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Tool 10: export
+  // -------------------------------------------------------------------------
+
+  server.tool(
+    'export',
+    'Export all memories as JSON for backup or migration. Returns a complete snapshot of the memory database.',
+    {
+      type: z
+        .enum(['all', 'decision', 'observation', 'task', 'context', 'error', 'milestone'])
+        .optional()
+        .describe('Filter by memory type. Defaults to all.'),
+      zone: z
+        .enum(['all', 'corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'])
+        .optional()
+        .describe('Filter by orbital zone. Defaults to all.'),
+      format: z
+        .enum(['json', 'markdown'])
+        .optional()
+        .describe('Output format. json = structured data, markdown = human-readable. Defaults to json.'),
+    },
+    async ({ type, zone, format }) => {
+      try {
+        const proj = resolveProject();
+        const effectiveFormat = format ?? 'json';
+
+        let memories: Memory[] = getMemoriesByProject(proj);
+
+        // Filter by type
+        if (type && type !== 'all') {
+          memories = memories.filter((m) => m.type === type);
+        }
+
+        // Filter by zone
+        if (zone && zone !== 'all') {
+          memories = memories.filter((m) => labelToZoneKey(getOrbitZone(m.distance)) === zone);
+        }
+
+        if (effectiveFormat === 'json') {
+          const payload = memories.map((m) => ({
+            id:         m.id,
+            type:       m.type,
+            summary:    m.summary,
+            content:    m.content,
+            tags:       m.tags,
+            distance:   m.distance,
+            importance: m.importance,
+            created_at: m.created_at,
+          }));
+
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+          };
+        }
+
+        // markdown format
+        const lines: string[] = [
+          `# Stellar Memory Export`,
+          `Project: ${proj} | ${memories.length} memories | ${new Date().toISOString()}`,
+          '',
+        ];
+
+        for (const m of memories) {
+          const zoneLabel = getOrbitZone(m.distance);
+          const tagsStr   = m.tags.length > 0 ? m.tags.join(', ') : '—';
+          const dateStr   = m.created_at.slice(0, 10);
+
+          lines.push(`## [${m.type.toUpperCase()}] ${m.summary}`);
+          lines.push(`- **Distance**: ${m.distance.toFixed(2)} AU (${zoneLabel})`);
+          lines.push(`- **Impact**: ${m.importance.toFixed(2)}`);
+          lines.push(`- **Tags**: ${tagsStr}`);
+          lines.push(`- **Created**: ${dateStr}`);
+          lines.push('');
+          lines.push(m.content);
+          lines.push('');
+          lines.push('---');
+          lines.push('');
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: lines.join('\n') }],
+        };
+      } catch (err) {
+        if (err instanceof McpError) throw err;
+        throw new McpError(ErrorCode.InternalError, `export failed: ${String(err)}`);
       }
     }
   );

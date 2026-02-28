@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS memories (
   source TEXT DEFAULT 'manual',
   source_path TEXT,
   source_hash TEXT,
+  content_hash TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
@@ -46,6 +47,11 @@ CREATE TABLE IF NOT EXISTS data_sources (
 CREATE INDEX IF NOT EXISTS idx_memories_source_path
   ON memories(source_path)
   WHERE source_path IS NOT NULL;
+
+-- Index for content-hash deduplication
+CREATE INDEX IF NOT EXISTS idx_memories_content_hash
+  ON memories(project, content_hash)
+  WHERE content_hash IS NOT NULL;
 
 -- Sun state — one row per project, acts as the "star" context
 CREATE TABLE IF NOT EXISTS sun_state (
@@ -118,6 +124,7 @@ const MIGRATIONS: Array<[string, string]> = [
   ['source', "TEXT DEFAULT 'manual'"],
   ['source_path', 'TEXT'],
   ['source_hash', 'TEXT'],
+  ['content_hash', 'TEXT'],
 ];
 
 function migrateMemoriesTable(db: DatabaseSync): void {
@@ -173,6 +180,27 @@ export function getDatabase(): DatabaseSync {
     );
   }
   return _db;
+}
+
+// ---------------------------------------------------------------------------
+// Transaction helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Run `fn` inside a SQLite transaction.
+ * Commits on success, rolls back and re-throws on any error.
+ */
+export function withTransaction<T>(fn: () => T): T {
+  const db = getDatabase();
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 // Allow tests to reset the singleton (e.g., open an in-memory DB)

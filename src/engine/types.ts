@@ -49,6 +49,7 @@ export interface Memory {
   source: string | null;              // 'manual' | 'scanner' | etc.
   source_path: string | null;         // absolute file path (for scanner-created memories)
   source_hash: string | null;         // mtime-based hash for dedup
+  content_hash: string | null;        // SHA-256 of content for content-level deduplication
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

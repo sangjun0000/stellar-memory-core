@@ -21,10 +21,11 @@ const app = new Hono();
 //   zone    (corona | inner | habitable | outer | kuiper | oort)
 //   limit   (integer)
 app.get('/', (c) => {
-  const project    = c.req.query('project') ?? 'default';
-  const zone       = c.req.query('zone') as OrbitZone | undefined;
-  const limitParam = c.req.query('limit');
-  const limit      = limitParam ? parseInt(limitParam, 10) : undefined;
+  const project     = c.req.query('project') ?? 'default';
+  const zone        = c.req.query('zone') as OrbitZone | undefined;
+  const limitParam  = c.req.query('limit');
+  const limit       = limitParam ? parseInt(limitParam, 10) : undefined;
+  const summaryOnly = c.req.query('summary_only') === 'true';
 
   let memories = getMemoriesByProject(project);
 
@@ -35,6 +36,17 @@ app.get('/', (c) => {
 
   if (limit && limit > 0) {
     memories = memories.slice(0, limit);
+  }
+
+  if (summaryOnly) {
+    const slim = memories.map((m) => ({
+      id:         m.id,
+      summary:    m.summary,
+      type:       m.type,
+      distance:   m.distance,
+      importance: m.importance,
+    }));
+    return c.json({ ok: true, data: slim, total: slim.length });
   }
 
   return c.json({ ok: true, data: memories, total: memories.length });

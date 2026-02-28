@@ -3,6 +3,9 @@ import { getDatabase } from './database.js';
 import type { Memory, MemoryType, OrbitZone, OrbitChange, SunState } from '../engine/types.js';
 import { ORBIT_ZONES } from '../engine/types.js';
 import type { DataSource } from '../scanner/types.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('queries');
 
 // ---------------------------------------------------------------------------
 // Raw DB row shapes (everything comes back as primitives from node:sqlite)
@@ -25,6 +28,7 @@ interface RawMemoryRow {
   source: string | null;
   source_path: string | null;
   source_hash: string | null;
+  content_hash: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -79,6 +83,7 @@ function deserializeMemory(row: RawMemoryRow): Memory {
     source: row.source ?? 'manual',
     source_path: row.source_path ?? null,
     source_hash: row.source_hash ?? null,
+    content_hash: row.content_hash ?? null,
   };
 }
 
@@ -105,23 +110,25 @@ function deserializeSunState(row: RawSunStateRow): SunState {
 }
 
 function parseJsonArray(value: string | null | undefined): string[] {
-  if (!value) return [];
+  if (typeof value !== 'string' || value === '') return [];
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
+    log.warn('JSON array parse failed', { raw: String(value).slice(0, 100) });
     return [];
   }
 }
 
 function parseJsonObject(value: string | null | undefined): Record<string, unknown> {
-  if (!value) return {};
+  if (typeof value !== 'string' || value === '') return {};
   try {
     const parsed = JSON.parse(value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : {};
   } catch {
+    log.warn('JSON object parse failed', { raw: String(value).slice(0, 100) });
     return {};
   }
 }
@@ -150,6 +157,7 @@ export function insertMemory(memory: Partial<Memory>): Memory {
   const source = memory.source ?? 'manual';
   const source_path = memory.source_path ?? null;
   const source_hash = memory.source_hash ?? null;
+  const content_hash = memory.content_hash ?? null;
   const created_at = memory.created_at ?? now;
   const updated_at = memory.updated_at ?? now;
   const deleted_at = memory.deleted_at ?? null;
@@ -159,14 +167,14 @@ export function insertMemory(memory: Partial<Memory>): Memory {
       id, project, content, summary, type, tags,
       distance, importance, velocity, impact,
       access_count, last_accessed_at, metadata,
-      source, source_path, source_hash,
+      source, source_path, source_hash, content_hash,
       created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, project, content, summary, type, tags,
     distance, importance, velocity, impact,
     access_count, last_accessed_at, metadata,
-    source, source_path, source_hash,
+    source, source_path, source_hash, content_hash,
     created_at, updated_at, deleted_at
   );
 
@@ -177,7 +185,7 @@ export function insertMemory(memory: Partial<Memory>): Memory {
     tags: memory.tags ?? [],
     distance, importance, velocity, impact,
     access_count, last_accessed_at, metadata: memory.metadata ?? {},
-    source, source_path, source_hash,
+    source, source_path, source_hash, content_hash,
     created_at, updated_at, deleted_at,
   };
 }
@@ -276,12 +284,27 @@ export function softDeleteMemory(id: string): void {
 // Full-text search (FTS5)
 // ---------------------------------------------------------------------------
 
+/**
+ * Escape a user-supplied string for use in an FTS5 MATCH clause.
+ * Wraps the entire query in double-quotes and escapes internal double-quotes
+ * so it is treated as a literal phrase rather than FTS5 query syntax.
+ */
+function escapeFtsQuery(query: string): string {
+  // Split into individual words, quote each one to escape FTS5 operators,
+  // then join with spaces (implicit AND). This avoids phrase-matching issues
+  // while still preventing FTS5 syntax errors from special characters.
+  const words = query.trim().split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return '""';
+  return words.map(w => '"' + w.replace(/"/g, '""') + '"').join(' ');
+}
+
 export function searchMemories(
   project: string,
   query: string,
   limit = 20
 ): Memory[] {
   const db = getDatabase();
+  const escapedQuery = escapeFtsQuery(query);
 
   // FTS5 MATCH uses its own query syntax; we join on rowid to get the full row
   const rows = db.prepare(`
@@ -293,7 +316,7 @@ export function searchMemories(
       AND m.deleted_at IS NULL
     ORDER BY rank
     LIMIT ?
-  `).all(query, project, limit) as unknown[];
+  `).all(escapedQuery, project, limit) as unknown[];
 
   return rows.map((r) => deserializeMemory(asRawMemory(r)));
 }
@@ -402,6 +425,13 @@ export function insertOrbitLog(change: OrbitChange): void {
   );
 }
 
+export function cleanupOrbitLog(retentionDays: number = 90): number {
+  const db = getDatabase();
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const result = db.prepare('DELETE FROM orbit_log WHERE created_at < ?').run(cutoff);
+  return Number(result.changes);
+}
+
 // ---------------------------------------------------------------------------
 // Source-path deduplication
 // ---------------------------------------------------------------------------
@@ -430,6 +460,20 @@ export function getMemoryBySourcePath(sourcePath: string): Memory | null {
     WHERE source_path = ? AND deleted_at IS NULL
     LIMIT 1
   `).get(sourcePath);
+  return row ? deserializeMemory(asRawMemory(row)) : null;
+}
+
+/**
+ * Find a non-deleted memory in the given project that has the same content hash.
+ * Used by createMemory() for content-level deduplication.
+ */
+export function getMemoryByContentHash(project: string, contentHash: string): Memory | null {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT * FROM memories
+    WHERE project = ? AND content_hash = ? AND deleted_at IS NULL
+    LIMIT 1
+  `).get(project, contentHash);
   return row ? deserializeMemory(asRawMemory(row)) : null;
 }
 
