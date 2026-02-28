@@ -1,0 +1,47 @@
+{
+  "name": "stellar-memory",
+  "version": "0.1.0",
+  "description": "AI memory system using celestial mechanics metaphor - MCP server for persistent context across sessions",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "stellar-memory": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "api": "tsx src/api/server.ts",
+    "api:start": "node dist/api/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "daemon": "tsx src/service/daemon.ts",
+    "daemon:start": "node dist/service/daemon.js"
+  },
+  "keywords": [
+    "mcp",
+    "memory",
+    "ai",
+    "context",
+    "stellar"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "^1.19.9",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@notionhq/client": "^5.11.0",
+    "@octokit/rest": "^22.0.1",
+    "@slack/web-api": "^7.14.1",
+    "@xenova/transformers": "^2.17.2",
+    "googleapis": "^171.4.0",
+    "hono": "^4.12.3",
+    "sqlite-vec": "^0.1.7-alpha.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.13",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

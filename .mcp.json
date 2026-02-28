@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "stellar-memory": {
+      "command": "node",
+      "args": ["C:\\Users\\USER\\stm\\dist\\index.js"]
+    }
+  }
+}

@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-space-950 text-gray-100;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    margin: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-space-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-space-800 border border-gray-700 rounded-lg;
+  }
+
+  .panel-header {
+    @apply px-4 py-3 border-b border-gray-700 text-xs font-semibold uppercase tracking-widest text-gray-400;
+  }
+}
+
+/* Sun glow animation */
+@keyframes sun-pulse {
+  0%, 100% { filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.6)); }
+  50%       { filter: drop-shadow(0 0 32px rgba(251, 191, 36, 0.9)); }
+}
+
+.sun-glow {
+  animation: sun-pulse 3s ease-in-out infinite;
+}
+
+/* Planet hover */
+.planet-dot {
+  transition: r 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
+}
+
+.planet-dot:hover {
+  filter: brightness(1.4);
+}
+
+/* Orbit ring */
+.orbit-ring {
+  fill: none;
+  stroke-dasharray: 4 8;
+}
