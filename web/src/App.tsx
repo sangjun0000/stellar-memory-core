@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api/client';
 import type { Memory, SunState, ZoneStat, OrbitZone } from './api/client';
 import { Layout } from './components/Layout';
@@ -6,6 +6,16 @@ import { SolarSystem } from './components/SolarSystem';
 import { MemoryDetail } from './components/MemoryDetail';
 import { ZoneStats } from './components/ZoneStats';
 import { SearchBar } from './components/SearchBar';
+import type { SearchFilters } from './components/SearchBar';
+import { DataSources } from './components/DataSources';
+import { StatsBar } from './components/StatsBar';
+
+// ---------------------------------------------------------------------------
+// Polling intervals (ms)
+// ---------------------------------------------------------------------------
+
+const POLL_MEMORIES_MS = 30_000;  // 30 s
+const POLL_SUN_MS      = 60_000;  // 60 s
 
 // ---------------------------------------------------------------------------
 // Sun detail panel
@@ -17,7 +27,7 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
       <div className="panel h-full flex flex-col">
         <div className="panel-header flex items-center justify-between">
           <span>Sun State</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">&#x2715;</button>
         </div>
         <div className="p-4 text-sm text-gray-500">No sun state committed yet.</div>
       </div>
@@ -27,8 +37,10 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
   return (
     <div className="panel h-full flex flex-col">
       <div className="panel-header flex items-center justify-between">
-        <span>Sun State — {sun.project}</span>
-        <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">✕</button>
+        <span>Sun State &mdash; {sun.project}</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
+          &#x2715;
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
         {sun.current_work && (
@@ -72,7 +84,7 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
           </div>
         )}
         <div className="text-gray-600 pt-1">
-          Tokens: {sun.token_count} · Committed:{' '}
+          Tokens: {sun.token_count} &middot; Committed:{' '}
           {sun.last_commit_at
             ? new Date(sun.last_commit_at).toLocaleString()
             : 'never'}
@@ -89,21 +101,51 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
 type DetailPanel = { type: 'memory'; memory: Memory } | { type: 'sun' } | null;
 
 export default function App() {
-  const [memories, setMemories] = useState<Memory[]>([]);
-  const [sun, setSun] = useState<SunState | null>(null);
-  const [zones, setZones] = useState<ZoneStat[]>([]);
-  const [activeZone, setActiveZone] = useState<OrbitZone | undefined>(undefined);
-  const [project, setProject] = useState('default');
-  const [detail, setDetail] = useState<DetailPanel>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [memories, setMemories]             = useState<Memory[]>([]);
+  const [sun, setSun]                       = useState<SunState | null>(null);
+  const [zones, setZones]                   = useState<ZoneStat[]>([]);
+  const [activeZone, setActiveZone]         = useState<OrbitZone | undefined>(undefined);
+  const [project, setProject]               = useState('default');
+  const [detail, setDetail]                 = useState<DetailPanel>(null);
+  const [isSearching, setIsSearching]       = useState(false);
   const [searchResultCount, setSearchResultCount] = useState<number | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [error, setError]                   = useState<string | null>(null);
+  const [loading, setLoading]               = useState(true);
+  const [isRefreshing, setIsRefreshing]     = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt]   = useState<number | null>(null);
 
-  // Initial load
+  // Track active search so polling doesn't overwrite search results
+  const activeSearchRef = useRef<SearchFilters | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Data loaders
+  // ---------------------------------------------------------------------------
+
+  const refreshMemories = useCallback(async (proj: string) => {
+    // Don't overwrite an active search with the polling refresh
+    if (activeSearchRef.current) return;
+    try {
+      const res = await api.getMemories({ project: proj, zone: activeZone });
+      setMemories(res.data);
+      setLastUpdatedAt(Date.now());
+    } catch {
+      // Silently ignore background poll errors — the user already sees data
+    }
+  }, [activeZone]);
+
+  const refreshSun = useCallback(async (proj: string) => {
+    try {
+      const res = await api.getSun(proj);
+      setSun(res.data);
+    } catch {
+      // Silently ignore
+    }
+  }, []);
+
   const loadAll = useCallback(async (proj: string) => {
     setLoading(true);
     setError(null);
+    activeSearchRef.current = null;
     try {
       const [memRes, sunRes, zoneRes] = await Promise.all([
         api.getMemories({ project: proj }),
@@ -113,6 +155,7 @@ export default function App() {
       setMemories(memRes.data);
       setSun(sunRes.data);
       setZones(zoneRes.data);
+      setLastUpdatedAt(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to connect to API');
     } finally {
@@ -120,36 +163,98 @@ export default function App() {
     }
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Polling — set up after initial load completes
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     void loadAll(project);
   }, [loadAll, project]);
 
+  // Memories poll (30 s)
+  useEffect(() => {
+    const id = setInterval(() => void refreshMemories(project), POLL_MEMORIES_MS);
+    return () => clearInterval(id);
+  }, [refreshMemories, project]);
+
+  // Sun poll (60 s)
+  useEffect(() => {
+    const id = setInterval(() => void refreshSun(project), POLL_SUN_MS);
+    return () => clearInterval(id);
+  }, [refreshSun, project]);
+
+  // ---------------------------------------------------------------------------
+  // Manual refresh handler
+  // ---------------------------------------------------------------------------
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      // If a search is active, re-run it; otherwise do a full reload
+      if (activeSearchRef.current) {
+        const f = activeSearchRef.current;
+        const res = await api.searchMemories(f.query, project, f.type, f.zone);
+        setMemories(res.data);
+        setSearchResultCount(res.total);
+      } else {
+        const [memRes, sunRes, zoneRes] = await Promise.all([
+          api.getMemories({ project, zone: activeZone }),
+          api.getSun(project),
+          api.getZoneStats(project),
+        ]);
+        setMemories(memRes.data);
+        setSun(sunRes.data);
+        setZones(zoneRes.data);
+      }
+      setLastUpdatedAt(Date.now());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Refresh failed');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, project, activeZone]);
+
+  // ---------------------------------------------------------------------------
   // Zone filter
+  // ---------------------------------------------------------------------------
+
   const handleZoneClick = useCallback(async (zone: OrbitZone | undefined) => {
     setActiveZone(zone);
     setSearchResultCount(undefined);
+    activeSearchRef.current = null;
     try {
       const res = await api.getMemories({ project, zone });
       setMemories(res.data);
+      setLastUpdatedAt(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load memories');
     }
   }, [project]);
 
+  // ---------------------------------------------------------------------------
   // Search
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query) {
+  // ---------------------------------------------------------------------------
+
+  const handleSearch = useCallback(async (filters: SearchFilters) => {
+    const { query, type, zone } = filters;
+
+    if (!query && !type && !zone) {
+      activeSearchRef.current = null;
       setSearchResultCount(undefined);
       setActiveZone(undefined);
       void loadAll(project);
       return;
     }
+
+    activeSearchRef.current = filters;
     setIsSearching(true);
     try {
-      const res = await api.searchMemories(query, project);
+      const res = await api.searchMemories(query, project, type, zone);
       setMemories(res.data);
       setSearchResultCount(res.total);
       setActiveZone(undefined);
+      setLastUpdatedAt(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed');
     } finally {
@@ -157,7 +262,10 @@ export default function App() {
     }
   }, [project, loadAll]);
 
+  // ---------------------------------------------------------------------------
   // Forget
+  // ---------------------------------------------------------------------------
+
   const handleForget = useCallback(async (id: string) => {
     try {
       await api.forgetMemory(id);
@@ -168,7 +276,10 @@ export default function App() {
     }
   }, [project, loadAll]);
 
+  // ---------------------------------------------------------------------------
   // Orbit recalc
+  // ---------------------------------------------------------------------------
+
   const handleOrbitRecalc = useCallback(async () => {
     try {
       await api.triggerOrbit(project);
@@ -178,7 +289,16 @@ export default function App() {
     }
   }, [project, loadAll]);
 
-  const selectedId = detail?.type === 'memory' ? detail.memory.id : null;
+  // ---------------------------------------------------------------------------
+  // Derived values
+  // ---------------------------------------------------------------------------
+
+  const selectedId   = detail?.type === 'memory' ? detail.memory.id : null;
+  const totalMemories = zones.reduce((sum, z) => sum + z.count, 0) || memories.length;
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   // Sidebar
   const sidebar = (
@@ -201,10 +321,13 @@ export default function App() {
       {/* Zone stats */}
       <ZoneStats
         zones={zones}
-        total={memories.length + (zones.reduce((s, z) => s + z.count, 0) === 0 ? 0 : 0)}
+        total={totalMemories}
         onZoneClick={handleZoneClick}
         activeZone={activeZone}
       />
+
+      {/* Data sources */}
+      <DataSources project={project} />
 
       {/* Actions */}
       <div className="panel">
@@ -216,18 +339,7 @@ export default function App() {
           >
             Recalculate orbits
           </button>
-          <button
-            onClick={() => loadAll(project)}
-            className="w-full text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded px-2 py-1.5 text-left transition-colors"
-          >
-            Refresh
-          </button>
         </div>
-      </div>
-
-      {/* Memory count */}
-      <div className="text-center text-xs text-gray-600 py-1">
-        {memories.length} memories
       </div>
     </div>
   );
@@ -235,6 +347,15 @@ export default function App() {
   // Main panel
   const main = (
     <div className="flex flex-col h-full">
+      {/* Stats bar */}
+      <StatsBar
+        totalMemories={totalMemories}
+        zones={zones}
+        lastUpdatedAt={lastUpdatedAt}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+      />
+
       {/* Search bar */}
       <div className="flex-shrink-0 p-2 border-b border-gray-800">
         <SearchBar
@@ -248,7 +369,13 @@ export default function App() {
       {error && (
         <div className="flex-shrink-0 mx-2 mt-2 px-3 py-2 bg-red-900/40 border border-red-800 rounded text-xs text-red-300 flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200 ml-2">✕</button>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-400 hover:text-red-200 ml-2"
+            aria-label="Dismiss error"
+          >
+            &#x2715;
+          </button>
         </div>
       )}
 

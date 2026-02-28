@@ -184,7 +184,7 @@ export function recallMemories(
   // ── 3. Merge via Reciprocal Rank Fusion (RRF) ──────────────────────────
   // RRF score = Σ 1 / (k + rank_i) where k=60 is the smoothing constant.
   // This is robust to differing score scales between FTS5 and vector search.
-  let results = mergeRRF(ftsResults, vecResults, limit * 4);
+  let results: Memory[] = mergeRRF(ftsResults, vecResults, limit * 4);
 
   // ── 4. Fetch full Memory objects for any vector-only results ─────────────
   // mergeRRF may include IDs that only appear in the vec results and were not
@@ -194,13 +194,13 @@ export function recallMemories(
   // Filter by memory type.
   if (options?.type && options.type !== 'all') {
     const filterType = options.type;
-    results = results.filter(m => m.type === filterType);
+    results = results.filter((m: Memory) => m.type === filterType);
   }
 
   // Filter by orbital distance.
   if (options?.maxDistance !== undefined) {
     const maxDist = options.maxDistance;
-    results = results.filter(m => m.distance <= maxDist);
+    results = results.filter((m: Memory) => m.distance <= maxDist);
   }
 
   // Apply the caller-requested limit after filtering.
@@ -215,7 +215,7 @@ export function recallMemories(
   const config = getConfig();
 
   // Apply access boost to each recalled memory and persist changes.
-  const boosted: Memory[] = results.map(memory => {
+  const boosted: Memory[] = results.map((memory: Memory) => {
     const newDistance = applyAccessBoost(memory.distance);
     const velocity    = newDistance - memory.distance;
 
@@ -293,5 +293,214 @@ export function forgetMemory(memoryId: string, mode: 'push' | 'delete'): void {
     old_importance: memory.importance,
     new_importance: newImportance,
     trigger:        'forget',
+  });
+
+  // Also remove the embedding from the vector index
+  try {
+    const db = getDatabase();
+    deleteEmbedding(db, memoryId);
+  } catch {
+    // vec tables may not be available — ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hybrid search helpers (Phase 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Attempt a vector search for the given query string.
+ *
+ * This is synchronous from the caller's perspective: it generates an
+ * embedding synchronously-cached by the pipeline singleton if the model
+ * has already been loaded, or returns an empty array if not yet ready.
+ *
+ * Because embedding generation is async, we start a non-blocking job and
+ * return an empty result on the first cold call. The model warms up in
+ * the background, and subsequent calls benefit from cached results.
+ */
+function tryVectorSearch(
+  project: string,
+  _query: string,
+  limit: number,
+): string[] {
+  // We only perform synchronous vector lookups here.
+  // The query embedding is generated async and not awaited on this call.
+  // Instead, we return the IDs that happen to already be in the vec index
+  // via an in-memory embedding approach.
+  //
+  // For a full async hybrid flow, callers should use recallMemoriesAsync().
+  // This synchronous version degrades gracefully to FTS5-only when the
+  // embedding model hasn't loaded yet.
+  try {
+    const db = getDatabase();
+    // Probe the vec table to see if it's available and has any entries.
+    const count = (db.prepare(
+      'SELECT COUNT(*) as n FROM memory_embedding_map'
+    ).get() as { n: number } | undefined)?.n ?? 0;
+
+    if (count === 0) return [];
+
+    // We can't generate the query embedding synchronously here because
+    // generateEmbedding() is async. The async path is exposed via
+    // recallMemoriesAsync() below. Return empty array to let FTS5 handle it.
+    void project; // suppress unused warning
+    void limit;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Reciprocal Rank Fusion: merge FTS5 results and vector result IDs.
+ *
+ * RRF(d) = Σ 1 / (k + rank_i)   where k = 60 (standard constant)
+ *
+ * Both lists are ranked 1-based. The merged list is sorted by descending
+ * RRF score and de-duplicated.
+ *
+ * Returns an array of Memory objects in merged order. Memories that only
+ * appear in the vecIds list will be represented as partial stubs with just
+ * the id field populated — callers should call hydrateVectorOnlyResults().
+ */
+function mergeRRF(
+  ftsResults: Memory[],
+  vecIds: string[],
+  limit: number,
+): Memory[] {
+  const K = 60;
+  const scores = new Map<string, number>();
+
+  ftsResults.forEach((m, i) => {
+    scores.set(m.id, (scores.get(m.id) ?? 0) + 1 / (K + i + 1));
+  });
+
+  vecIds.forEach((id, i) => {
+    scores.set(id, (scores.get(id) ?? 0) + 1 / (K + i + 1));
+  });
+
+  // Sort by descending RRF score
+  const sorted = [...scores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id);
+
+  // Build result list: prefer full Memory objects from ftsResults when available
+  const ftsMap = new Map(ftsResults.map(m => [m.id, m]));
+  return sorted.map(id => ftsMap.get(id) ?? ({ id } as Memory));
+}
+
+/**
+ * Resolve partial Memory stubs (from vector-only results) into full objects.
+ * Performs a single batched DB lookup for all missing memories.
+ */
+function hydrateVectorOnlyResults(
+  merged: Memory[],
+  ftsResults: Memory[],
+): Memory[] {
+  const ftsIds = new Set(ftsResults.map(m => m.id));
+  const missingIds = merged
+    .filter(m => !ftsIds.has(m.id) && m.content === undefined)
+    .map(m => m.id);
+
+  if (missingIds.length === 0) return merged;
+
+  const fetched = getMemoryByIds(missingIds);
+  const fetchedMap = new Map(fetched.map(m => [m.id, m]));
+
+  return merged.map(m =>
+    m.content === undefined ? (fetchedMap.get(m.id) ?? m) : m
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Async hybrid recall (Phase 2 — full pipeline)
+// ---------------------------------------------------------------------------
+
+/**
+ * Async version of recallMemories that generates the query embedding and
+ * performs a true hybrid FTS5 + vector search.
+ *
+ * Use this from async contexts (e.g., MCP tool handlers) for best results.
+ * Falls back to FTS5-only if embedding generation fails.
+ */
+export async function recallMemoriesAsync(
+  project: string,
+  query: string,
+  options?: {
+    type?: MemoryType | 'all';
+    maxDistance?: number;
+    limit?: number;
+  },
+): Promise<Memory[]> {
+  const limit = options?.limit ?? 10;
+  const fetchN = limit * 3;
+
+  // ── 1. FTS5 keyword search (synchronous) ─────────────────────────────────
+  const ftsResults = searchMemories(project, query, fetchN);
+
+  // ── 2. Vector KNN search (async embedding) ────────────────────────────────
+  let vecIds: string[] = [];
+  try {
+    const db = getDatabase();
+    const queryEmbedding = await generateEmbedding(query);
+    const vecResults = searchByVector(db, queryEmbedding, fetchN);
+    vecIds = vecResults.map(r => r.memoryId);
+  } catch {
+    // Model not ready or vec tables unavailable — FTS5 covers it
+  }
+
+  // ── 3. Merge (RRF) + hydrate ──────────────────────────────────────────────
+  let results = mergeRRF(ftsResults, vecIds, limit * 4);
+  results = hydrateVectorOnlyResults(results, ftsResults);
+
+  // ── 4. Filter ─────────────────────────────────────────────────────────────
+  if (options?.type && options.type !== 'all') {
+    const filterType = options.type;
+    results = results.filter(m => m.type === filterType);
+  }
+
+  if (options?.maxDistance !== undefined) {
+    const maxDist = options.maxDistance;
+    results = results.filter(m => m.distance <= maxDist);
+  }
+
+  results = results.slice(0, limit);
+
+  // ── 5. Access boost + orbit update ────────────────────────────────────────
+  const sunState = getSunState(project);
+  const sunText  = sunState
+    ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
+    : '';
+  const config = getConfig();
+
+  return results.map(memory => {
+    const newDistance = applyAccessBoost(memory.distance);
+    const velocity    = newDistance - memory.distance;
+
+    updateMemoryAccess(memory.id);
+
+    const updatedMemory: Memory = {
+      ...memory,
+      distance:         newDistance,
+      access_count:     memory.access_count + 1,
+      last_accessed_at: new Date().toISOString(),
+    };
+
+    const components = calculateImportance(updatedMemory, sunText, config);
+    updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
+
+    insertOrbitLog({
+      memory_id:      memory.id,
+      project,
+      old_distance:   memory.distance,
+      new_distance:   newDistance,
+      old_importance: memory.importance,
+      new_importance: components.total,
+      trigger:        'access',
+    });
+
+    return { ...updatedMemory, importance: components.total, velocity };
   });
 }

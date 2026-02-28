@@ -52,6 +52,16 @@ export interface SystemStatus {
   db_size_bytes: number;
   db_path: string;
   zone_breakdown: Record<OrbitZone, number>;
+  last_orbit_at?: string | null;
+}
+
+export interface DataSource {
+  id: string;
+  path: string;
+  status: 'active' | 'inactive' | 'error';
+  file_count: number;
+  last_scanned_at: string | null;
+  error?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,8 +115,16 @@ export const api = {
   getMemory: (id: string) =>
     get<{ data: Memory }>(`/api/memories/${id}`),
 
-  searchMemories: (query: string, project?: string) =>
-    get<{ data: Memory[]; total: number; query: string }>('/api/memories/search', { query, project }),
+  searchMemories: (
+    query: string,
+    project?: string,
+    type?: MemoryType,
+    zone?: OrbitZone,
+  ) =>
+    get<{ data: Memory[]; total: number; query: string }>(
+      '/api/memories/search',
+      { query, project, type, zone } as Record<string, string | undefined>,
+    ),
 
   createMemory: (body: {
     content: string;
@@ -140,4 +158,7 @@ export const api = {
 
   getZoneStats: (project?: string) =>
     get<{ data: ZoneStat[] }>('/api/system/zones', { project }),
+
+  getDataSources: (project?: string) =>
+    get<{ data: DataSource[] }>('/api/sources', { project }),
 };

@@ -5,10 +5,11 @@ import { z } from 'zod';
 import type { MemoryType, OrbitZone, Memory, OrbitChange } from '../engine/types.js';
 import { ORBIT_ZONES } from '../engine/types.js';
 import { getSunContent, commitToSun } from '../engine/sun.js';
-import { createMemory, recallMemories, forgetMemory } from '../engine/planet.js';
+import { createMemory, recallMemoriesAsync, forgetMemory } from '../engine/planet.js';
 import { recalculateOrbits, getOrbitZone } from '../engine/orbit.js';
 import { getMemoriesByProject } from '../storage/queries.js';
 import { getConfig } from '../utils/config.js';
+import { parseRelativeTime } from '../utils/time.js';
 import { StellarScanner, listDataSources } from '../scanner/index.js';
 import { createLogger } from '../utils/logger.js';
 import { GoogleDriveConnector } from '../scanner/cloud/google-drive.js';
@@ -42,9 +43,9 @@ function getOrCreateScheduler(): StellarScheduler {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Resolve project: use provided value or fall back to default from config. */
-function resolveProject(project: string | undefined): string {
-  return project ?? getConfig().defaultProject;
+/** Resolve project from config — always uses the configured default. */
+function resolveProject(): string {
+  return getConfig().defaultProject;
 }
 
 /**
@@ -67,14 +68,11 @@ function formatDistance(distance: number): string {
 }
 
 /**
- * Build a readable one-memory summary for list output.
+ * Build a compact one-line memory summary for list output.
  */
-function formatMemoryLine(m: Memory, index: number): string {
-  const tags = m.tags.length > 0 ? ` [${m.tags.join(', ')}]` : '';
-  return (
-    `${index + 1}. [${m.type.toUpperCase()}] ${m.summary}${tags}\n` +
-    `   ID: ${m.id} | Distance: ${formatDistance(m.distance)} | Importance: ${(m.importance * 100).toFixed(0)}%`
-  );
+function formatMemoryLine(m: Memory): string {
+  const pct = (m.importance * 100).toFixed(0);
+  return `  [${m.type.toUpperCase()}] ${m.summary} | ${m.distance.toFixed(2)} AU | ${pct}% | ${m.id}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +82,7 @@ function formatMemoryLine(m: Memory, index: number): string {
 export function createStellarServer(): McpServer {
   const server = new McpServer({
     name: 'stellar-memory',
-    version: '0.1.0',
+    version: '0.2.0',
   });
 
   // -------------------------------------------------------------------------
@@ -115,18 +113,15 @@ export function createStellarServer(): McpServer {
   );
 
   // -------------------------------------------------------------------------
-  // Tool 1: stellar_status
+  // Tool 1: status
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_status',
-    'View the current state of your stellar memory system. Shows all memories grouped by orbital zone ' +
-    '(corona = actively working, oort = nearly forgotten). Use this to get a snapshot of what the system knows.',
+    'status',
+    'View the current state of your stellar memory system. Shows memories grouped by orbital zone ' +
+    '(corona = actively working, oort = nearly forgotten), and optionally lists registered data sources. ' +
+    'Use this to get a snapshot of what the system knows.',
     {
-      project: z
-        .string()
-        .optional()
-        .describe('Project name to inspect. Defaults to the configured default project.'),
       zone: z
         .enum(['all', 'corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'])
         .optional()
@@ -141,63 +136,91 @@ export function createStellarServer(): McpServer {
         .max(200)
         .optional()
         .describe('Maximum number of memories to return. Defaults to 50.'),
+      show: z
+        .enum(['memories', 'sources', 'all'])
+        .optional()
+        .describe('What to display: memories, data sources, or both. Default: "memories".'),
     },
-    async ({ project, zone, limit }) => {
+    async ({ zone, limit, show }) => {
       try {
-        const proj = resolveProject(project);
+        const proj = resolveProject();
         const effectiveLimit = limit ?? 50;
-        const effectiveZone = zone ?? 'all';
+        const effectiveZone  = zone ?? 'all';
+        const effectiveShow  = show ?? 'memories';
 
-        // getMemoriesByProject returns all non-deleted memories sorted by distance ASC
-        const all: Memory[] = getMemoriesByProject(proj);
-        const memories = all.slice(0, effectiveLimit);
+        const lines: string[] = [];
 
-        // Filter by zone if requested
-        const filtered =
-          effectiveZone === 'all'
-            ? memories
-            : memories.filter((m) => {
-                const zoneKey = labelToZoneKey(getOrbitZone(m.distance));
-                return zoneKey === effectiveZone;
-              });
+        // ── Memories section ────────────────────────────────────────────────
+        if (effectiveShow === 'memories' || effectiveShow === 'all') {
+          const all: Memory[] = getMemoriesByProject(proj);
+          const memories = all.slice(0, effectiveLimit);
 
-        if (filtered.length === 0) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `No memories found for project "${proj}"${effectiveZone !== 'all' ? ` in zone "${effectiveZone}"` : ''}.`,
-              },
-            ],
-          };
+          const filtered =
+            effectiveZone === 'all'
+              ? memories
+              : memories.filter((m) => {
+                  const zoneKey = labelToZoneKey(getOrbitZone(m.distance));
+                  return zoneKey === effectiveZone;
+                });
+
+          lines.push(`☀ Project: ${proj} | ${filtered.length} memories`);
+
+          if (filtered.length === 0) {
+            lines.push(
+              effectiveZone !== 'all'
+                ? `No memories in zone "${effectiveZone}".`
+                : 'No memories yet. Use remember or scan to add some.'
+            );
+          } else {
+            lines.push('');
+
+            // Group by zone
+            const byZone: Partial<Record<OrbitZone, Memory[]>> = {};
+            for (const m of filtered) {
+              const zoneKey = labelToZoneKey(getOrbitZone(m.distance));
+              const bucket = byZone[zoneKey] ?? [];
+              bucket.push(m);
+              byZone[zoneKey] = bucket;
+            }
+
+            const zoneOrder: OrbitZone[] = ['corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'];
+
+            for (const zoneName of zoneOrder) {
+              const zoneMemories = byZone[zoneName];
+              if (!zoneMemories || zoneMemories.length === 0) continue;
+
+              lines.push(`▸ ${ORBIT_ZONES[zoneName].label} (${zoneMemories.length})`);
+              for (const m of zoneMemories) {
+                lines.push(formatMemoryLine(m));
+              }
+              lines.push('');
+            }
+          }
         }
 
-        // Group by zone key
-        const byZone: Partial<Record<OrbitZone, Memory[]>> = {};
-        for (const m of filtered) {
-          const zoneKey = labelToZoneKey(getOrbitZone(m.distance));
-          const bucket = byZone[zoneKey] ?? [];
-          bucket.push(m);
-          byZone[zoneKey] = bucket;
-        }
+        // ── Sources section ─────────────────────────────────────────────────
+        if (effectiveShow === 'sources' || effectiveShow === 'all') {
+          if (effectiveShow === 'all') {
+            lines.push('─────────────────────────────────');
+          }
 
-        const zoneOrder: OrbitZone[] = ['corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'];
-        const lines: string[] = [
-          `Stellar Memory — Project: ${proj}`,
-          `Total memories: ${filtered.length}`,
-          '',
-        ];
+          const sources = listDataSources();
 
-        for (const zoneName of zoneOrder) {
-          const zoneMemories = byZone[zoneName];
-          if (!zoneMemories || zoneMemories.length === 0) continue;
-
-          const zoneInfo = ORBIT_ZONES[zoneName];
-          lines.push(`== ${zoneInfo.label} (${zoneMemories.length} memor${zoneMemories.length === 1 ? 'y' : 'ies'}) ==`);
-          zoneMemories.forEach((m, i) => {
-            lines.push(formatMemoryLine(m, i));
-          });
-          lines.push('');
+          if (sources.length === 0) {
+            lines.push('No data sources registered yet. Use scan to index a directory.');
+          } else {
+            lines.push(`Data sources (${sources.length}):`);
+            lines.push('');
+            for (const ds of sources) {
+              const lastScan = ds.last_scanned_at
+                ? new Date(ds.last_scanned_at).toLocaleString()
+                : 'never';
+              const sizeMB = (ds.total_size / 1_048_576).toFixed(2);
+              lines.push(
+                `  ${ds.path} | ${ds.status} | ${ds.file_count} files (${sizeMB} MB) | last: ${lastScan} | id: ${ds.id}`
+              );
+            }
+          }
         }
 
         return {
@@ -205,24 +228,20 @@ export function createStellarServer(): McpServer {
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_status failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `status failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 2: stellar_commit
+  // Tool 2: commit
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_commit',
+    'commit',
     'Save the current session state into the Sun (working context). Call this at the end of each session ' +
     'or when switching tasks to preserve your progress. The Sun is automatically available as a resource next session.',
     {
-      project: z
-        .string()
-        .optional()
-        .describe('Project name. Defaults to the configured default project.'),
       current_work: z
         .string()
         .min(1)
@@ -260,9 +279,9 @@ export function createStellarServer(): McpServer {
           '(e.g., tech stack, constraints, team conventions).'
         ),
     },
-    async ({ project, current_work, decisions, next_steps, errors, context }) => {
+    async ({ current_work, decisions, next_steps, errors, context }) => {
       try {
-        const proj = resolveProject(project);
+        const proj = resolveProject();
         const config = getConfig();
 
         commitToSun(proj, {
@@ -273,52 +292,32 @@ export function createStellarServer(): McpServer {
           context: context ?? '',
         });
 
-        // After committing, recalculate orbits so related memories gravitate closer
         const changes: OrbitChange[] = recalculateOrbits(proj, config);
 
-        const orbitSummary =
-          changes.length > 0
-            ? `Recalculated orbits for ${changes.length} memor${changes.length === 1 ? 'y' : 'ies'}.`
-            : 'No orbital changes triggered.';
-
-        const lines: string[] = [
-          `Sun committed for project "${proj}".`,
-          `Current work: ${current_work}`,
+        const parts: string[] = [
+          `✓ Committed | decisions: ${(decisions ?? []).length} | steps: ${(next_steps ?? []).length} | errors: ${(errors ?? []).length} | orbit changes: ${changes.length}`,
         ];
-        if (decisions && decisions.length > 0) {
-          lines.push(`Decisions recorded: ${decisions.length} (each stored as a memory planet)`);
-        }
-        if (next_steps && next_steps.length > 0) {
-          lines.push(`Next steps saved: ${next_steps.length}`);
-        }
-        if (errors && errors.length > 0) {
-          lines.push(`Active errors tracked: ${errors.length}`);
-        }
-        lines.push(orbitSummary);
 
         return {
-          content: [{ type: 'text' as const, text: lines.join('\n') }],
+          content: [{ type: 'text' as const, text: parts.join('\n') }],
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_commit failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `commit failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 3: stellar_recall
+  // Tool 3: recall
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_recall',
+    'recall',
     'Search memories by content and pull relevant ones closer to the Sun (increasing their importance). ' +
+    'Uses hybrid FTS5 + vector search for best results. ' +
     'Use this to surface forgotten context that is relevant to your current work.',
     {
-      project: z
-        .string()
-        .optional()
-        .describe('Project name. Defaults to the configured default project.'),
       query: z
         .string()
         .min(1)
@@ -330,7 +329,7 @@ export function createStellarServer(): McpServer {
           'Filter by memory type. "decision" for architectural choices, "error" for bugs, ' +
           '"task" for work items, etc. Defaults to "all".'
         ),
-      max_distance: z
+      max_au: z
         .number()
         .min(0.1)
         .max(100)
@@ -347,16 +346,16 @@ export function createStellarServer(): McpServer {
         .optional()
         .describe('Maximum number of memories to return. Defaults to 10.'),
     },
-    async ({ project, query, type, max_distance, limit }) => {
+    async ({ query, type, max_au, limit }) => {
       try {
-        const proj = resolveProject(project);
+        const proj = resolveProject();
 
-        const memoryType: MemoryType | 'all' | undefined =
-          type === 'all' ? undefined : (type as MemoryType | undefined);
+        const memoryType: MemoryType | undefined =
+          type === 'all' || type === undefined ? undefined : (type as MemoryType);
 
-        const results: Memory[] = recallMemories(proj, query, {
+        const results: Memory[] = await recallMemoriesAsync(proj, query, {
           type: memoryType,
-          maxDistance: max_distance,
+          maxDistance: max_au,
           limit: limit ?? 10,
         });
 
@@ -365,54 +364,44 @@ export function createStellarServer(): McpServer {
             content: [
               {
                 type: 'text' as const,
-                text: `No memories found matching "${query}" in project "${proj}".`,
+                text: `No memories found matching "${query}".`,
               },
             ],
           };
         }
 
         const lines: string[] = [
-          `Recall results for "${query}" in project "${proj}" (${results.length} found):`,
-          '(Recalled memories have been pulled closer to the Sun)',
+          `Recall: "${query}" — ${results.length} result${results.length === 1 ? '' : 's'} (pulled closer to Sun)`,
           '',
         ];
 
-        results.forEach((m, i) => {
-          lines.push(`${i + 1}. [${m.type.toUpperCase()}] ${m.summary}`);
-          lines.push(`   Distance: ${formatDistance(m.distance)}`);
-          lines.push(
-            `   Content: ${m.content.slice(0, 200)}${m.content.length > 200 ? '...' : ''}`
-          );
-          if (m.tags.length > 0) {
-            lines.push(`   Tags: ${m.tags.join(', ')}`);
-          }
-          lines.push(`   ID: ${m.id} | Importance: ${(m.importance * 100).toFixed(0)}%`);
+        for (const m of results) {
+          const preview = m.content.slice(0, 150) + (m.content.length > 150 ? '…' : '');
+          const tags = m.tags.length > 0 ? ` [${m.tags.join(', ')}]` : '';
+          lines.push(`[${m.type.toUpperCase()}] ${m.summary}${tags} | ${formatDistance(m.distance)} | ${m.id}`);
+          lines.push(`  ${preview}`);
           lines.push('');
-        });
+        }
 
         return {
           content: [{ type: 'text' as const, text: lines.join('\n') }],
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_recall failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `recall failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 4: stellar_remember
+  // Tool 4: remember
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_remember',
+    'remember',
     'Store a new memory in the stellar system. Memories are automatically placed in an orbital zone ' +
     'based on their type and impact. High-impact decisions orbit closer; low-impact observations orbit further.',
     {
-      project: z
-        .string()
-        .optional()
-        .describe('Project name. Defaults to the configured default project.'),
       content: z
         .string()
         .min(1)
@@ -450,9 +439,9 @@ export function createStellarServer(): McpServer {
           '(e.g., ["auth", "bug", "performance"]).'
         ),
     },
-    async ({ project, content, summary, type, impact, tags }) => {
+    async ({ content, summary, type, impact, tags }) => {
       try {
-        const proj = resolveProject(project);
+        const proj = resolveProject();
 
         const memory: Memory = createMemory({
           project: proj,
@@ -469,46 +458,30 @@ export function createStellarServer(): McpServer {
           content: [
             {
               type: 'text' as const,
-              text: [
-                `Memory stored in project "${proj}".`,
-                `ID: ${memory.id}`,
-                `Type: ${memory.type}`,
-                `Summary: ${memory.summary}`,
-                `Orbital placement: ${formatDistance(memory.distance)}`,
-                `Zone: ${zoneLabel}`,
-                `Importance: ${(memory.importance * 100).toFixed(0)}%`,
-                tags && tags.length > 0 ? `Tags: ${tags.join(', ')}` : '',
-              ]
-                .filter(Boolean)
-                .join('\n'),
+              text: `✦ Stored [${memory.type.toUpperCase()}] at ${memory.distance.toFixed(2)} AU (${zoneLabel}) | ID: ${memory.id}`,
             },
           ],
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_remember failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `remember failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 5: stellar_orbit
+  // Tool 5: orbit
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_orbit',
-    'Force a recalculation of all orbital positions for a project. Memories decay over time ' +
+    'orbit',
+    'Force a recalculation of all orbital positions for the project. Memories decay over time ' +
     '(drifting outward) and are pulled inward by access and relevance. ' +
     'Run this to apply pending orbital physics without committing a new session.',
-    {
-      project: z
-        .string()
-        .optional()
-        .describe('Project name. Defaults to the configured default project.'),
-    },
-    async ({ project }) => {
+    {},
+    async () => {
       try {
-        const proj = resolveProject(project);
+        const proj = resolveProject();
         const config = getConfig();
         const changes: OrbitChange[] = recalculateOrbits(proj, config);
 
@@ -517,23 +490,19 @@ export function createStellarServer(): McpServer {
             content: [
               {
                 type: 'text' as const,
-                text: `No orbital changes for project "${proj}". All memories are stable.`,
+                text: `Orbit: ${proj} — no changes. All memories are stable.`,
               },
             ],
           };
         }
 
-        const lines: string[] = [
-          `Orbital recalculation for project "${proj}": ${changes.length} change${changes.length === 1 ? '' : 's'}`,
-          '',
-        ];
-
         let closerCount = 0;
         let furtherCount = 0;
+        const lines: string[] = [];
 
         for (const change of changes) {
           const delta = change.new_distance - change.old_distance;
-          const direction = delta < 0 ? 'pulled closer' : 'drifted further';
+          const direction = delta < 0 ? '↓' : '↑';
           const absAU = Math.abs(delta).toFixed(2);
 
           if (delta < 0) closerCount++;
@@ -541,74 +510,65 @@ export function createStellarServer(): McpServer {
 
           const oldZone = getOrbitZone(change.old_distance);
           const newZone = getOrbitZone(change.new_distance);
-          const zoneChange = oldZone !== newZone ? ` | Zone: ${oldZone} -> ${newZone}` : '';
+          const zoneChange = oldZone !== newZone ? ` ${oldZone}→${newZone}` : '';
 
           lines.push(
-            `  ${direction} by ${absAU} AU ` +
-            `(${change.old_distance.toFixed(2)} -> ${change.new_distance.toFixed(2)} AU)` +
-            `${zoneChange}`
+            `  ${direction}${absAU} AU (${change.old_distance.toFixed(2)}→${change.new_distance.toFixed(2)})${zoneChange} | ${change.trigger} | ${change.memory_id}`
           );
-          lines.push(`  Trigger: ${change.trigger} | Memory: ${change.memory_id}`);
-          lines.push('');
         }
 
-        lines.push(`Summary: ${closerCount} pulled closer, ${furtherCount} drifted further.`);
+        const header = `Orbit: ${proj} — ${changes.length} change${changes.length === 1 ? '' : 's'} | ↓${closerCount} closer  ↑${furtherCount} further`;
 
         return {
-          content: [{ type: 'text' as const, text: lines.join('\n') }],
+          content: [{ type: 'text' as const, text: [header, '', ...lines].join('\n') }],
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_orbit failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `orbit failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 6: stellar_forget
+  // Tool 6: forget
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_forget',
+    'forget',
     'Push a memory into a distant orbit (soft forget) or permanently delete it. ' +
     'Use "push" to deprioritize without losing data; use "delete" only when the memory is truly irrelevant.',
     {
-      project: z
-        .string()
-        .optional()
-        .describe('Project name. Used to verify the memory belongs to this project.'),
-      memory_id: z
+      id: z
         .string()
         .min(1)
         .describe(
-          'The ID of the memory to forget. Get IDs from stellar_status or stellar_recall output.'
+          'The ID of the memory to forget. Get IDs from status or recall output.'
         ),
       mode: z
         .enum(['push', 'delete'])
         .optional()
         .describe(
-          '"push" moves the memory to the Oort Cloud (distant but recoverable via stellar_recall). ' +
+          '"push" moves the memory to the Oort Cloud (distant but recoverable via recall). ' +
           '"delete" permanently removes it. Defaults to "push".'
         ),
     },
-    async ({ project: _project, memory_id, mode }) => {
+    async ({ id, mode }) => {
       try {
         const effectiveMode = mode ?? 'push';
 
-        forgetMemory(memory_id, effectiveMode);
+        forgetMemory(id, effectiveMode);
 
         if (effectiveMode === 'delete') {
           return {
             content: [
               {
                 type: 'text' as const,
-                text: `Memory "${memory_id}" permanently deleted.`,
+                text: `✗ Deleted memory ${id}.`,
               },
             ],
           };
         }
 
-        // Push mode — memory is at Oort cloud distance (95 AU per planet.ts)
         const oortDistance = 95.0;
         const zoneLabel = getOrbitZone(oortDistance);
 
@@ -616,28 +576,23 @@ export function createStellarServer(): McpServer {
           content: [
             {
               type: 'text' as const,
-              text: [
-                `Memory "${memory_id}" pushed to outer orbit.`,
-                `New position: ${oortDistance.toFixed(2)} AU`,
-                `Zone: ${zoneLabel}`,
-                'The memory is still recoverable via stellar_recall if needed.',
-              ].join('\n'),
+              text: `↑ Pushed ${id} to ${oortDistance.toFixed(2)} AU (${zoneLabel}) — still recoverable via recall.`,
             },
           ],
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_forget failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `forget failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 7: stellar_scan
+  // Tool 7: scan
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_scan',
+    'scan',
     'Scan a local directory and automatically convert files into memories. ' +
     'Supports .md, .ts, .js, .py, .json, .txt, and many more file types. ' +
     'Files already indexed (same content hash) are skipped — scanning is idempotent.',
@@ -650,11 +605,11 @@ export function createStellarServer(): McpServer {
         .boolean()
         .optional()
         .describe('Recurse into subdirectories. Defaults to true.'),
-      include_git: z
+      git: z
         .boolean()
         .optional()
         .describe('Also import recent git commit history as memories. Defaults to true.'),
-      max_file_size_kb: z
+      max_kb: z
         .number()
         .int()
         .min(1)
@@ -662,103 +617,57 @@ export function createStellarServer(): McpServer {
         .optional()
         .describe('Maximum individual file size in KB to process. Defaults to 1024 KB (1 MB).'),
     },
-    async ({ path, recursive, include_git, max_file_size_kb }) => {
+    async ({ path, recursive, git, max_kb }) => {
       try {
         const scanner = new StellarScanner({
           paths: [path],
-          maxFileSize: (max_file_size_kb ?? 1024) * 1024,
+          maxFileSize: (max_kb ?? 1024) * 1024,
         });
 
         const result = await scanner.scanPath(path, {
-          recursive:   recursive ?? true,
-          includeGit:  include_git ?? true,
+          recursive:  recursive ?? true,
+          includeGit: git ?? true,
         });
 
         const lines: string[] = [
-          `Scan complete for: ${path}`,
-          `Duration: ${(result.durationMs / 1000).toFixed(2)}s`,
-          '',
-          `Files scanned:       ${result.scannedFiles}`,
-          `Memories created:    ${result.createdMemories}`,
-          `Files skipped:       ${result.skippedFiles}  (already indexed or excluded)`,
-          `Files with errors:   ${result.errorFiles}`,
+          `Scan: ${path} | ${(result.durationMs / 1000).toFixed(2)}s`,
+          `  files: ${result.scannedFiles}  new: ${result.createdMemories}  skipped: ${result.skippedFiles}  errors: ${result.errorFiles}`,
         ];
 
         return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_scan failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `scan failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 8: stellar_sources
+  // Tool 8: sync
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_sources',
-    'List all data sources (directories) that have been registered for scanning. ' +
-    'Shows scan status, file counts, and last scan time for each source.',
-    {},
-    async () => {
-      try {
-        const sources = listDataSources();
-
-        if (sources.length === 0) {
-          return {
-            content: [{
-              type: 'text' as const,
-              text: 'No data sources registered yet. Use stellar_scan to scan a directory.',
-            }],
-          };
-        }
-
-        const lines: string[] = [
-          `Registered data sources (${sources.length}):`,
-          '',
-        ];
-
-        for (const ds of sources) {
-          const lastScan = ds.last_scanned_at
-            ? new Date(ds.last_scanned_at).toLocaleString()
-            : 'Never';
-          const sizeMB = (ds.total_size / 1_048_576).toFixed(2);
-
-          lines.push(`Path: ${ds.path}`);
-          lines.push(`  Status:       ${ds.status}`);
-          lines.push(`  Type:         ${ds.type}`);
-          lines.push(`  Files:        ${ds.file_count} (${sizeMB} MB total)`);
-          lines.push(`  Last scanned: ${lastScan}`);
-          lines.push(`  ID:           ${ds.id}`);
-          lines.push('');
-        }
-
-        return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
-      } catch (err) {
-        if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_sources failed: ${String(err)}`);
-      }
-    }
-  );
-
-  // -------------------------------------------------------------------------
-  // Tool 9: stellar_connect
-  // -------------------------------------------------------------------------
-
-  server.tool(
-    'stellar_connect',
-    'Connect a cloud service (Google Drive, Notion, GitHub, or Slack) so that stellar_sync can pull ' +
-    'documents into memory. Credentials are passed as key-value pairs and are stored only in process ' +
-    'memory — they are never written to disk.',
+    'sync',
+    'Pull documents from cloud services into stellar memory. ' +
+    'If credentials are provided, the service is connected first before syncing. ' +
+    'Only fetches content modified since the given time (incremental by default). ' +
+    'Each document becomes a memory planet in the appropriate orbital zone.',
     {
       service: z
         .enum(['google-drive', 'notion', 'github', 'slack'])
-        .describe('Cloud service to connect.'),
+        .optional()
+        .describe(
+          'Specific service to connect and/or sync. If omitted (and no credentials), all connected services are synced.'
+        ),
+      since: z
+        .string()
+        .optional()
+        .describe('Relative time ("24h", "7d") or ISO date. Default: "24h".'),
       credentials: z
         .record(z.string())
+        .optional()
         .describe(
-          'Service-specific credentials. ' +
+          'Service credentials. If provided, connects to the service before syncing. ' +
           'Google Drive (Service Account): client_email, private_key. ' +
           'Google Drive (OAuth2): client_id, client_secret, refresh_token. ' +
           'Notion: api_key. ' +
@@ -766,83 +675,51 @@ export function createStellarServer(): McpServer {
           'Slack: bot_token, include_dms (optional "true"/"false").'
         ),
     },
-    async ({ service, credentials }) => {
+    async ({ service, since, credentials }) => {
       try {
-        let connector: CloudConnector;
-        switch (service) {
-          case 'google-drive': connector = new GoogleDriveConnector(); break;
-          case 'notion':       connector = new NotionConnector();      break;
-          case 'github':       connector = new GitHubConnector();      break;
-          case 'slack':        connector = new SlackConnector();       break;
+        const proj = resolveProject();
+
+        // ── Connect phase (if credentials supplied) ──────────────────────────
+        if (credentials !== undefined) {
+          if (!service) {
+            throw new McpError(
+              ErrorCode.InvalidParams,
+              'sync: "service" is required when "credentials" are provided.'
+            );
+          }
+
+          let connector: CloudConnector;
+          switch (service) {
+            case 'google-drive': connector = new GoogleDriveConnector(); break;
+            case 'notion':       connector = new NotionConnector();      break;
+            case 'github':       connector = new GitHubConnector();      break;
+            case 'slack':        connector = new SlackConnector();       break;
+          }
+
+          await connector.authenticate(credentials);
+          connectorRegistry.set(service, connector);
+
+          // Rebuild scheduler with updated registry
+          if (_scheduler) {
+            _scheduler.stop();
+            _scheduler = null;
+          }
+
+          log.info('Cloud connector registered via sync', { service });
         }
 
-        await connector.authenticate(credentials);
-        connectorRegistry.set(service, connector);
-
-        // Rebuild scheduler with updated registry when next task fires
-        if (_scheduler) {
-          _scheduler.stop();
-          _scheduler = null;
-        }
-
-        log.info('Cloud connector registered', { service });
-
-        return {
-          content: [{
-            type: 'text' as const,
-            text: `Connected to ${connector.name}. Use stellar_sync to pull documents into memory.`,
-          }],
-        };
-      } catch (err) {
-        if (err instanceof McpError) throw err;
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new McpError(ErrorCode.InternalError, `stellar_connect failed: ${msg}`);
-      }
-    }
-  );
-
-  // -------------------------------------------------------------------------
-  // Tool 10: stellar_sync
-  // -------------------------------------------------------------------------
-
-  server.tool(
-    'stellar_sync',
-    'Pull documents from connected cloud services into stellar memory. ' +
-    'Only fetches content modified since the last sync by default (incremental). ' +
-    'Each document becomes a memory planet in the appropriate orbital zone.',
-    {
-      service: z
-        .enum(['google-drive', 'notion', 'github', 'slack'])
-        .optional()
-        .describe(
-          'Specific service to sync. If omitted, all connected services are synced.'
-        ),
-      since: z
-        .string()
-        .optional()
-        .describe(
-          'ISO 8601 date string. Only fetch documents modified after this date. ' +
-          'Defaults to 24 hours ago for incremental sync.'
-        ),
-      project: z
-        .string()
-        .optional()
-        .describe('Project to store memories in. Defaults to the configured default project.'),
-    },
-    async ({ service, since, project }) => {
-      try {
+        // ── Sync phase ───────────────────────────────────────────────────────
         if (connectorRegistry.size === 0) {
           return {
             content: [{
               type: 'text' as const,
-              text: 'No cloud services connected. Use stellar_connect first.',
+              text: 'No cloud services connected. Provide credentials to connect a service.',
             }],
           };
         }
 
-        const proj      = project ?? getConfig().defaultProject;
         const sinceDate = since
-          ? new Date(since)
+          ? parseRelativeTime(since)
           : new Date(Date.now() - 24 * 60 * 60 * 1000);
 
         const targets: CloudConnector[] = service
@@ -853,15 +730,13 @@ export function createStellarServer(): McpServer {
           return {
             content: [{
               type: 'text' as const,
-              text: service
-                ? `Service "${service}" is not connected. Use stellar_connect first.`
-                : 'No connected services found.',
+              text: `Service "${service}" is not connected. Provide credentials to connect it.`,
             }],
           };
         }
 
-        const lines: string[] = [`Cloud sync started (project: "${proj}"):`, ''];
-        let totalDocs = 0;
+        const lines: string[] = [`Sync (project: ${proj} | since: ${sinceDate.toISOString()}):`];
+        let totalCreated = 0;
 
         for (const connector of targets) {
           try {
@@ -873,11 +748,11 @@ export function createStellarServer(): McpServer {
               try {
                 const input = connector.toMemory(doc);
                 createMemory({
-                  project:  proj,
-                  content:  input.content,
-                  summary:  input.summary,
-                  type:     input.type,
-                  tags:     input.tags,
+                  project: proj,
+                  content: input.content,
+                  summary: input.summary,
+                  type:    input.type,
+                  tags:    input.tags,
                 });
                 created++;
               } catch (memErr) {
@@ -885,34 +760,34 @@ export function createStellarServer(): McpServer {
               }
             }
 
-            lines.push(`${connector.name}: ${docs.length} documents fetched, ${created} memories created`);
-            totalDocs += created;
+            lines.push(`  ${connector.name}: ${docs.length} fetched, ${created} stored`);
+            totalCreated += created;
           } catch (syncErr) {
             const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-            lines.push(`${connector.name}: FAILED — ${msg}`);
+            lines.push(`  ${connector.name}: FAILED — ${msg}`);
             log.error(`Sync failed for ${connector.type}`,
               syncErr instanceof Error ? syncErr : new Error(msg));
           }
         }
 
-        lines.push('', `Total memories created: ${totalDocs}`);
+        lines.push(`  Total: ${totalCreated} memories created`);
 
         return {
           content: [{ type: 'text' as const, text: lines.join('\n') }],
         };
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_sync failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `sync failed: ${String(err)}`);
       }
     }
   );
 
   // -------------------------------------------------------------------------
-  // Tool 11: stellar_daemon
+  // Tool 9: daemon
   // -------------------------------------------------------------------------
 
   server.tool(
-    'stellar_daemon',
+    'daemon',
     'Control the background scheduler daemon. ' +
     'The scheduler automatically recalculates orbits, runs local scans, syncs cloud sources, ' +
     'and cleans up the Oort cloud on configurable intervals.',
@@ -934,7 +809,7 @@ export function createStellarServer(): McpServer {
             scheduler.start();
             _schedulerStartedAt = new Date();
             return {
-              content: [{ type: 'text' as const, text: 'Background scheduler started.' }],
+              content: [{ type: 'text' as const, text: 'Daemon: started.' }],
             };
           }
 
@@ -942,27 +817,27 @@ export function createStellarServer(): McpServer {
             scheduler.stop();
             _schedulerStartedAt = null;
             return {
-              content: [{ type: 'text' as const, text: 'Background scheduler stopped.' }],
+              content: [{ type: 'text' as const, text: 'Daemon: stopped.' }],
             };
           }
 
           case 'status': {
             const taskStatus = scheduler.getStatus();
             const isRunning  = _schedulerStartedAt !== null;
+            const startedStr = _schedulerStartedAt
+              ? _schedulerStartedAt.toISOString()
+              : '—';
+            const services = [...connectorRegistry.keys()].join(', ') || 'none';
+
             const lines: string[] = [
-              `Scheduler: ${isRunning ? 'RUNNING' : 'STOPPED'}`,
-              _schedulerStartedAt
-                ? `Started:   ${_schedulerStartedAt.toISOString()}`
-                : 'Started:   —',
-              `Connected: ${connectorRegistry.size} cloud service(s) (${[...connectorRegistry.keys()].join(', ') || 'none'})`,
+              `Daemon: ${isRunning ? 'RUNNING' : 'STOPPED'} | started: ${startedStr} | services: ${services}`,
               '',
-              'Tasks:',
             ];
 
             for (const [name, status] of Object.entries(taskStatus)) {
               const last = status.lastRunAt ? status.lastRunAt.toISOString() : 'never';
               const dur  = status.lastDuration !== null ? `${status.lastDuration}ms` : '—';
-              const err  = status.lastError ? ` | ERROR: ${status.lastError}` : '';
+              const err  = status.lastError ? ` ERR: ${status.lastError}` : '';
               lines.push(
                 `  ${name.padEnd(22)} runs=${status.runCount}  last=${last}  dur=${dur}${err}`
               );
@@ -975,7 +850,7 @@ export function createStellarServer(): McpServer {
         }
       } catch (err) {
         if (err instanceof McpError) throw err;
-        throw new McpError(ErrorCode.InternalError, `stellar_daemon failed: ${String(err)}`);
+        throw new McpError(ErrorCode.InternalError, `daemon failed: ${String(err)}`);
       }
     }
   );

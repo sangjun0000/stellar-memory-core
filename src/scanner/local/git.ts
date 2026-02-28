@@ -112,12 +112,12 @@ export function getRecentCommits(repoPath: string, limit = 50): GitCommit[] {
  */
 function inferCommitType(message: string): MemoryType {
   const lower = message.toLowerCase();
+  // BREAKING CHANGE takes priority (feat!: is a breaking change → decision)
+  if (lower.includes('breaking') || /\w+!:/.test(lower))                                return 'decision';
   if (/^feat[(!:]/.test(lower) || lower.includes('add') || lower.includes('implement')) return 'milestone';
   if (/^fix[(!:]/.test(lower)  || lower.includes('bug') || lower.includes('error'))     return 'error';
   if (/^(refactor|chore|build|ci)[(!:]/.test(lower))                                    return 'decision';
   if (/^(docs|test)[(!:]/.test(lower))                                                  return 'observation';
-  // BREAKING CHANGE
-  if (lower.includes('breaking') || lower.includes('!:'))                               return 'decision';
   return 'milestone';
 }
 

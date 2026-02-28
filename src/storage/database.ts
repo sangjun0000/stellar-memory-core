@@ -112,6 +112,24 @@ CREATE INDEX IF NOT EXISTS idx_memories_deleted
   ON memories(deleted_at);
 `;
 
+// Migrate existing databases that lack newer columns.
+// Each entry: [column_name, column_definition]
+const MIGRATIONS: Array<[string, string]> = [
+  ['source', "TEXT DEFAULT 'manual'"],
+  ['source_path', 'TEXT'],
+  ['source_hash', 'TEXT'],
+];
+
+function migrateMemoriesTable(db: DatabaseSync): void {
+  const cols = db.prepare('PRAGMA table_info(memories)').all() as Array<{ name: string }>;
+  const existing = new Set(cols.map((c) => c.name));
+  for (const [col, def] of MIGRATIONS) {
+    if (!existing.has(col)) {
+      db.exec(`ALTER TABLE memories ADD COLUMN ${col} ${def};`);
+    }
+  }
+}
+
 export function initDatabase(dbPath: string): DatabaseSync {
   // allowExtension is required for sqlite-vec to load its native module.
   const db = new DatabaseSync(dbPath, { allowExtension: true });
@@ -130,6 +148,9 @@ export function initDatabase(dbPath: string): DatabaseSync {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(`[stellar-memory] sqlite-vec not available: ${msg}\n`);
   }
+
+  // Migrate existing tables before running full DDL (adds missing columns)
+  try { migrateMemoriesTable(db); } catch { /* table may not exist yet */ }
 
   // Create all tables, triggers, and indexes
   db.exec(DDL);
