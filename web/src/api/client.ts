@@ -18,6 +18,7 @@ export interface Memory {
   impact: number;
   access_count: number;
   last_accessed_at: string | null;
+  source_path: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -68,7 +69,7 @@ export interface DataSource {
 // Client
 // ---------------------------------------------------------------------------
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:21547';
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 function qs(params?: Record<string, string | number | undefined>): string {
   if (!params) return '';
@@ -89,6 +90,19 @@ async function get<T>(path: string, params?: Record<string, string | number | un
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function patch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -134,6 +148,12 @@ export const api = {
     tags?: string[];
     impact?: number;
   }) => post<{ data: Memory }>('/api/memories', body),
+
+  updateOrbit: (id: string, distance: number) =>
+    patch<{ ok: boolean; data: { id: string; new_distance: number; new_importance: number } }>(
+      `/api/memories/${id}/orbit`,
+      { distance },
+    ),
 
   forgetMemory: (id: string) =>
     del<{ success: boolean; id: string }>(`/api/memories/${id}`),

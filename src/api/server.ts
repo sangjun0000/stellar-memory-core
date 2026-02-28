@@ -1,6 +1,10 @@
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
 import { initDatabase } from '../storage/database.js';
 import { getConfig } from '../utils/config.js';
 import memoriesRouter from './routes/memories.js';
@@ -8,6 +12,9 @@ import sunRouter from './routes/sun.js';
 import systemRouter from './routes/system.js';
 import { scanRouter, sourcesRouter } from './routes/scan.js';
 import orbitRouter from './routes/orbit.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const WEB_DIST = resolve(__dirname, '..', '..', 'web', 'dist');
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -23,10 +30,10 @@ initDatabase(config.dbPath);
 const app = new Hono();
 
 // CORS — allow all origins for local development
-app.use('/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'] }));
+app.use('/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
 
 // Health check
-app.get('/', (c) => c.json({ name: 'stellar-memory-api', version: '0.2.0', status: 'ok' }));
+app.get('/api/health', (c) => c.json({ name: 'stellar-memory-api', version: '0.4.0', status: 'ok' }));
 
 // Routers
 app.route('/api/memories', memoriesRouter);
@@ -35,6 +42,24 @@ app.route('/api/system', systemRouter);
 app.route('/api/scan', scanRouter);
 app.route('/api/sources', sourcesRouter);
 app.route('/api/orbit', orbitRouter);
+
+// ---------------------------------------------------------------------------
+// Static web dashboard (serve web/dist/ if it exists)
+// ---------------------------------------------------------------------------
+
+const hasWebDist = existsSync(join(WEB_DIST, 'index.html'));
+
+if (hasWebDist) {
+  // Serve static assets (JS, CSS, images)
+  app.use('/*', serveStatic({ root: WEB_DIST }));
+
+  // SPA fallback — non-API, non-asset routes return index.html
+  app.get('*', (c) => {
+    const indexPath = join(WEB_DIST, 'index.html');
+    const html = readFileSync(indexPath, 'utf-8');
+    return c.html(html);
+  });
+}
 
 // Global error handler
 app.onError((err, c) => {

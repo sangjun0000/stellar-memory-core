@@ -134,6 +134,19 @@ export function importanceToDistance(importance: number): number {
 }
 
 /**
+ * Inverse of importanceToDistance — derive importance from a given distance.
+ *
+ * Used when a user manually drags a memory to a new orbital position.
+ */
+export function distanceToImportance(distance: number): number {
+  const MIN_DISTANCE = 0.1;
+  const MAX_DISTANCE = 100.0;
+  const clamped = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, distance));
+  const normalized = (clamped - MIN_DISTANCE) / (MAX_DISTANCE - MIN_DISTANCE);
+  return Math.max(0.0, Math.min(1.0, 1 - Math.sqrt(normalized)));
+}
+
+/**
  * Return the orbit zone label for a given distance.
  *
  * Iterates ORBIT_ZONES in definition order (corona → oort) and returns the

@@ -36,28 +36,7 @@
   }
 }
 
-/* Sun glow animation */
-@keyframes sun-pulse {
-  0%, 100% { filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.6)); }
-  50%       { filter: drop-shadow(0 0 32px rgba(251, 191, 36, 0.9)); }
-}
-
-.sun-glow {
-  animation: sun-pulse 3s ease-in-out infinite;
-}
-
-/* Planet hover */
-.planet-dot {
-  transition: r 0.15s ease, filter 0.15s ease;
-  cursor: pointer;
-}
-
-.planet-dot:hover {
-  filter: brightness(1.4);
-}
-
-/* Orbit ring */
-.orbit-ring {
-  fill: none;
-  stroke-dasharray: 4 8;
+/* 3D Canvas */
+canvas {
+  outline: none !important;
 }

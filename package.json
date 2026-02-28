@@ -1,6 +1,6 @@
 {
   "name": "stellar-memory",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI memory system using celestial mechanics metaphor - MCP server for persistent context across sessions",
   "type": "module",
   "main": "dist/index.js",
@@ -9,10 +9,15 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:web": "cd web && npx vite build",
+    "build:electron": "tsc -p electron/tsconfig.json && node --input-type=commonjs -e \"require('fs').writeFileSync('dist-electron/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\"",
+    "build:all": "npm run build && npm run build:web && npm run build:electron",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "api": "tsx src/api/server.ts",
     "api:start": "node dist/api/server.js",
+    "electron:dev": "npm run build:all && electron dist-electron/main.js",
+    "electron:pack": "npm run build:all && electron-builder --config electron-builder.yml",
     "test": "vitest run",
     "test:watch": "vitest",
     "daemon": "tsx src/service/daemon.ts",
@@ -40,6 +45,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.13",
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"

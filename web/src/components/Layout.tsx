@@ -30,7 +30,7 @@ export function Layout({ sidebar, main, detail }: LayoutProps) {
 
         {/* Right detail panel */}
         {detail && (
-          <aside className="flex-shrink-0 w-72 bg-space-900 border-l border-gray-800 overflow-hidden">
+          <aside className="flex-shrink-0 w-80 bg-space-900 border-l border-gray-800 overflow-hidden">
             {detail}
           </aside>
         )}

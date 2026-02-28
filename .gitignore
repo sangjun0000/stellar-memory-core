@@ -7,3 +7,5 @@ data/*.db-shm
 .env
 web/dist/
 web/node_modules/
+dist-electron/
+release/

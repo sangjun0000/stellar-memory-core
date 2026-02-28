@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from './api/client';
 import type { Memory, SunState, ZoneStat, OrbitZone } from './api/client';
 import { Layout } from './components/Layout';
@@ -277,6 +277,19 @@ export default function App() {
   }, [project, loadAll]);
 
   // ---------------------------------------------------------------------------
+  // Drag — update orbit distance
+  // ---------------------------------------------------------------------------
+
+  const handleDragEnd = useCallback(async (memoryId: string, newDistance: number) => {
+    try {
+      await api.updateOrbit(memoryId, newDistance);
+      void loadAll(project);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update orbit');
+    }
+  }, [project, loadAll]);
+
+  // ---------------------------------------------------------------------------
   // Orbit recalc
   // ---------------------------------------------------------------------------
 
@@ -295,6 +308,12 @@ export default function App() {
 
   const selectedId   = detail?.type === 'memory' ? detail.memory.id : null;
   const totalMemories = zones.reduce((sum, z) => sum + z.count, 0) || memories.length;
+
+  // Filter out empty/contentless memories from the 3D view
+  const visibleMemories = useMemo(
+    () => memories.filter((m) => m.content && m.content.trim().length > 0),
+    [memories],
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -346,7 +365,7 @@ export default function App() {
 
   // Main panel
   const main = (
-    <div className="flex flex-col h-full">
+    <div className="absolute inset-0 flex flex-col">
       {/* Stats bar */}
       <StatsBar
         totalMemories={totalMemories}
@@ -380,18 +399,20 @@ export default function App() {
       )}
 
       {/* Canvas */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0 overflow-hidden">
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
             Loading...
           </div>
         ) : (
           <SolarSystem
-            memories={memories}
+            memories={visibleMemories}
             sun={sun}
             selectedId={selectedId}
             onSelectMemory={(m) => setDetail(m ? { type: 'memory', memory: m } : null)}
             onSelectSun={() => setDetail({ type: 'sun' })}
+            onDragEnd={handleDragEnd}
+            totalCount={memories.length}
           />
         )}
       </div>

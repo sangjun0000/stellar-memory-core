@@ -1,0 +1,30 @@
+appId: com.stellarmemory.app
+productName: Stellar Memory
+copyright: Copyright © 2025-2026
+
+directories:
+  output: release
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - web/dist/**/*
+  - package.json
+
+extraMetadata:
+  main: dist-electron/main.js
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: web/dist/favicon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Stellar Memory

@@ -8,7 +8,9 @@ import {
 import { ORBIT_ZONES } from '../../engine/types.js';
 import type { OrbitZone, MemoryType } from '../../engine/types.js';
 import { IMPACT_DEFAULTS } from '../../engine/types.js';
-import { importanceToDistance } from '../../engine/orbit.js';
+import { importanceToDistance, distanceToImportance } from '../../engine/orbit.js';
+import { updateMemoryOrbit, insertOrbitLog } from '../../storage/queries.js';
+import type { OrbitChange } from '../../engine/types.js';
 import { recallMemoriesAsync } from '../../engine/planet.js';
 import { forgetMemory } from '../../engine/planet.js';
 
@@ -169,6 +171,58 @@ app.post('/:id/forget', async (c) => {
     const message = err instanceof Error ? err.message : 'Forget failed';
     return c.json({ ok: false, error: message }, 500);
   }
+});
+
+// PATCH /api/memories/:id/orbit — manually set orbit distance (drag & drop)
+//
+// Body:
+//   { distance: number }  — new orbital distance in AU (0.1–100)
+app.patch('/:id/orbit', async (c) => {
+  const id = c.req.param('id');
+  const memory = getMemoryById(id);
+
+  if (!memory) {
+    return c.json({ ok: false, error: 'Memory not found' }, 404);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ ok: false, error: 'Invalid JSON body' }, 400);
+  }
+
+  const newDistance = body.distance as number | undefined;
+  if (typeof newDistance !== 'number' || newDistance < 0.1 || newDistance > 100) {
+    return c.json({ ok: false, error: 'distance must be a number between 0.1 and 100' }, 400);
+  }
+
+  const newImportance = distanceToImportance(newDistance);
+  const velocity = newDistance - memory.distance;
+
+  updateMemoryOrbit(id, newDistance, newImportance, velocity);
+
+  const change: OrbitChange = {
+    memory_id: id,
+    project: memory.project,
+    old_distance: memory.distance,
+    new_distance: newDistance,
+    old_importance: memory.importance,
+    new_importance: newImportance,
+    trigger: 'manual',
+  };
+  insertOrbitLog(change);
+
+  return c.json({
+    ok: true,
+    data: {
+      id,
+      old_distance: memory.distance,
+      new_distance: newDistance,
+      old_importance: memory.importance,
+      new_importance: newImportance,
+    },
+  });
 });
 
 // DELETE /api/memories/:id — soft delete (legacy endpoint, kept for compatibility)
