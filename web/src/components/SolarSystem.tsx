@@ -5,7 +5,7 @@ import {
 import { Canvas, useFrame, useThree, type ThreeEvent, extend } from '@react-three/fiber';
 import { OrbitControls, Text, Html, Stars, Sparkles, shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import type { Memory, SunState, OrbitZone } from '../api/client';
+import type { Memory, SunState, OrbitZone, ConstellationEdge } from '../api/client';
 import { MEMORY_COLORS } from './Planet';
 
 // Minimum pointer distance (px) before a press becomes a drag
@@ -385,6 +385,85 @@ const TYPE_VISUAL: Record<string, { emissiveBoost: number; roughness: number; me
   milestone:   { emissiveBoost: 0.2,  roughness: 0.2, metalness: 0.5, pulseSpeed: 1.5 }, // golden shine
   context:     { emissiveBoost: 0.1,  roughness: 0.3, metalness: 0.6, pulseSpeed: 0.8 }, // purple gem
 };
+
+// ---------------------------------------------------------------------------
+// Relation type → line color
+// ---------------------------------------------------------------------------
+
+const RELATION_COLORS: Record<string, string> = {
+  related_to:   '#60a5fa',  // blue
+  uses:         '#34d399',  // emerald
+  depends_on:   '#6ee7b7',  // light emerald
+  caused_by:    '#f87171',  // red
+  part_of:      '#a78bfa',  // violet
+  derived_from: '#c084fc',  // purple
+  contradicts:  '#fb923c',  // orange
+  supersedes:   '#facc15',  // yellow
+};
+
+// ---------------------------------------------------------------------------
+// ConstellationLines — renders edges as line segments in 3D
+// ---------------------------------------------------------------------------
+
+function ConstellationLines({
+  edges,
+  memories,
+  selectedId,
+}: {
+  edges: ConstellationEdge[];
+  memories: Memory[];
+  selectedId: string | null;
+}) {
+  const posMap = useMemo(() => {
+    const map = new Map<string, THREE.Vector3>();
+    for (const m of memories) {
+      const r = auTo3D(m.distance);
+      const { theta, phi } = idToAngles(m.id);
+      map.set(m.id, new THREE.Vector3(
+        r * Math.cos(phi) * Math.cos(theta),
+        r * Math.sin(phi),
+        r * Math.cos(phi) * Math.sin(theta),
+      ));
+    }
+    return map;
+  }, [memories]);
+
+  if (edges.length === 0) return null;
+
+  return (
+    <>
+      {edges.map((edge) => {
+        const src = posMap.get(edge.source_id);
+        const tgt = posMap.get(edge.target_id);
+        if (!src || !tgt) return null;
+
+        const isHighlighted =
+          selectedId !== null &&
+          (edge.source_id === selectedId || edge.target_id === selectedId);
+
+        const color  = RELATION_COLORS[edge.relation] ?? '#60a5fa';
+        const opacity = isHighlighted ? 0.75 : Math.max(0.08, edge.weight * 0.35);
+        const lineWidth = isHighlighted ? 0.018 : 0.008;
+
+        // Build a tube geometry between the two 3D points
+        const curve = new THREE.LineCurve3(src, tgt);
+        const tubeGeom = new THREE.TubeGeometry(curve, 1, lineWidth, 4, false);
+
+        return (
+          <mesh key={edge.id} geometry={tubeGeom}>
+            <meshBasicMaterial
+              color={color}
+              transparent
+              opacity={opacity}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Orbit Trails rendered at scene level (correct positioning)
@@ -956,15 +1035,17 @@ interface SceneProps {
   onSelectMemory: (memory: Memory | null) => void;
   onSelectSun: () => void;
   onDragEnd?: (memoryId: string, newDistanceAU: number) => void;
+  constellationEdges?: ConstellationEdge[];
 }
 
-function Scene({ memories, sun, selectedId, onSelectMemory, onSelectSun, onDragEnd }: SceneProps) {
+function Scene({ memories, sun, selectedId, onSelectMemory, onSelectSun, onDragEnd, constellationEdges = [] }: SceneProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<THREE.Vector3 | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [idle, setIdle] = useState(false);
   const controlsRef = useRef<any>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justSelectedRef = useRef(false);
 
   // Track user interaction to toggle auto-rotate
   const resetIdleTimer = useCallback(() => {
@@ -996,6 +1077,10 @@ function Scene({ memories, sun, selectedId, onSelectMemory, onSelectSun, onDragE
   }, [onDragEnd]);
 
   const handleBgClick = useCallback(() => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
     if (!draggingId) {
       onSelectMemory(null);
       setHoveredId(null);
@@ -1064,6 +1149,15 @@ function Scene({ memories, sun, selectedId, onSelectMemory, onSelectSun, onDragE
       {/* Planet orbital trails at scene level */}
       <OrbitTrailScene memories={memories} />
 
+      {/* Constellation relationship lines */}
+      {constellationEdges.length > 0 && (
+        <ConstellationLines
+          edges={constellationEdges}
+          memories={memories}
+          selectedId={selectedId}
+        />
+      )}
+
       {/* Drag plane */}
       <DragPlane isDragging={!!draggingId} onDragMove={handleDragMove} />
 
@@ -1078,7 +1172,7 @@ function Scene({ memories, sun, selectedId, onSelectMemory, onSelectSun, onDragE
         draggingId={draggingId}
         dragPos={dragPos}
         onHover={setHoveredId}
-        onSelect={onSelectMemory}
+        onSelect={(m) => { justSelectedRef.current = true; onSelectMemory(m); }}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       />
@@ -1272,6 +1366,7 @@ export interface SolarSystemProps {
   onSelectSun: () => void;
   onDragEnd?: (memoryId: string, newDistanceAU: number) => void;
   totalCount?: number;
+  constellationEdges?: ConstellationEdge[];
 }
 
 export function SolarSystem(props: SolarSystemProps) {
@@ -1300,7 +1395,10 @@ export function SolarSystem(props: SolarSystemProps) {
           }}
         >
           <Suspense fallback={null}>
-            <Scene {...props} />
+            <Scene
+              {...props}
+              constellationEdges={props.constellationEdges ?? []}
+            />
           </Suspense>
         </Canvas>
       </CanvasErrorBoundary>
