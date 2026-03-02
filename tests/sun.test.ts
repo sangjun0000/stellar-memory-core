@@ -125,7 +125,7 @@ describe('sun — working context management', () => {
         last_commit_at: null,
         updated_at: new Date().toISOString(),
       };
-      const result = formatSunContent(sun, []);
+      const result = formatSunContent(sun, [], []);
       expect(result).toContain('WORKING ON');
       expect(result).toContain('Building API');
       expect(result).toContain('RECENT DECISIONS');
@@ -136,7 +136,7 @@ describe('sun — working context management', () => {
       expect(result).toContain('CORS issue');
     });
 
-    it('includes nearest memories section', () => {
+    it('includes core identity and active context sections', () => {
       const sun: SunState = {
         project: 'test',
         content: '',
@@ -149,8 +149,30 @@ describe('sun — working context management', () => {
         last_commit_at: null,
         updated_at: new Date().toISOString(),
       };
-      const memories: Memory[] = [{
-        id: 'test-id',
+      const coreMemory: Memory = {
+        id: 'core-id',
+        project: 'test',
+        content: 'A core memory',
+        summary: 'Core memory summary',
+        type: 'decision',
+        tags: [],
+        distance: 0.5,
+        importance: 0.95,
+        velocity: 0,
+        impact: 0.8,
+        access_count: 10,
+        last_accessed_at: null,
+        metadata: {},
+        source: null,
+        source_path: null,
+        source_hash: null,
+        content_hash: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+      const nearMemory: Memory = {
+        id: 'near-id',
         project: 'test',
         content: 'A nearby memory',
         summary: 'Nearby memory summary',
@@ -163,13 +185,19 @@ describe('sun — working context management', () => {
         access_count: 3,
         last_accessed_at: null,
         metadata: {},
+        source: null,
+        source_path: null,
+        source_hash: null,
+        content_hash: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         deleted_at: null,
-      }];
+      };
 
-      const result = formatSunContent(sun, memories);
-      expect(result).toContain('NEAREST MEMORIES');
+      const result = formatSunContent(sun, [coreMemory], [nearMemory]);
+      expect(result).toContain('CORE IDENTITY');
+      expect(result).toContain('Core memory summary');
+      expect(result).toContain('ACTIVE CONTEXT');
       expect(result).toContain('Nearby memory summary');
     });
   });

@@ -1,6 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { getDatabase } from './database.js';
-import type { Memory, MemoryType, OrbitZone, OrbitChange, SunState } from '../engine/types.js';
+import type {
+  Memory,
+  MemoryType,
+  OrbitZone,
+  OrbitChange,
+  SunState,
+  ConstellationEdge,
+  RelationType,
+  MemoryConflict,
+  MemoryAnalytics,
+  ObservationEntry,
+} from '../engine/types.js';
 import { ORBIT_ZONES } from '../engine/types.js';
 import type { DataSource } from '../scanner/types.js';
 import { createLogger } from '../utils/logger.js';
@@ -32,6 +43,45 @@ interface RawMemoryRow {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  superseded_by: string | null;
+  consolidated_into: string | null;
+  quality_score: number | null;
+  is_universal: number | null;
+}
+
+interface RawConstellationEdgeRow {
+  id: string;
+  source_id: string;
+  target_id: string;
+  relation: string;
+  weight: number;
+  project: string;
+  metadata: string;
+  created_at: string;
+}
+
+interface RawConflictRow {
+  id: string;
+  memory_id: string;
+  conflicting_memory_id: string;
+  severity: string;
+  description: string;
+  status: string;
+  resolution: string | null;
+  project: string;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+interface RawObservationRow {
+  id: string;
+  content: string;
+  extracted_memories: string;
+  source: string;
+  project: string;
+  created_at: string;
 }
 
 interface RawDataSourceRow {
@@ -84,6 +134,38 @@ function deserializeMemory(row: RawMemoryRow): Memory {
     source_path: row.source_path ?? null,
     source_hash: row.source_hash ?? null,
     content_hash: row.content_hash ?? null,
+    valid_from: row.valid_from ?? undefined,
+    valid_until: row.valid_until ?? undefined,
+    superseded_by: row.superseded_by ?? undefined,
+    consolidated_into: row.consolidated_into ?? undefined,
+    quality_score: row.quality_score ?? undefined,
+    is_universal: row.is_universal ? Boolean(row.is_universal) : undefined,
+  };
+}
+
+function deserializeConstellationEdge(row: RawConstellationEdgeRow): ConstellationEdge {
+  return {
+    ...row,
+    relation: row.relation as RelationType,
+    metadata: parseJsonObject(row.metadata),
+  };
+}
+
+function deserializeConflict(row: RawConflictRow): MemoryConflict {
+  return {
+    ...row,
+    severity: row.severity as MemoryConflict['severity'],
+    status: row.status as MemoryConflict['status'],
+    resolution: row.resolution ?? undefined,
+    resolved_at: row.resolved_at ?? undefined,
+  };
+}
+
+function deserializeObservation(row: RawObservationRow): ObservationEntry {
+  return {
+    ...row,
+    extracted_memories: parseJsonArray(row.extracted_memories),
+    source: row.source as ObservationEntry['source'],
   };
 }
 
@@ -322,6 +404,36 @@ export function searchMemories(
 }
 
 // ---------------------------------------------------------------------------
+// Distance-ranged FTS5 search (used by tiered recall pipeline)
+// ---------------------------------------------------------------------------
+
+export function searchMemoriesInRange(
+  project: string,
+  query: string,
+  minDistance: number,
+  maxDistance: number,
+  limit: number,
+): Memory[] {
+  const db = getDatabase();
+  const escapedQuery = escapeFtsQuery(query);
+
+  const rows = db.prepare(`
+    SELECT m.*
+    FROM memories m
+    JOIN memories_fts fts ON m.rowid = fts.rowid
+    WHERE memories_fts MATCH ?
+      AND m.project = ?
+      AND m.deleted_at IS NULL
+      AND m.distance >= ?
+      AND m.distance < ?
+    ORDER BY rank
+    LIMIT ?
+  `).all(escapedQuery, project, minDistance, maxDistance, limit) as unknown[];
+
+  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+}
+
+// ---------------------------------------------------------------------------
 // Nearest memories (by orbital distance — closest to the "sun" first)
 // ---------------------------------------------------------------------------
 
@@ -527,4 +639,478 @@ export function getDataSourceByPath(path: string): DataSource | null {
   const db = getDatabase();
   const row = db.prepare(`SELECT * FROM data_sources WHERE path = ? LIMIT 1`).get(path);
   return row ? deserializeDataSource(asRawDataSource(row)) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Constellation queries (Knowledge Graph)
+// ---------------------------------------------------------------------------
+
+export function createEdge(edge: ConstellationEdge): void {
+  const db = getDatabase();
+  db.prepare(`
+    INSERT INTO constellation_edges (id, source_id, target_id, relation, weight, project, metadata, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(source_id, target_id, relation) DO UPDATE SET
+      weight = excluded.weight,
+      metadata = excluded.metadata
+  `).run(
+    edge.id,
+    edge.source_id,
+    edge.target_id,
+    edge.relation,
+    edge.weight,
+    edge.project,
+    JSON.stringify(edge.metadata ?? {}),
+    edge.created_at,
+  );
+}
+
+export function getEdges(memoryId: string, project: string): ConstellationEdge[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM constellation_edges
+    WHERE (source_id = ? OR target_id = ?) AND project = ?
+    ORDER BY weight DESC
+  `).all(memoryId, memoryId, project) as unknown[];
+  return rows.map((r) => deserializeConstellationEdge(r as RawConstellationEdgeRow));
+}
+
+export function getConstellation(
+  memoryId: string,
+  project: string,
+  depth = 1
+): { nodes: Memory[]; edges: ConstellationEdge[] } {
+  const db = getDatabase();
+
+  const visitedNodeIds = new Set<string>([memoryId]);
+  const allEdges: ConstellationEdge[] = [];
+  let frontier = [memoryId];
+
+  for (let d = 0; d < depth; d++) {
+    if (frontier.length === 0) break;
+    const placeholders = frontier.map(() => '?').join(', ');
+    const edgeRows = db.prepare(`
+      SELECT * FROM constellation_edges
+      WHERE (source_id IN (${placeholders}) OR target_id IN (${placeholders}))
+        AND project = ?
+    `).all(...frontier, ...frontier, project) as unknown[];
+
+    for (const r of edgeRows) {
+      const edge = deserializeConstellationEdge(r as RawConstellationEdgeRow);
+      allEdges.push(edge);
+      visitedNodeIds.add(edge.source_id);
+      visitedNodeIds.add(edge.target_id);
+    }
+
+    frontier = [...visitedNodeIds].filter((id) => !frontier.includes(id) && id !== memoryId);
+  }
+
+  const nodes = getMemoryByIds([...visitedNodeIds]);
+  return { nodes, edges: allEdges };
+}
+
+export function deleteEdge(id: string): void {
+  const db = getDatabase();
+  db.prepare(`DELETE FROM constellation_edges WHERE id = ?`).run(id);
+}
+
+// ---------------------------------------------------------------------------
+// Conflict queries
+// ---------------------------------------------------------------------------
+
+export function createConflict(conflict: MemoryConflict): void {
+  const db = getDatabase();
+  db.prepare(`
+    INSERT INTO memory_conflicts (
+      id, memory_id, conflicting_memory_id, severity,
+      description, status, resolution, project, created_at, resolved_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    conflict.id,
+    conflict.memory_id,
+    conflict.conflicting_memory_id,
+    conflict.severity,
+    conflict.description,
+    conflict.status,
+    conflict.resolution ?? null,
+    conflict.project,
+    conflict.created_at,
+    conflict.resolved_at ?? null,
+  );
+}
+
+export function getConflicts(project: string, status?: string): MemoryConflict[] {
+  const db = getDatabase();
+  const rows = status
+    ? db.prepare(`
+        SELECT * FROM memory_conflicts
+        WHERE project = ? AND status = ?
+        ORDER BY created_at DESC
+      `).all(project, status) as unknown[]
+    : db.prepare(`
+        SELECT * FROM memory_conflicts
+        WHERE project = ?
+        ORDER BY created_at DESC
+      `).all(project) as unknown[];
+  return rows.map((r) => deserializeConflict(r as RawConflictRow));
+}
+
+export function getConflictsForMemory(memoryId: string): MemoryConflict[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM memory_conflicts
+    WHERE memory_id = ? OR conflicting_memory_id = ?
+    ORDER BY created_at DESC
+  `).all(memoryId, memoryId) as unknown[];
+  return rows.map((r) => deserializeConflict(r as RawConflictRow));
+}
+
+export function resolveConflict(id: string, resolution: string): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE memory_conflicts
+    SET status = 'resolved', resolution = ?, resolved_at = ?
+    WHERE id = ?
+  `).run(resolution, now, id);
+}
+
+// ---------------------------------------------------------------------------
+// Observation queries
+// ---------------------------------------------------------------------------
+
+export function createObservation(entry: ObservationEntry): void {
+  const db = getDatabase();
+  db.prepare(`
+    INSERT INTO observation_log (id, content, extracted_memories, source, project, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    entry.id,
+    entry.content,
+    JSON.stringify(entry.extracted_memories),
+    entry.source,
+    entry.project,
+    entry.created_at,
+  );
+}
+
+export function getObservations(project: string, limit = 20): ObservationEntry[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM observation_log
+    WHERE project = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(project, limit) as unknown[];
+  return rows.map((r) => deserializeObservation(r as RawObservationRow));
+}
+
+// ---------------------------------------------------------------------------
+// Temporal queries
+// ---------------------------------------------------------------------------
+
+export function getMemoriesAtTime(project: string, timestamp: string): Memory[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM memories
+    WHERE project = ?
+      AND deleted_at IS NULL
+      AND (valid_from IS NULL OR valid_from <= ?)
+      AND (valid_until IS NULL OR valid_until > ?)
+    ORDER BY distance ASC
+  `).all(project, timestamp, timestamp) as unknown[];
+  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+}
+
+export function supersedMemory(memoryId: string, newMemoryId: string): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE memories
+    SET superseded_by = ?, valid_until = ?, updated_at = ?
+    WHERE id = ?
+  `).run(newMemoryId, now, now, memoryId);
+}
+
+export function getSupersessionChain(memoryId: string): Memory[] {
+  const db = getDatabase();
+  const chain: Memory[] = [];
+  let currentId: string | null = memoryId;
+
+  while (currentId) {
+    const row = db.prepare(`SELECT * FROM memories WHERE id = ?`).get(currentId);
+    if (!row) break;
+    const mem = deserializeMemory(asRawMemory(row));
+    chain.push(mem);
+    currentId = mem.superseded_by ?? null;
+  }
+
+  return chain;
+}
+
+// ---------------------------------------------------------------------------
+// Consolidation queries
+// ---------------------------------------------------------------------------
+
+export function consolidateMemories(sourceIds: string[], targetId: string): void {
+  if (sourceIds.length === 0) return;
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const placeholders = sourceIds.map(() => '?').join(', ');
+  db.prepare(`
+    UPDATE memories
+    SET consolidated_into = ?, updated_at = ?
+    WHERE id IN (${placeholders})
+  `).run(targetId, now, ...sourceIds);
+}
+
+export function getConsolidationHistory(memoryId: string): Memory[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM memories
+    WHERE consolidated_into = ?
+    ORDER BY created_at ASC
+  `).all(memoryId) as unknown[];
+  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+}
+
+// ---------------------------------------------------------------------------
+// Multi-project queries
+// ---------------------------------------------------------------------------
+
+export function getUniversalMemories(limit = 50): Memory[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM memories
+    WHERE is_universal = 1 AND deleted_at IS NULL
+    ORDER BY importance DESC
+    LIMIT ?
+  `).all(limit) as unknown[];
+  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+}
+
+export function setUniversal(memoryId: string, isUniversal: boolean): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE memories SET is_universal = ?, updated_at = ? WHERE id = ?
+  `).run(isUniversal ? 1 : 0, now, memoryId);
+}
+
+export function listProjects(): Array<{ project: string; count: number }> {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT project, COUNT(*) as count
+    FROM memories
+    WHERE deleted_at IS NULL
+    GROUP BY project
+    ORDER BY count DESC
+  `).all() as unknown[];
+  return rows.map((r) => {
+    const row = r as { project: string; count: number };
+    return { project: row.project, count: row.count };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Quality queries
+// ---------------------------------------------------------------------------
+
+export function updateQualityScore(memoryId: string, score: number): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE memories SET quality_score = ?, updated_at = ? WHERE id = ?
+  `).run(score, now, memoryId);
+}
+
+export function getMemoriesByQuality(
+  project: string,
+  minScore = 0.0,
+  maxScore = 1.0
+): Memory[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM memories
+    WHERE project = ?
+      AND deleted_at IS NULL
+      AND quality_score >= ?
+      AND quality_score <= ?
+    ORDER BY quality_score DESC
+  `).all(project, minScore, maxScore) as unknown[];
+  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+}
+
+// ---------------------------------------------------------------------------
+// Analytics queries
+// ---------------------------------------------------------------------------
+
+export function getTopTags(project: string, limit = 20): Array<{ tag: string; count: number }> {
+  const db = getDatabase();
+  // Tags are stored as JSON arrays — we use the memories table and parse in JS
+  const rows = db.prepare(`
+    SELECT tags FROM memories
+    WHERE project = ? AND deleted_at IS NULL
+  `).all(project) as unknown[];
+
+  const tagCounts = new Map<string, number>();
+  for (const r of rows) {
+    const row = r as { tags: string };
+    const tags = parseJsonArray(row.tags);
+    for (const tag of tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return [...tagCounts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+export function getActivityTimeline(
+  project: string,
+  days = 30
+): Array<{ date: string; created: number; accessed: number }> {
+  const db = getDatabase();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const createdRows = db.prepare(`
+    SELECT date(created_at) as date, COUNT(*) as count
+    FROM memories
+    WHERE project = ? AND date(created_at) >= ?
+    GROUP BY date(created_at)
+  `).all(project, cutoff) as unknown[];
+
+  const accessedRows = db.prepare(`
+    SELECT date(last_accessed_at) as date, COUNT(*) as count
+    FROM memories
+    WHERE project = ?
+      AND last_accessed_at IS NOT NULL
+      AND date(last_accessed_at) >= ?
+    GROUP BY date(last_accessed_at)
+  `).all(project, cutoff) as unknown[];
+
+  const timeline = new Map<string, { created: number; accessed: number }>();
+
+  for (const r of createdRows) {
+    const row = r as { date: string; count: number };
+    const entry = timeline.get(row.date) ?? { created: 0, accessed: 0 };
+    entry.created = row.count;
+    timeline.set(row.date, entry);
+  }
+
+  for (const r of accessedRows) {
+    const row = r as { date: string; count: number };
+    const entry = timeline.get(row.date) ?? { created: 0, accessed: 0 };
+    entry.accessed = row.count;
+    timeline.set(row.date, entry);
+  }
+
+  return [...timeline.entries()]
+    .map(([date, counts]) => ({ date, ...counts }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function getRecallSuccessRate(project: string): number {
+  const db = getDatabase();
+  const result = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN access_count > 0 THEN 1 ELSE 0 END) as accessed
+    FROM memories
+    WHERE project = ? AND deleted_at IS NULL
+  `).get(project) as unknown;
+
+  const row = result as { total: number; accessed: number } | undefined;
+  if (!row || row.total === 0) return 0;
+  return row.accessed / row.total;
+}
+
+export function getAnalytics(project: string): MemoryAnalytics {
+  const db = getDatabase();
+
+  // Aggregate stats
+  const statsRow = db.prepare(`
+    SELECT
+      COUNT(*) as total_memories,
+      AVG(CASE WHEN quality_score IS NOT NULL THEN quality_score ELSE 0.5 END) as avg_quality,
+      AVG(importance) as avg_importance,
+      SUM(CASE WHEN consolidated_into IS NOT NULL THEN 1 ELSE 0 END) as consolidation_count
+    FROM memories
+    WHERE project = ? AND deleted_at IS NULL
+  `).get(project) as unknown;
+
+  const stats = (statsRow ?? {}) as {
+    total_memories: number;
+    avg_quality: number;
+    avg_importance: number;
+    consolidation_count: number;
+  };
+
+  // Zone distribution
+  const zoneRows = db.prepare(`
+    SELECT
+      CASE
+        WHEN distance < 1.0  THEN 'core'
+        WHEN distance < 5.0  THEN 'near'
+        WHEN distance < 15.0 THEN 'active'
+        WHEN distance < 40.0 THEN 'archive'
+        WHEN distance < 70.0 THEN 'fading'
+        ELSE 'forgotten'
+      END as zone,
+      COUNT(*) as count
+    FROM memories
+    WHERE project = ? AND deleted_at IS NULL
+    GROUP BY zone
+  `).all(project) as unknown[];
+
+  const zone_distribution: Record<string, number> = {};
+  for (const r of zoneRows) {
+    const row = r as { zone: string; count: number };
+    zone_distribution[row.zone] = row.count;
+  }
+
+  // Type distribution
+  const typeRows = db.prepare(`
+    SELECT type, COUNT(*) as count
+    FROM memories
+    WHERE project = ? AND deleted_at IS NULL
+    GROUP BY type
+  `).all(project) as unknown[];
+
+  const type_distribution: Record<string, number> = {};
+  for (const r of typeRows) {
+    const row = r as { type: string; count: number };
+    type_distribution[row.type] = row.count;
+  }
+
+  // Conflict count
+  const conflictRow = db.prepare(`
+    SELECT COUNT(*) as count FROM memory_conflicts
+    WHERE project = ? AND status = 'open'
+  `).get(project) as unknown;
+  const conflict_count = ((conflictRow as { count: number } | undefined)?.count) ?? 0;
+
+  // Activity timeline (last 30 days)
+  const timelineRows = getActivityTimeline(project, 30);
+  const activity_timeline = timelineRows.map((row) => ({
+    date: row.date,
+    created: row.created,
+    accessed: row.accessed,
+    forgotten: 0, // soft-delete count per day — simplified to 0 here
+  }));
+
+  return {
+    total_memories: stats.total_memories ?? 0,
+    zone_distribution,
+    type_distribution,
+    avg_quality: stats.avg_quality ?? 0.5,
+    avg_importance: stats.avg_importance ?? 0.5,
+    recall_success_rate: getRecallSuccessRate(project),
+    consolidation_count: stats.consolidation_count ?? 0,
+    conflict_count,
+    top_tags: getTopTags(project),
+    activity_timeline,
+  };
 }

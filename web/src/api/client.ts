@@ -2,8 +2,8 @@
 // Types mirrored from the engine (no direct import to avoid bundling Node.js)
 // ---------------------------------------------------------------------------
 
-export type MemoryType = 'decision' | 'observation' | 'task' | 'context' | 'error' | 'milestone';
-export type OrbitZone = 'corona' | 'inner' | 'habitable' | 'outer' | 'kuiper' | 'oort';
+export type MemoryType = 'decision' | 'observation' | 'task' | 'context' | 'error' | 'milestone' | 'procedural';
+export type OrbitZone = 'core' | 'near' | 'active' | 'archive' | 'fading' | 'forgotten';
 
 export interface Memory {
   id: string;
@@ -23,6 +23,14 @@ export interface Memory {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // Temporal fields
+  valid_from?: string | null;
+  valid_until?: string | null;
+  superseded_by?: string | null;
+  consolidated_into?: string | null;
+  // Quality / universal
+  quality_score?: number | null;
+  is_universal?: boolean;
 }
 
 export interface SunState {
@@ -63,6 +71,94 @@ export interface DataSource {
   file_count: number;
   last_scanned_at: string | null;
   error?: string;
+}
+
+export type RelationType = 'uses' | 'caused_by' | 'part_of' | 'contradicts' | 'supersedes' | 'related_to' | 'depends_on' | 'derived_from';
+
+export interface ConstellationEdge {
+  id: string;
+  source_id: string;
+  target_id: string;
+  relation: RelationType;
+  weight: number;
+  project: string;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ConstellationGraph {
+  nodes: Memory[];
+  edges: ConstellationEdge[];
+}
+
+// ---------------------------------------------------------------------------
+// New types — multi-project, conflicts, consolidation, analytics
+// ---------------------------------------------------------------------------
+
+export interface MemoryConflict {
+  id: string;
+  memory_id: string;
+  conflicting_memory_id: string;
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  resolution?: string;
+  project: string;
+  created_at: string;
+  resolved_at?: string;
+}
+
+export interface ObservationEntry {
+  id: string;
+  content: string;
+  extracted_memories: string[];
+  source: 'conversation' | 'reflection';
+  project: string;
+  created_at: string;
+}
+
+export interface ProjectInfo {
+  project: string;
+  memoryCount: number;
+  lastUpdated?: string;
+  hasUniversal?: boolean;
+}
+
+export interface MemoryHealth {
+  totalMemories: number;
+  activeRatio: number;
+  staleRatio: number;
+  qualityAvg: number;
+  conflictRatio: number;
+  consolidationOpportunities: number;
+  recommendations: string[];
+}
+
+export interface TopicCluster {
+  topic: string;
+  memoryCount: number;
+  avgImportance: number;
+  avgDistance: number;
+  recentActivity: number;
+}
+
+export interface SurvivalPoint {
+  ageInDays: number;
+  survivingCount: number;
+  accessedCount: number;
+  forgottenCount: number;
+}
+
+export interface AnalyticsOverview {
+  total_memories: number;
+  zone_distribution: Record<string, number>;
+  type_distribution: Record<string, number>;
+  avg_quality: number;
+  avg_importance: number;
+  recall_success_rate: number;
+  consolidation_count: number;
+  conflict_count: number;
+  top_tags: Array<{ tag: string; count: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +219,7 @@ async function del<T>(path: string): Promise<T> {
 }
 
 export const api = {
+  // Memories
   getMemories: (params?: { project?: string; zone?: OrbitZone; limit?: number }) =>
     get<{ data: Memory[]; total: number }>('/api/memories', params as Record<string, string | number | undefined>),
 
@@ -158,6 +255,7 @@ export const api = {
   forgetMemory: (id: string) =>
     del<{ ok: boolean; id: string }>(`/api/memories/${id}`),
 
+  // Sun
   getSun: (project?: string) =>
     get<{ data: SunState | null }>('/api/sun', { project }),
 
@@ -170,6 +268,7 @@ export const api = {
     context?: string;
   }) => post<{ data: SunState; success: boolean }>('/api/sun/commit', body),
 
+  // System
   getSystemStatus: (project?: string) =>
     get<{ data: SystemStatus }>('/api/system/status', { project }),
 
@@ -179,6 +278,91 @@ export const api = {
   getZoneStats: (project?: string) =>
     get<{ data: ZoneStat[] }>('/api/system/zones', { project }),
 
+  // Data sources
   getDataSources: (project?: string) =>
     get<{ data: DataSource[] }>('/api/sources', { project }),
+
+  // Constellation
+  getConstellation: (id: string, project?: string, depth?: number) =>
+    get<{ ok: boolean; data: ConstellationGraph }>(
+      `/api/constellation/${id}`,
+      { project, depth } as Record<string, string | number | undefined>,
+    ),
+
+  getRelatedMemories: (id: string, project?: string, limit?: number) =>
+    get<{ ok: boolean; data: Memory[]; total: number }>(
+      `/api/constellation/${id}/related`,
+      { project, limit } as Record<string, string | number | undefined>,
+    ),
+
+  // Projects
+  listProjects: () =>
+    get<{ data: ProjectInfo[]; current_project: string }>('/api/projects'),
+
+  switchProject: (name: string) =>
+    post<{ ok: boolean; data: { previous: string; current: string; memoryCount: number } }>('/api/projects/switch', { project: name }),
+
+  createProject: (name: string) =>
+    post<{ ok: boolean; data: ProjectInfo }>('/api/projects', { name }),
+
+  markUniversal: (id: string, isUniversal: boolean) =>
+    post<{ ok: boolean; id: string; is_universal: boolean }>(`/api/projects/universal/${id}`, { is_universal: isUniversal }),
+
+  // Conflicts
+  getConflicts: (project?: string) =>
+    get<{ data: MemoryConflict[]; total: number }>('/api/conflicts', { project }),
+
+  getConflictsForMemory: (memoryId: string) =>
+    get<{ data: MemoryConflict[]; total: number }>(`/api/conflicts/${memoryId}`),
+
+  resolveConflict: (id: string, resolution: string, action: string) =>
+    post<{ ok: boolean }>(`/api/conflicts/${id}/resolve`, { resolution, action }),
+
+  dismissConflict: (id: string) =>
+    post<{ ok: boolean }>(`/api/conflicts/${id}/dismiss`),
+
+  // Consolidation
+  getConsolidationCandidates: (project?: string) =>
+    get<{ data: Array<{ memories: Memory[]; similarity: number }>; total: number }>('/api/consolidation/candidates', { project }),
+
+  runConsolidation: (project?: string) =>
+    post<{ ok: boolean; data: { groupsFound: number; memoriesConsolidated: number; newMemoriesCreated: number } }>('/api/consolidation/run', { project }),
+
+  // Temporal
+  getContextAtTime: (timestamp: string, project?: string) =>
+    get<{ data: Memory[] }>('/api/temporal/at', { timestamp, project }),
+
+  getEvolutionChain: (id: string) =>
+    get<{ data: Memory[] }>(`/api/temporal/chain/${id}`),
+
+  // Observations
+  getObservations: (project?: string, limit?: number) =>
+    get<{ data: ObservationEntry[]; total: number }>('/api/observations', { project, limit }),
+
+  // Analytics
+  getAnalyticsOverview: (project?: string) =>
+    get<{ data: AnalyticsOverview }>('/api/analytics/overview', { project }),
+
+  getMemoryHealth: (project?: string) =>
+    get<{ data: MemoryHealth }>('/api/analytics/health', { project }),
+
+  getSurvivalCurve: (project?: string) =>
+    get<{ data: SurvivalPoint[] }>('/api/analytics/survival', { project }),
+
+  getTopicClusters: (project?: string) =>
+    get<{ data: TopicCluster[] }>('/api/analytics/clusters', { project }),
+
+  // Full Scan (onboarding)
+  startFullScan: (config: { mode: 'full' | 'folders'; paths?: string[]; includeGit?: boolean }) =>
+    fetch(`${BASE_URL}/api/scan/full`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    }),
+
+  getScanStatus: () =>
+    get<{ data: { isScanning: boolean; startedAt?: number; progress?: { scannedFiles: number; createdMemories: number; totalFiles: number; currentFile: string; percentComplete: number } } }>('/api/scan/status'),
+
+  cancelScan: () =>
+    post<{ ok: boolean; message?: string }>('/api/scan/cancel'),
 };

@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { Memory } from '../api/client';
+import type { Memory, MemoryConflict } from '../api/client';
+import { api } from '../api/client';
 import { MEMORY_COLORS } from './Planet';
+import { useTranslation } from '../i18n/context';
 
 interface MemoryDetailProps {
   memory: Memory;
@@ -19,16 +21,9 @@ const TYPE_ICONS: Record<string, string> = {
   observation: '👁️',
   milestone:   '🏆',
   context:     '📎',
+  procedural:  '🧭',
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  decision:    'Decision',
-  error:       'Error',
-  task:        'Task',
-  observation: 'Observation',
-  milestone:   'Milestone',
-  context:     'Context',
-};
 
 const ZONE_INFO: { max: number; label: string; color: string }[] = [
   { max: 1,   label: 'Corona',    color: '#fbbf24' },
@@ -51,18 +46,6 @@ function formatDate(iso: string) {
     hour:   '2-digit',
     minute: '2-digit',
   });
-}
-
-function formatRelative(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const sec  = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  return `${day}d ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +300,47 @@ function ActionButton({
 }
 
 // ---------------------------------------------------------------------------
+// Quality score ring
+// ---------------------------------------------------------------------------
+
+function QualityRing({ score }: { score: number }) {
+  const { t } = useTranslation();
+  const pct = score * 100;
+  const ringColor = pct >= 70 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444';
+  const label     = pct >= 70 ? t.memoryDetail.qualityGood : pct >= 40 ? t.memoryDetail.qualityFair : t.memoryDetail.qualityLow;
+
+  return (
+    <span
+      title={`Quality: ${pct.toFixed(0)}%`}
+      style={{
+        display:        'inline-flex',
+        alignItems:     'center',
+        gap:            '4px',
+        fontSize:       '10px',
+        fontFamily:     'monospace',
+        color:          ringColor,
+        background:     `${ringColor}18`,
+        border:         `1px solid ${ringColor}44`,
+        borderRadius:   '999px',
+        padding:        '1px 6px 1px 4px',
+        boxShadow:      `0 0 6px ${ringColor}33`,
+      }}
+    >
+      <span style={{
+        display:      'inline-block',
+        width:        '6px',
+        height:       '6px',
+        borderRadius: '50%',
+        background:   ringColor,
+        boxShadow:    `0 0 4px ${ringColor}`,
+        flexShrink:   0,
+      }} />
+      {pct.toFixed(0)}% {label}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shimmer keyframe — injected once
 // ---------------------------------------------------------------------------
 
@@ -350,10 +374,14 @@ function injectShimmer() {
 export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
   injectShimmer();
 
-  const color = MEMORY_COLORS[memory.type];
+  const { t, formatRelative: formatRel } = useTranslation();
+  const color = MEMORY_COLORS[memory.type] ?? '#6b7280';
   const zone  = getZone(memory.distance);
-  const [contentExpanded, setContentExpanded] = useState(false);
+  const [contentExpanded, setContentExpanded]   = useState(true);
   const [confirmingForget, setConfirmingForget] = useState(false);
+  const [conflicts, setConflicts]               = useState<MemoryConflict[]>([]);
+  const [isUniversal, setIsUniversal]           = useState(!!memory.is_universal);
+  const [togglingUniversal, setTogglingUniversal] = useState(false);
 
   // Auto-revert confirmation after 3 seconds
   useEffect(() => {
@@ -361,7 +389,35 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
     const t = setTimeout(() => setConfirmingForget(false), 3000);
     return () => clearTimeout(t);
   }, [confirmingForget]);
-  const maxPreview = 200;
+
+  // Load conflicts for this memory
+  useEffect(() => {
+    api.getConflictsForMemory(memory.id)
+      .then((res) => setConflicts(res.data ?? []))
+      .catch(() => setConflicts([]));
+  }, [memory.id]);
+
+  const handleToggleUniversal = useCallback(async () => {
+    setTogglingUniversal(true);
+    try {
+      await api.markUniversal(memory.id, !isUniversal);
+      setIsUniversal(!isUniversal);
+    } catch {
+      // silently ignore
+    } finally {
+      setTogglingUniversal(false);
+    }
+  }, [memory.id, isUniversal]);
+
+  const handleDismissConflict = useCallback(async (conflictId: string) => {
+    try {
+      await api.dismissConflict(conflictId);
+      setConflicts((prev) => prev.filter((c) => c.id !== conflictId));
+    } catch {
+      // silently ignore
+    }
+  }, []);
+  const maxPreview = 500;
   const isLong = memory.content.length > maxPreview;
 
   const sourcePath =
@@ -426,7 +482,7 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
               className="text-sm font-semibold leading-snug"
               style={{ color: '#f3f4f6', textShadow: `0 0 20px ${color}44` }}
             >
-              {memory.summary || 'Untitled Memory'}
+              {memory.summary || t.memoryDetail.untitled}
             </div>
 
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -440,7 +496,7 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
                   boxShadow:  `0 0 8px ${color}33`,
                 }}
               >
-                {TYPE_LABELS[memory.type] ?? memory.type}
+                {t.memoryTypes[memory.type] ?? memory.type}
               </span>
 
               {/* Zone badge */}
@@ -454,13 +510,38 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
               >
                 {zone.label} · {memory.distance.toFixed(1)} AU
               </span>
+
+              {/* Quality score badge */}
+              {memory.quality_score != null && (
+                <QualityRing score={memory.quality_score} />
+              )}
+
+              {/* Universal badge */}
+              {isUniversal && (
+                <span
+                  title={t.memoryDetail.universalBadge}
+                  style={{
+                    display:     'inline-flex',
+                    alignItems:  'center',
+                    gap:         '3px',
+                    fontSize:    '10px',
+                    color:       '#818cf8',
+                    background:  'rgba(99,102,241,0.12)',
+                    border:      '1px solid rgba(99,102,241,0.3)',
+                    borderRadius: '999px',
+                    padding:     '1px 6px',
+                  }}
+                >
+                  &#x1F310; {t.memoryDetail.universal}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Close button */}
           <button
             onClick={onClose}
-            title="Close"
+            title={t.memoryDetail.close}
             style={{
               width:        '26px',
               height:       '26px',
@@ -499,8 +580,8 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
 
         {/* Animated stat bars */}
         <div className="mt-3 space-y-1.5">
-          <StatBar label="Importance" value={memory.importance} color={color} />
-          <StatBar label="Impact"     value={memory.impact}     color={color} />
+          <StatBar label={t.memoryDetail.importance} value={memory.importance} color={color} />
+          <StatBar label={t.memoryDetail.impact}     value={memory.impact}     color={color} />
         </div>
 
         {/* Holographic tags */}
@@ -511,7 +592,7 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
             ))}
             {memory.tags.length > 6 && (
               <span className="text-[10px] text-gray-600 self-center">
-                +{memory.tags.length - 6} more
+                +{memory.tags.length - 6} {t.memoryDetail.more}
               </span>
             )}
           </div>
@@ -521,22 +602,26 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
       {/* ── Scrollable body ────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: `${color}33 transparent` }}>
 
-        {/* Content */}
-        <Section title="Content" icon="📝" color={color} defaultOpen>
+        {/* Content — always visible, no collapsible wrapper */}
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div
             style={{
               background:   'rgba(0,0,0,0.45)',
               border:       `1px solid rgba(255,255,255,0.07)`,
-              borderLeft:   `2px solid ${color}55`,
+              borderLeft:   `3px solid ${color}55`,
               borderRadius: '6px',
               padding:      '10px 12px',
               fontFamily:   "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-              fontSize:     '11px',
-              lineHeight:   '1.7',
-              color:        '#d1d5db',
+              fontSize:     '12px',
+              lineHeight:   '1.8',
+              color:        '#e5e7eb',
               whiteSpace:   'pre-wrap',
               wordBreak:    'break-word',
               boxShadow:    `inset 0 0 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.03)`,
+              maxHeight:    '40vh',
+              overflowY:    'auto',
+              scrollbarWidth: 'thin',
+              scrollbarColor: `${color}33 transparent`,
             }}
           >
             {isLong && !contentExpanded
@@ -552,20 +637,20 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = `${color}bb`; }}
             >
               {contentExpanded
-                ? '▲ Collapse'
-                : `▼ Expand · ${memory.content.length} chars`}
+                ? '▲ ' + t.memoryDetail.collapse
+                : `▼ ${t.memoryDetail.expand} · ${memory.content.length} ${t.memoryDetail.chars}`}
             </button>
           )}
-        </Section>
+        </div>
 
         {/* Properties */}
-        <Section title="Properties" icon="📊" color={color} defaultOpen={false}>
+        <Section title={t.memoryDetail.properties} icon="📊" color={color} defaultOpen={false}>
           <div className="space-y-0.5">
-            <PropRow label="Type"  value={<span style={{ color }}>{TYPE_LABELS[memory.type] ?? memory.type}</span>} />
-            <PropRow label="Zone"  value={<span style={{ color: zone.color }}>{zone.label}</span>} />
-            <PropRow label="Distance" value={`${memory.distance.toFixed(2)} AU`} mono />
+            <PropRow label={t.memoryDetail.type}  value={<span style={{ color }}>{t.memoryTypes[memory.type] ?? memory.type}</span>} />
+            <PropRow label={t.memoryDetail.zone}  value={<span style={{ color: zone.color }}>{zone.label}</span>} />
+            <PropRow label={t.memoryDetail.distance} value={`${memory.distance.toFixed(2)} AU`} mono />
             <PropRow
-              label="Velocity"
+              label={t.memoryDetail.velocity}
               value={
                 <span
                   style={{
@@ -580,13 +665,203 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
               }
               mono
             />
-            <PropRow label="Accessed" value={`${memory.access_count}×`} mono />
+            <PropRow label={t.memoryDetail.accessed} value={`${memory.access_count}×`} mono />
+          </div>
+        </Section>
+
+        {/* Temporal info */}
+        {(memory.valid_from || memory.valid_until || memory.superseded_by || memory.consolidated_into) && (
+          <Section title={t.memoryDetail.temporal} icon="⏳" color={color} defaultOpen>
+            <div className="space-y-1.5">
+              {(memory.valid_from || memory.valid_until) && (
+                <PropRow
+                  label={t.memoryDetail.valid}
+                  value={
+                    <span className="font-mono text-gray-400">
+                      {memory.valid_from
+                        ? new Date(memory.valid_from).toLocaleDateString()
+                        : '—'}
+                      {' ~ '}
+                      {memory.valid_until
+                        ? new Date(memory.valid_until).toLocaleDateString()
+                        : t.memoryDetail.present}
+                    </span>
+                  }
+                />
+              )}
+              {memory.superseded_by && (
+                <div
+                  style={{
+                    display:      'flex',
+                    alignItems:   'center',
+                    gap:          '6px',
+                    padding:      '6px 8px',
+                    background:   'rgba(245,158,11,0.08)',
+                    border:       '1px solid rgba(245,158,11,0.25)',
+                    borderRadius: '6px',
+                    fontSize:     '10px',
+                  }}
+                >
+                  <span style={{ color: '#f59e0b' }}>&#x26A0;</span>
+                  <span style={{ color: '#9ca3af' }}>{t.memoryDetail.supersededBy}</span>
+                  <span
+                    style={{
+                      fontFamily: 'monospace',
+                      color:      '#fbbf24',
+                      fontSize:   '9px',
+                      opacity:    0.8,
+                    }}
+                  >
+                    {memory.superseded_by.slice(0, 12)}…
+                  </span>
+                </div>
+              )}
+              {memory.consolidated_into && (
+                <div
+                  style={{
+                    display:      'flex',
+                    alignItems:   'center',
+                    gap:          '6px',
+                    padding:      '6px 8px',
+                    background:   'rgba(99,102,241,0.08)',
+                    border:       '1px solid rgba(99,102,241,0.25)',
+                    borderRadius: '6px',
+                    fontSize:     '10px',
+                    color:        '#a5b4fc',
+                  }}
+                >
+                  <span>&#x1F4E6;</span>
+                  <span style={{ color: '#9ca3af' }}>{t.memoryDetail.consolidatedInto}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: '9px', opacity: 0.8 }}>
+                    {memory.consolidated_into.slice(0, 12)}…
+                  </span>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* Conflict warnings */}
+        {conflicts.length > 0 && (
+          <Section title={`${t.memoryDetail.conflicts} (${conflicts.length})`} icon="⚡" color="#f59e0b" defaultOpen>
+            <div className="space-y-2">
+              {conflicts.map((c) => {
+                const severityColor = c.severity === 'high' ? '#ef4444'
+                  : c.severity === 'medium' ? '#f59e0b'
+                  : '#6b7280';
+                return (
+                  <div
+                    key={c.id}
+                    style={{
+                      padding:      '8px 10px',
+                      background:   `${severityColor}0c`,
+                      border:       `1px solid ${severityColor}33`,
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <span
+                        style={{
+                          fontSize:    '9px',
+                          fontWeight:  700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                          color:       severityColor,
+                          background:  `${severityColor}22`,
+                          border:      `1px solid ${severityColor}44`,
+                          borderRadius: '999px',
+                          padding:     '1px 5px',
+                        }}
+                      >
+                        {c.severity}
+                      </span>
+                      <span style={{ fontSize: '10px', color: '#6b7280', fontFamily: 'monospace' }}>
+                        {c.id.slice(0, 8)}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0 0 6px', lineHeight: 1.5 }}>
+                      {c.description}
+                    </p>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => void handleDismissConflict(c.id)}
+                        style={{
+                          fontSize:    '10px',
+                          padding:     '2px 8px',
+                          borderRadius: '4px',
+                          border:      '1px solid rgba(255,255,255,0.1)',
+                          background:  'rgba(255,255,255,0.04)',
+                          color:       '#6b7280',
+                          cursor:      'pointer',
+                          transition:  'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget as HTMLElement;
+                          el.style.color = '#e5e7eb';
+                          el.style.background = 'rgba(255,255,255,0.08)';
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget as HTMLElement;
+                          el.style.color = '#6b7280';
+                          el.style.background = 'rgba(255,255,255,0.04)';
+                        }}
+                      >
+                        {t.memoryDetail.dismiss}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
+        {/* Universal toggle */}
+        <Section title={t.memoryDetail.universal} icon="&#x1F310;" color="#818cf8" defaultOpen={false}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ flex: 1, fontSize: '10px', color: '#6b7280', lineHeight: 1.6 }}>
+              {t.memoryDetail.universalDesc}
+            </div>
+            <button
+              onClick={() => void handleToggleUniversal()}
+              disabled={togglingUniversal}
+              style={{
+                flexShrink:   0,
+                padding:      '4px 10px',
+                borderRadius: '6px',
+                border:       isUniversal
+                  ? '1px solid rgba(99,102,241,0.5)'
+                  : '1px solid rgba(255,255,255,0.1)',
+                background:   isUniversal
+                  ? 'rgba(99,102,241,0.15)'
+                  : 'rgba(255,255,255,0.04)',
+                color:        isUniversal ? '#a5b4fc' : '#6b7280',
+                fontSize:     '10px',
+                cursor:       togglingUniversal ? 'not-allowed' : 'pointer',
+                transition:   'all 0.2s ease',
+                fontWeight:   isUniversal ? 600 : 400,
+              }}
+              onMouseEnter={(e) => {
+                if (togglingUniversal) return;
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = 'rgba(99,102,241,0.5)';
+                el.style.color = '#c7d2fe';
+              }}
+              onMouseLeave={(e) => {
+                if (togglingUniversal) return;
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = isUniversal ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)';
+                el.style.color = isUniversal ? '#a5b4fc' : '#6b7280';
+              }}
+            >
+              {togglingUniversal ? '...' : isUniversal ? t.memoryDetail.removeUniversal : t.memoryDetail.markUniversal}
+            </button>
           </div>
         </Section>
 
         {/* Source */}
         {sourcePath && (
-          <Section title="Source" icon="📁" color={color} defaultOpen>
+          <Section title={t.memoryDetail.source} icon="📁" color={color} defaultOpen>
             <div
               style={{
                 display:      'flex',
@@ -636,7 +911,7 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
                   el.style.color       = `${color}cc`;
                 }}
               >
-                {isElectron ? '📂 Open' : '📋 Copy'}
+                {isElectron ? '📂 ' + t.memoryDetail.open : '📋 ' + t.memoryDetail.copy}
               </button>
             </div>
           </Section>
@@ -644,7 +919,7 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
 
         {/* All tags */}
         {memory.tags.length > 6 && (
-          <Section title="All Tags" icon="🏷️" color={color} defaultOpen={false}>
+          <Section title={t.memoryDetail.allTags} icon="🏷️" color={color} defaultOpen={false}>
             <div className="flex flex-wrap gap-1.5">
               {memory.tags.map((tag) => (
                 <TagChip key={tag} tag={tag} color={color} />
@@ -654,13 +929,13 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
         )}
 
         {/* Timeline */}
-        <Section title="Timeline" icon="🕐" color={color} defaultOpen={false}>
+        <Section title={t.memoryDetail.timeline} icon="🕐" color={color} defaultOpen={false}>
           <div className="space-y-0.5">
             <PropRow
-              label="Created"
+              label={t.memoryDetail.created}
               value={
                 <span title={formatDate(memory.created_at)} className="text-gray-400">
-                  <span className="text-gray-500">{formatRelative(memory.created_at)}</span>
+                  <span className="text-gray-500">{formatRel(memory.created_at)}</span>
                   {' · '}
                   {formatDate(memory.created_at)}
                 </span>
@@ -668,23 +943,23 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
             />
             {memory.last_accessed_at && (
               <PropRow
-                label="Last access"
+                label={t.memoryDetail.lastAccess}
                 value={
                   <span title={formatDate(memory.last_accessed_at)} className="text-gray-400">
-                    <span className="text-gray-500">{formatRelative(memory.last_accessed_at)}</span>
+                    <span className="text-gray-500">{formatRel(memory.last_accessed_at)}</span>
                     {' · '}
                     {formatDate(memory.last_accessed_at)}
                   </span>
                 }
               />
             )}
-            <PropRow label="Updated" value={formatDate(memory.updated_at)} />
+            <PropRow label={t.memoryDetail.updated} value={formatDate(memory.updated_at)} />
           </div>
         </Section>
 
         {/* Metadata */}
         {Object.keys(memory.metadata).length > 0 && (
-          <Section title="Metadata" icon="📋" color={color} defaultOpen={false}>
+          <Section title={t.memoryDetail.metadata} icon="📋" color={color} defaultOpen={false}>
             <div
               style={{
                 background:   'rgba(0,0,0,0.4)',
@@ -722,17 +997,17 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
           gap:          '8px',
         }}
       >
-        <ActionButton onClick={() => handleCopy(memory.content)} title="Copy content to clipboard">
-          📋 Copy content
+        <ActionButton onClick={() => handleCopy(memory.content)} title={t.memoryDetail.copyContent}>
+          📋 {t.memoryDetail.copyContent}
         </ActionButton>
         {confirmingForget ? (
           <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-            <ActionButton onClick={() => onForget(memory.id)} variant="danger" title="Confirm delete">
-              Confirm delete?
+            <ActionButton onClick={() => onForget(memory.id)} variant="danger" title={t.memoryDetail.confirmDelete}>
+              {t.memoryDetail.confirmDelete}
             </ActionButton>
             <button
               onClick={() => setConfirmingForget(false)}
-              title="Cancel"
+              title={t.memoryDetail.cancel}
               style={{
                 fontSize:     '11px',
                 padding:      '6px 10px',
@@ -756,12 +1031,12 @@ export function MemoryDetail({ memory, onClose, onForget }: MemoryDetailProps) {
                 el.style.color       = '#9ca3af';
               }}
             >
-              Cancel
+              {t.memoryDetail.cancel}
             </button>
           </div>
         ) : (
-          <ActionButton onClick={() => setConfirmingForget(true)} variant="danger" title="Remove from memory">
-            Forget
+          <ActionButton onClick={() => setConfirmingForget(true)} variant="danger" title={t.memoryDetail.forget}>
+            {t.memoryDetail.forget}
           </ActionButton>
         )}
       </div>

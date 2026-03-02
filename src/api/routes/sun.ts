@@ -11,12 +11,13 @@ app.get('/', (c) => {
 
   if (!sun) {
     return c.json({
+      ok: true,
       data: null,
       message: 'No sun state found. Use POST /api/sun/commit to initialize.',
     });
   }
 
-  return c.json({ data: sun });
+  return c.json({ ok: true, data: sun });
 });
 
 // POST /api/sun/commit — commit session state to sun
@@ -25,7 +26,7 @@ app.post('/commit', async (c) => {
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
+    return c.json({ ok: false, error: 'Invalid JSON body' }, 400);
   }
 
   const project = (body.project as string | undefined) ?? 'default';
@@ -36,13 +37,13 @@ app.post('/commit', async (c) => {
   const context = body.context as string | undefined;
 
   if (!current_work.trim()) {
-    return c.json({ error: 'current_work is required' }, 400);
+    return c.json({ ok: false, error: 'current_work is required' }, 400);
   }
 
   commitToSun(project, { current_work, decisions, next_steps, errors, context });
 
   const updated = getSunState(project);
-  return c.json({ data: updated, success: true });
+  return c.json({ ok: true, data: updated });
 });
 
 export default app;

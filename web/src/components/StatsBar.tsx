@@ -1,20 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
 import type { ZoneStat, OrbitZone } from '../api/client';
+import { useTranslation } from '../i18n/context';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const ZONE_COLORS: Record<OrbitZone, string> = {
-  corona:    '#fbbf24',
-  inner:     '#f97316',
-  habitable: '#22c55e',
-  outer:     '#60a5fa',
-  kuiper:    '#a78bfa',
-  oort:      '#9ca3af',
+  core:      '#fbbf24',
+  near:      '#f97316',
+  active:    '#22c55e',
+  archive:   '#60a5fa',
+  fading:    '#a78bfa',
+  forgotten: '#9ca3af',
 };
 
-const ZONE_ORDER: OrbitZone[] = ['corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'];
+const ZONE_ORDER: OrbitZone[] = ['core', 'near', 'active', 'archive', 'fading', 'forgotten'];
 
 // ---------------------------------------------------------------------------
 // CSS — once per page
@@ -53,29 +54,22 @@ function injectStatsCss() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatRelative(iso: string | null | undefined): string {
-  if (!iso) return 'never';
-  const diff = Date.now() - new Date(iso).getTime();
-  const sec  = Math.floor(diff / 1000);
-  if (sec < 60)  return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60)  return `${min}m ago`;
-  const hr  = Math.floor(min / 60);
-  if (hr  < 24)  return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
-}
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 interface StatsBarProps {
-  totalMemories:  number;
-  zones:          ZoneStat[];
-  lastOrbitAt?:   string | null;
-  lastUpdatedAt?: number | null;
-  onRefresh:      () => void;
-  isRefreshing:   boolean;
+  totalMemories:    number;
+  zones:            ZoneStat[];
+  lastOrbitAt?:     string | null;
+  lastUpdatedAt?:   number | null;
+  onRefresh:        () => void;
+  isRefreshing:     boolean;
+  // Optional enriched stats
+  avgQuality?:      number | null;
+  conflictCount?:   number;
+  proceduralCount?: number;
+  universalCount?:  number;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +77,7 @@ interface StatsBarProps {
 // ---------------------------------------------------------------------------
 
 function ZonePill({ zone, count }: { zone: ZoneStat; count: number }) {
+  const { t } = useTranslation();
   const color = ZONE_COLORS[zone.zone];
   const [hovered, setHovered] = useState(false);
 
@@ -92,7 +87,7 @@ function ZonePill({ zone, count }: { zone: ZoneStat; count: number }) {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      title={`${zone.label}: avg importance ${(zone.avg_importance * 100).toFixed(0)}%`}
+      title={`${t.zones[zone.zone]?.name ?? zone.label}: avg importance ${(zone.avg_importance * 100).toFixed(0)}%`}
       style={{
         display:      'inline-flex',
         alignItems:   'center',
@@ -125,10 +120,9 @@ function ZonePill({ zone, count }: { zone: ZoneStat; count: number }) {
           color:     hovered ? color : `${color}cc`,
           fontWeight: 500,
           transition: 'color 0.18s ease',
-          textTransform: 'capitalize',
         }}
       >
-        {zone.zone}
+        {t.zones[zone.zone]?.name ?? zone.zone}
       </span>
       <span
         style={{
@@ -156,6 +150,7 @@ function RefreshButton({
   onClick:      () => void;
   isRefreshing: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
@@ -206,7 +201,7 @@ function RefreshButton({
       >
         ⟳
       </span>
-      {isRefreshing ? 'Syncing…' : 'Refresh'}
+      {isRefreshing ? t.statsBar.syncing : t.statsBar.refresh}
     </button>
   );
 }
@@ -216,6 +211,7 @@ function RefreshButton({
 // ---------------------------------------------------------------------------
 
 function MemoryCount({ count }: { count: number }) {
+  const { t } = useTranslation();
   const [displayCount, setDisplayCount] = useState(count);
   const [animKey, setAnimKey] = useState(0);
   const prevRef = useRef(count);
@@ -257,7 +253,7 @@ function MemoryCount({ count }: { count: number }) {
           letterSpacing: '0.08em',
         }}
       >
-        Memories
+        {t.statsBar.memories}
       </span>
       <span
         key={animKey}
@@ -307,11 +303,16 @@ export function StatsBar({
   lastUpdatedAt,
   onRefresh,
   isRefreshing,
+  avgQuality,
+  conflictCount,
+  proceduralCount,
+  universalCount,
 }: StatsBarProps) {
   injectStatsCss();
+  const { t, formatRelative: formatRel } = useTranslation();
 
   const updatedLabel = lastUpdatedAt
-    ? formatRelative(new Date(lastUpdatedAt).toISOString())
+    ? formatRel(new Date(lastUpdatedAt).toISOString())
     : null;
 
   // Sort zones by canonical order, filter out zero-count
@@ -354,11 +355,87 @@ export function StatsBar({
           </div>
         )}
 
+        {/* Quality */}
+        {avgQuality != null && (
+          <>
+            <HudDivider />
+            <div title={t.statsBar.qualityTooltip} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <span style={{
+                display:    'inline-block',
+                width:      '5px', height: '5px',
+                borderRadius: '50%',
+                background: avgQuality >= 0.7 ? '#22c55e' : avgQuality >= 0.4 ? '#f59e0b' : '#ef4444',
+                boxShadow:  `0 0 4px ${avgQuality >= 0.7 ? '#22c55e' : avgQuality >= 0.4 ? '#f59e0b' : '#ef4444'}`,
+              }} />
+              <span style={{ fontSize: '10px', color: '#374151' }}>{t.statsBar.quality}</span>
+              <span style={{
+                fontSize:   '10px',
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                color:      avgQuality >= 0.7 ? '#22c55e' : avgQuality >= 0.4 ? '#f59e0b' : '#ef4444',
+              }}>
+                {(avgQuality * 100).toFixed(0)}%
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Conflicts */}
+        {conflictCount != null && conflictCount > 0 && (
+          <>
+            <HudDivider />
+            <div title={t.statsBar.conflictsTooltip} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <span style={{
+                display:      'inline-flex',
+                alignItems:   'center',
+                gap:          '4px',
+                padding:      '1px 6px',
+                borderRadius: '999px',
+                background:   'rgba(239,68,68,0.12)',
+                border:       '1px solid rgba(239,68,68,0.3)',
+                fontSize:     '10px',
+                color:        '#f87171',
+                fontWeight:   700,
+                boxShadow:    '0 0 6px rgba(239,68,68,0.2)',
+              }}>
+                &#x26A0; {conflictCount}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Procedural */}
+        {proceduralCount != null && proceduralCount > 0 && (
+          <>
+            <HudDivider />
+            <div title={t.statsBar.rulesTooltip} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <span style={{ fontSize: '10px', color: '#374151' }}>{t.statsBar.rules}</span>
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#06b6d4', fontWeight: 700 }}>
+                {proceduralCount}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Universal */}
+        {universalCount != null && universalCount > 0 && (
+          <>
+            <HudDivider />
+            <div title={t.statsBar.universalTooltip} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <span style={{ fontSize: '10px', opacity: 0.7 }}>&#x1F310;</span>
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#818cf8', fontWeight: 700 }}>
+                {universalCount}
+              </span>
+            </div>
+          </>
+        )}
+
         {/* Orbit recalc */}
         {lastOrbitAt !== undefined && (
           <>
             <HudDivider />
             <div
+              title={t.statsBar.orbitTooltip}
               style={{
                 display:    'flex',
                 alignItems: 'center',
@@ -366,9 +443,9 @@ export function StatsBar({
                 flexShrink: 0,
               }}
             >
-              <span style={{ fontSize: '10px', color: '#374151' }}>Orbit</span>
+              <span style={{ fontSize: '10px', color: '#374151' }}>{t.statsBar.orbit}</span>
               <span style={{ fontSize: '10px', color: '#4b5563', fontFamily: 'monospace' }}>
-                {formatRelative(lastOrbitAt)}
+                {formatRel(lastOrbitAt)}
               </span>
             </div>
           </>
@@ -402,7 +479,7 @@ export function StatsBar({
                 flexShrink:   0,
               }}
             />
-            <span style={{ fontSize: '10px', color: '#374151' }}>Updated</span>
+            <span style={{ fontSize: '10px', color: '#374151' }}>{t.statsBar.updated}</span>
             <span style={{ fontSize: '10px', color: '#4b5563', fontFamily: 'monospace' }}>
               {updatedLabel}
             </span>

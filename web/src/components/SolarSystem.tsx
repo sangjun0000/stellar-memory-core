@@ -51,12 +51,12 @@ const MIN_AU = 0.1;
 const MAX_AU = 100;
 
 const ZONE_DEFS: { zone: OrbitZone; minAU: number; maxAU: number; label: string; color: string }[] = [
-  { zone: 'corona',    minAU: 0.1,  maxAU: 1.0,  label: 'CORONA',    color: '#fbbf24' },
-  { zone: 'inner',     minAU: 1.0,  maxAU: 5.0,  label: 'INNER',     color: '#f97316' },
-  { zone: 'habitable', minAU: 5.0,  maxAU: 15.0, label: 'HABITABLE', color: '#22c55e' },
-  { zone: 'outer',     minAU: 15.0, maxAU: 40.0, label: 'OUTER',     color: '#60a5fa' },
-  { zone: 'kuiper',    minAU: 40.0, maxAU: 70.0, label: 'KUIPER',    color: '#a78bfa' },
-  { zone: 'oort',      minAU: 70.0, maxAU: 100.0,label: 'OORT',      color: '#9ca3af' },
+  { zone: 'core',      minAU: 0.1,  maxAU: 1.0,  label: 'CORE',      color: '#fbbf24' },
+  { zone: 'near',      minAU: 1.0,  maxAU: 5.0,  label: 'NEAR',      color: '#f97316' },
+  { zone: 'active',    minAU: 5.0,  maxAU: 15.0, label: 'ACTIVE',    color: '#22c55e' },
+  { zone: 'archive',   minAU: 15.0, maxAU: 40.0, label: 'ARCHIVE',   color: '#60a5fa' },
+  { zone: 'fading',    minAU: 40.0, maxAU: 70.0, label: 'FADING',    color: '#a78bfa' },
+  { zone: 'forgotten', minAU: 70.0, maxAU: 100.0,label: 'FORGOTTEN', color: '#9ca3af' },
 ];
 
 // Log-scale AU → 3D units (1..20)
@@ -739,6 +739,37 @@ function InstancedPlanets({
   const pointerDownIdx = useRef<number>(-1);
   const reallyDragging = useRef(false);
 
+  // Stable refs to avoid stale closures in window listener
+  const memoriesRef = useRef(memories);
+  memoriesRef.current = memories;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  // Window-level pointerup: fires even if the ray no longer hits the tiny planet
+  useEffect(() => {
+    const handleWindowPointerUp = (e: PointerEvent) => {
+      const downPos = pointerDownPos.current;
+      const idx = pointerDownIdx.current;
+      if (downPos == null || idx < 0) return;
+      // Drag is handled by the R3F handler — skip here
+      if (reallyDragging.current) return;
+
+      const dx = e.clientX - downPos.x;
+      const dy = e.clientY - downPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= DRAG_THRESHOLD) {
+        const m = memoriesRef.current[idx];
+        if (m) onSelectRef.current(m);
+      }
+
+      pointerDownPos.current = null;
+      pointerDownIdx.current = -1;
+      reallyDragging.current = false;
+    };
+
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    return () => window.removeEventListener('pointerup', handleWindowPointerUp);
+  }, []);
+
   // Precompute positions and sizes per memory
   const planetData = useMemo(() => memories.map((m) => {
     const radius3D = auTo3D(m.distance);
@@ -836,21 +867,21 @@ function InstancedPlanets({
 
   const handlePointerUp = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    const idx = pointerDownIdx.current;
-    if (idx >= 0 && idx < memories.length) {
-      const m = memories[idx];
-      if (reallyDragging.current && draggingId && dragPos) {
+    // Only handle drag completion here — click is handled by the window listener
+    if (reallyDragging.current && draggingId && dragPos) {
+      const idx = pointerDownIdx.current;
+      if (idx >= 0 && idx < memories.length) {
+        const m = memories[idx];
         const dist = dragPos.length();
         const au = threeDToAU(dist);
         onDragEnd(m.id, Math.min(100, Math.max(0.1, au)));
-      } else {
-        onSelect(m);
       }
+      // Reset so window listener doesn't double-fire
+      pointerDownPos.current = null;
+      pointerDownIdx.current = -1;
+      reallyDragging.current = false;
     }
-    pointerDownPos.current = null;
-    pointerDownIdx.current = -1;
-    reallyDragging.current = false;
-  }, [memories, draggingId, dragPos, onDragEnd, onSelect]);
+  }, [memories, draggingId, dragPos, onDragEnd]);
 
   const handlePointerOut = useCallback(() => {
     onHover(null);

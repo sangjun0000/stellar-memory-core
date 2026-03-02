@@ -19,6 +19,7 @@ import {
   cleanupOrbitLog,
 } from '../storage/queries.js';
 import { getDatabase } from '../storage/database.js';
+import { corona } from './corona.js';
 
 // ---------------------------------------------------------------------------
 // Scoring primitives
@@ -157,7 +158,7 @@ export function calculateImportance(
  * Convert importance (0–1) to orbital distance (0.1–100).
  *
  * Uses quadratic mapping so that:
- *   - importance = 1.0 → distance ≈ 0.1  (corona / working memory)
+ *   - importance = 1.0 → distance ≈ 0.1  (core / working memory)
  *   - importance = 0.0 → distance = 100  (Oort cloud / nearly forgotten)
  *
  * The quadratic curve creates a non-linear relationship: a memory must fall
@@ -188,9 +189,9 @@ export function distanceToImportance(distance: number): number {
 /**
  * Return the orbit zone label for a given distance.
  *
- * Iterates ORBIT_ZONES in definition order (corona → oort) and returns the
+ * Iterates ORBIT_ZONES in definition order (core → forgotten) and returns the
  * first zone whose [min, max) range contains the distance. Falls back to
- * the 'oort' label for any distance at or beyond 70.
+ * the 'forgotten' label for any distance at or beyond 70.
  */
 export function getOrbitZone(distance: number): string {
   for (const [, zone] of Object.entries(ORBIT_ZONES)) {
@@ -198,8 +199,8 @@ export function getOrbitZone(distance: number): string {
       return zone.label;
     }
   }
-  // Beyond all defined zones — treat as Oort cloud.
-  return ORBIT_ZONES.oort.label;
+  // Beyond all defined zones — treat as forgotten.
+  return ORBIT_ZONES.forgotten.label;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,8 +214,8 @@ export function getOrbitZone(distance: number): string {
  *   - Far-away memories (high distance) receive a large absolute pull.
  *   - Close memories (low distance) are nudged only slightly.
  *
- * MIN_BOOST ensures even corona memories get a small reward.
- * The floor of 0.1 prevents distance from going below the corona minimum.
+ * MIN_BOOST ensures even core memories get a small reward.
+ * The floor of 0.1 prevents distance from going below the core minimum.
  */
 export function applyAccessBoost(currentDistance: number): number {
   const BOOST_FACTOR = 0.3;
@@ -279,6 +280,10 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
 
   // Prune orbit log entries older than 90 days to prevent unbounded growth.
   cleanupOrbitLog(90);
+
+  // Refresh the corona cache after orbit recalculation so distance changes
+  // are reflected in the in-memory tier immediately.
+  corona.warmup(project);
 
   return changes;
 }

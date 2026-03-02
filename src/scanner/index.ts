@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import type { ScanConfig, ScanResult, FileEntry } from './types.js';
 import { DEFAULT_SCAN_CONFIG } from './types.js';
@@ -22,6 +23,30 @@ import {
   importanceToDistance,
 } from '../engine/orbit.js';
 import { getConfig } from '../utils/config.js';
+
+// ---------------------------------------------------------------------------
+// Progress event type for scanWithProgress()
+// ---------------------------------------------------------------------------
+
+export type ScanProgressEvent = {
+  phase: 'collecting' | 'collected' | 'processing' | 'path_complete';
+  path: string;
+  currentFile?: string;
+  totalFiles?: number;
+  scannedFiles?: number;
+  createdMemories?: number;
+  skippedFiles?: number;
+  errorFiles?: number;
+};
+
+// Full-scan exclude patterns (home directory scan)
+export const FULL_SCAN_EXTRA_EXCLUDES = [
+  'AppData', 'Application Data', '.npm', '.yarn', '.pnpm-store',
+  '.docker', '.gradle', '.m2', 'Temp', 'tmp', '.Trash', '.local',
+  'Library', 'Pictures', 'Videos', 'Music', 'Downloads', 'Desktop',
+  'OneDrive', '$Recycle.Bin', 'System Volume Information',
+  'ProgramData', 'Program Files', 'Program Files (x86)', 'Windows',
+];
 
 // ---------------------------------------------------------------------------
 // StellarScanner
@@ -150,6 +175,106 @@ export class StellarScanner {
 
     if (opts.includeGit !== false) {
       createdMemories += this._insertGitMemories(absPath, project);
+    }
+
+    return {
+      scannedFiles,
+      createdMemories,
+      skippedFiles,
+      errorFiles,
+      durationMs: Date.now() - startMs,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // scanWithProgress() — scan with progress callbacks + abort support
+  // -------------------------------------------------------------------------
+
+  async scanWithProgress(opts: {
+    paths?: string[];
+    includeGit?: boolean;
+    onProgress: (event: ScanProgressEvent) => void;
+    abortSignal?: AbortSignal;
+  }): Promise<ScanResult> {
+    const startMs = Date.now();
+    let scannedFiles = 0;
+    let createdMemories = 0;
+    let skippedFiles = 0;
+    let errorFiles = 0;
+
+    const cfg = getConfig();
+    const project = cfg.defaultProject;
+    const scanPaths = opts.paths && opts.paths.length > 0
+      ? opts.paths
+      : this.config.paths;
+
+    for (const scanPath of scanPaths) {
+      if (opts.abortSignal?.aborted) break;
+
+      const absPath = resolve(scanPath);
+
+      opts.onProgress({ phase: 'collecting', path: absPath });
+
+      await this._ensureDataSource(absPath);
+
+      const { entries, skippedCount } = await collectFilesWithStats(absPath, this.config);
+      skippedFiles += skippedCount;
+
+      opts.onProgress({
+        phase: 'collected',
+        path: absPath,
+        totalFiles: entries.length,
+      });
+
+      for (const entry of entries) {
+        if (opts.abortSignal?.aborted) break;
+
+        scannedFiles++;
+        opts.onProgress({
+          phase: 'processing',
+          path: absPath,
+          currentFile: entry.path,
+          totalFiles: entries.length,
+          scannedFiles,
+          createdMemories,
+          skippedFiles,
+          errorFiles,
+        });
+
+        const result = await this._processFile(entry, project);
+        if (result === 'created') createdMemories++;
+        else if (result === 'skip') skippedFiles++;
+        else errorFiles++;
+      }
+
+      // Update data source stats
+      const ds = getDataSourceByPath(absPath);
+      if (ds) {
+        updateDataSource(ds.id, {
+          status: 'active',
+          last_scanned_at: new Date().toISOString(),
+          file_count: entries.length,
+          total_size: entries.reduce((sum, e) => sum + e.size, 0),
+        });
+      }
+
+      opts.onProgress({
+        phase: 'path_complete',
+        path: absPath,
+        scannedFiles,
+        createdMemories,
+        skippedFiles,
+        errorFiles,
+      });
+    }
+
+    // Git history scanning
+    if (opts.includeGit !== false && !opts.abortSignal?.aborted) {
+      for (const scanPath of scanPaths) {
+        if (opts.abortSignal?.aborted) break;
+        const absPath = resolve(scanPath);
+        createdMemories += this._insertGitMemories(absPath, project);
+      }
     }
 
     return {

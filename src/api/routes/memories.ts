@@ -17,7 +17,7 @@ const app = new Hono();
 //
 // Query params:
 //   project (default: "default")
-//   zone    (corona | inner | habitable | outer | kuiper | oort)
+//   zone    (core | near | active | archive | fading | forgotten)
 //   limit   (integer)
 app.get('/', (c) => {
   const project     = c.req.query('project') ?? 'default';
@@ -69,9 +69,9 @@ app.get('/search', async (c) => {
 
   // Zone → distance range mapping
   const ZONE_RANGE: Record<string, { min: number; max: number }> = {
-    corona: { min: 0.1, max: 1.0 }, inner: { min: 1.0, max: 5.0 },
-    habitable: { min: 5.0, max: 15.0 }, outer: { min: 15.0, max: 40.0 },
-    kuiper: { min: 40.0, max: 70.0 }, oort: { min: 70.0, max: 100.0 },
+    core: { min: 0.1, max: 1.0 }, near: { min: 1.0, max: 5.0 },
+    active: { min: 5.0, max: 15.0 }, archive: { min: 15.0, max: 40.0 },
+    fading: { min: 40.0, max: 70.0 }, forgotten: { min: 70.0, max: 100.0 },
   };
   const zoneRange = zone && ZONE_RANGE[zone] ? ZONE_RANGE[zone] : undefined;
   const minDistance = zoneRange ? zoneRange.min : undefined;
@@ -79,8 +79,24 @@ app.get('/search', async (c) => {
     : zoneRange ? zoneRange.max : undefined;
   const limit       = limitRaw ? parseInt(limitRaw, 10) : 10;
 
+  // When q is empty but type/zone filters are set, filter without full-text search
   if (!q.trim()) {
-    return c.json({ ok: false, error: 'q parameter is required' }, 400);
+    let memories = getMemoriesByProject(project);
+
+    if (type && type !== 'all') {
+      memories = memories.filter((m) => m.type === type);
+    }
+    if (minDistance !== undefined) {
+      memories = memories.filter((m) => m.distance >= minDistance);
+    }
+    if (maxDistance !== undefined) {
+      memories = memories.filter((m) => m.distance < maxDistance);
+    }
+    if (limit > 0) {
+      memories = memories.slice(0, limit);
+    }
+
+    return c.json({ ok: true, data: memories, total: memories.length, query: q });
   }
 
   try {
@@ -135,11 +151,11 @@ app.post('/', async (c) => {
   return c.json({ ok: true, data: memory }, 201);
 });
 
-// POST /api/memories/:id/forget — forget a memory (push to Oort or soft-delete)
+// POST /api/memories/:id/forget — forget a memory (push to Forgotten or soft-delete)
 //
 // Body:
 //   { mode: 'push' | 'delete' }
-//   'push'  — moves memory to the Oort cloud (distance ≈ 95 AU), stays searchable
+//   'push'  — moves memory to the Forgotten zone (distance ≈ 95 AU), stays searchable
 //   'delete' — soft-deletes the memory (excluded from all queries)
 app.post('/:id/forget', async (c) => {
   const id = c.req.param('id');

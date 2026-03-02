@@ -116,6 +116,49 @@ CREATE INDEX IF NOT EXISTS idx_memories_project_importance
 
 CREATE INDEX IF NOT EXISTS idx_memories_deleted
   ON memories(deleted_at);
+
+-- Knowledge Graph: Constellation edges
+CREATE TABLE IF NOT EXISTS constellation_edges (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES memories(id),
+  target_id TEXT NOT NULL REFERENCES memories(id),
+  relation TEXT NOT NULL DEFAULT 'related_to',
+  weight REAL NOT NULL DEFAULT 0.5,
+  project TEXT NOT NULL DEFAULT 'default',
+  metadata TEXT DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(source_id, target_id, relation)
+);
+CREATE INDEX IF NOT EXISTS idx_constellation_source ON constellation_edges(source_id);
+CREATE INDEX IF NOT EXISTS idx_constellation_target ON constellation_edges(target_id);
+CREATE INDEX IF NOT EXISTS idx_constellation_project ON constellation_edges(project);
+
+-- Conflict Detection
+CREATE TABLE IF NOT EXISTS memory_conflicts (
+  id TEXT PRIMARY KEY,
+  memory_id TEXT NOT NULL REFERENCES memories(id),
+  conflicting_memory_id TEXT NOT NULL REFERENCES memories(id),
+  severity TEXT NOT NULL DEFAULT 'medium',
+  description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  resolution TEXT,
+  project TEXT NOT NULL DEFAULT 'default',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_conflicts_project ON memory_conflicts(project);
+CREATE INDEX IF NOT EXISTS idx_conflicts_status ON memory_conflicts(status);
+
+-- Observation Log
+CREATE TABLE IF NOT EXISTS observation_log (
+  id TEXT PRIMARY KEY,
+  content TEXT NOT NULL,
+  extracted_memories TEXT DEFAULT '[]',
+  source TEXT NOT NULL DEFAULT 'conversation',
+  project TEXT NOT NULL DEFAULT 'default',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_observations_project ON observation_log(project);
 `;
 
 // Migrate existing databases that lack newer columns.
@@ -125,6 +168,12 @@ const MIGRATIONS: Array<[string, string]> = [
   ['source_path', 'TEXT'],
   ['source_hash', 'TEXT'],
   ['content_hash', 'TEXT'],
+  ['valid_from', 'TEXT'],
+  ['valid_until', 'TEXT'],
+  ['superseded_by', 'TEXT'],
+  ['consolidated_into', 'TEXT'],
+  ['quality_score', 'REAL DEFAULT 0.5'],
+  ['is_universal', 'INTEGER DEFAULT 0'],
 ];
 
 function migrateMemoriesTable(db: DatabaseSync): void {

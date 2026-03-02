@@ -21,6 +21,7 @@ import { IMPACT_DEFAULTS } from './types.js';
 import {
   insertMemory,
   searchMemories,
+  searchMemoriesInRange,
   updateMemoryAccess,
   updateMemoryOrbit,
   insertOrbitLog,
@@ -43,6 +44,7 @@ import { generateEmbedding } from './embedding.js';
 import { insertEmbedding, searchByVector, deleteEmbedding } from '../storage/vec.js';
 import { getDatabase, withTransaction } from '../storage/database.js';
 import { createLogger } from '../utils/logger.js';
+import { corona } from './corona.js';
 
 const log = createLogger('planet');
 
@@ -144,6 +146,11 @@ export function createMemory(data: {
   // The vector index will be populated within seconds after the model loads.
   scheduleEmbedding(memory.id, memory.content + ' ' + summary);
 
+  // If the new memory lands in the corona zone, cache it immediately.
+  if (memory.distance < 5.0) {
+    corona.upsert(memory);
+  }
+
   return memory;
 }
 
@@ -181,6 +188,7 @@ function scheduleEmbedding(memoryId: string, text: string): void {
 export function forgetMemory(memoryId: string, mode: 'push' | 'delete'): void {
   if (mode === 'delete') {
     softDeleteMemory(memoryId);
+    corona.evict(memoryId);
     return;
   }
 
@@ -213,6 +221,9 @@ export function forgetMemory(memoryId: string, mode: 'push' | 'delete'): void {
   } catch {
     // vec tables may not be available — ignore
   }
+
+  // Evict from corona cache regardless of mode.
+  corona.evict(memoryId);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,15 +293,40 @@ function hydrateVectorOnlyResults(
 }
 
 // ---------------------------------------------------------------------------
-// Async hybrid recall (Phase 2 — full pipeline)
+// Tiered recall pipeline (Corona architecture)
 // ---------------------------------------------------------------------------
 
+/** Zone boost factors applied to search results by tier origin. */
+const ZONE_BOOST = {
+  core: 1.2,
+  near: 1.1,
+  active: 1.0,
+  archive: 0.95,
+  fading: 0.85,
+  forgotten: 0.7,
+} as const;
+
+/** Tier priority multiplier (earlier tiers are preferred at equal relevance). */
+const TIER_PRIORITY = {
+  tier1: 1.0,
+  tier2: 0.95,
+  tier3: 0.90,
+} as const;
+
+interface ScoredMemory {
+  memory: Memory;
+  score: number;
+  tier: 'CORE' | 'NEAR' | 'ACTIVE' | 'DEEP';
+}
+
 /**
- * Async version of recallMemories that generates the query embedding and
- * performs a true hybrid FTS5 + vector search.
+ * Async tiered recall: 3-tier pipeline from corona cache → FTS5 → full hybrid.
  *
- * Use this from async contexts (e.g., MCP tool handlers) for best results.
- * Falls back to FTS5-only if embedding generation fails.
+ * Tier 1: Corona cache (0ms) — core + near zone, token matching
+ * Tier 2: Active zone FTS5 (1-5ms) — distance 5.0–15.0
+ * Tier 3: Full hybrid FTS5 + vector (5-50ms) — distance 15.0+
+ *
+ * Early exit: if Tier 1 fills the requested limit, Tier 2 and 3 are skipped.
  */
 export async function recallMemoriesAsync(
   project: string,
@@ -303,53 +339,118 @@ export async function recallMemoriesAsync(
   },
 ): Promise<Memory[]> {
   const limit = options?.limit ?? 10;
-  const fetchN = limit * 3;
+  const scored: ScoredMemory[] = [];
+  const seenIds = new Set<string>();
 
-  // ── 1. FTS5 keyword search (synchronous) ─────────────────────────────────
-  const ftsResults = searchMemories(project, query, fetchN);
-
-  // ── 2. Vector KNN search (async embedding) ────────────────────────────────
-  let vecIds: string[] = [];
-  try {
-    const db = getDatabase();
-    const queryEmbedding = await generateEmbedding(query);
-    const vecResults = searchByVector(db, queryEmbedding, fetchN);
-    vecIds = vecResults.map(r => r.memoryId);
-  } catch {
-    // Model not ready or vec tables unavailable — FTS5 covers it
+  // ── Tier 1: Corona cache (in-memory, ~0ms) ─────────────────────────────
+  const coronaResults = corona.search(query, limit * 2);
+  for (let i = 0; i < coronaResults.length; i++) {
+    const m = coronaResults[i];
+    const zoneBoost = m.distance < 1.0 ? ZONE_BOOST.core : ZONE_BOOST.near;
+    const rankScore = 1 / (1 + i);  // rank-based score
+    scored.push({
+      memory: m,
+      score: rankScore * zoneBoost * TIER_PRIORITY.tier1,
+      tier: m.distance < 1.0 ? 'CORE' : 'NEAR',
+    });
+    seenIds.add(m.id);
   }
 
-  // ── 3. Merge (RRF) + hydrate ──────────────────────────────────────────────
-  let results = mergeRRF(ftsResults, vecIds, limit * 4);
-  results = hydrateVectorOnlyResults(results, ftsResults);
+  // Early exit: if corona filled the limit, skip DB searches
+  const remaining = limit - scored.length;
 
-  // ── 4. Filter ─────────────────────────────────────────────────────────────
+  // ── Tier 2: Active zone FTS5 (distance 5.0–15.0, ~1-5ms) ──────────────
+  if (remaining > 0) {
+    const tier2Results = searchMemoriesInRange(project, query, 5.0, 15.0, remaining * 2);
+    for (let i = 0; i < tier2Results.length; i++) {
+      const m = tier2Results[i];
+      if (seenIds.has(m.id)) continue;
+      const rankScore = 1 / (1 + i);
+      scored.push({
+        memory: m,
+        score: rankScore * ZONE_BOOST.active * TIER_PRIORITY.tier2,
+        tier: 'ACTIVE',
+      });
+      seenIds.add(m.id);
+    }
+  }
+
+  // ── Tier 3: Full hybrid FTS5 + vector (distance 15.0+, ~5-50ms) ───────
+  const remaining3 = limit - scored.filter(s => s.score > 0).length;
+  if (remaining3 > 0) {
+    const fetchN = remaining3 * 3;
+
+    // FTS5 for far zone
+    const ftsResults = searchMemoriesInRange(project, query, 15.0, 100.0, fetchN);
+
+    // Vector KNN search (async embedding)
+    let vecIds: string[] = [];
+    try {
+      const db = getDatabase();
+      const queryEmbedding = await generateEmbedding(query);
+      const vecResults = searchByVector(db, queryEmbedding, fetchN);
+      vecIds = vecResults.map(r => r.memoryId);
+    } catch {
+      // Model not ready or vec tables unavailable — FTS5 covers it
+    }
+
+    // Merge FTS5 + vector via RRF
+    let merged = mergeRRF(ftsResults, vecIds, fetchN);
+    merged = hydrateVectorOnlyResults(merged, ftsResults);
+
+    for (let i = 0; i < merged.length; i++) {
+      const m = merged[i];
+      if (seenIds.has(m.id)) continue;
+      if (!m.content) continue; // skip unhydrated stubs
+
+      const zoneBoost = m.distance < 40
+        ? ZONE_BOOST.archive
+        : m.distance < 70
+          ? ZONE_BOOST.fading
+          : ZONE_BOOST.forgotten;
+
+      const rankScore = 1 / (1 + i);
+      scored.push({
+        memory: m,
+        score: rankScore * zoneBoost * TIER_PRIORITY.tier3,
+        tier: 'DEEP',
+      });
+      seenIds.add(m.id);
+    }
+  }
+
+  // ── Sort by composite score descending ─────────────────────────────────
+  scored.sort((a, b) => b.score - a.score);
+
+  // ── Filter ─────────────────────────────────────────────────────────────
+  let filtered = scored;
+
   if (options?.type && options.type !== 'all') {
     const filterType = options.type;
-    results = results.filter(m => m.type === filterType);
+    filtered = filtered.filter(s => s.memory.type === filterType);
   }
 
   if (options?.minDistance !== undefined) {
     const minDist = options.minDistance;
-    results = results.filter(m => m.distance >= minDist);
+    filtered = filtered.filter(s => s.memory.distance >= minDist);
   }
 
   if (options?.maxDistance !== undefined) {
     const maxDist = options.maxDistance;
-    results = results.filter(m => m.distance <= maxDist);
+    filtered = filtered.filter(s => s.memory.distance <= maxDist);
   }
 
-  results = results.slice(0, limit);
+  const finalScored = filtered.slice(0, limit);
 
-  // ── 5. Access boost + orbit update ────────────────────────────────────────
+  // ── Access boost + orbit update ────────────────────────────────────────
   const sunState = getSunState(project);
   const sunText  = sunState
     ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
     : '';
   const config = getConfig();
 
-  return withTransaction(() =>
-    results.map(memory => {
+  const results = withTransaction(() =>
+    finalScored.map(({ memory, tier }) => {
       const newDistance = applyAccessBoost(memory.distance);
       const velocity    = newDistance - memory.distance;
 
@@ -375,7 +476,19 @@ export async function recallMemoriesAsync(
         trigger:        'access',
       });
 
-      return { ...updatedMemory, importance: components.total, velocity };
+      const result = { ...updatedMemory, importance: components.total, velocity };
+
+      // If memory moved into the corona zone (< 5.0 AU), update cache
+      if (newDistance < 5.0) {
+        corona.upsert(result);
+      }
+
+      // Attach tier marker to metadata for display
+      result.metadata = { ...result.metadata, _tier: tier };
+
+      return result;
     })
   );
+
+  return results;
 }

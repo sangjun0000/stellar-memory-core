@@ -32,6 +32,7 @@ app.get('/status', (c) => {
   }
 
   return c.json({
+    ok: true,
     data: {
       project,
       memory_count: memories.length,
@@ -50,7 +51,7 @@ app.post('/orbit', (c) => {
   const changes = recalculateOrbits(project, config);
 
   return c.json({
-    success: true,
+    ok: true,
     changes_count: changes.length,
     data: changes,
   });
@@ -81,7 +82,7 @@ app.get('/zones', (c) => {
     };
   });
 
-  return c.json({ data: zones, project });
+  return c.json({ ok: true, data: zones, project });
 });
 
 export default app;

@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { MemoryType, OrbitZone } from '../api/client';
+import { useTranslation } from '../i18n/context';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -12,15 +13,16 @@ const MEMORY_TYPES: { value: MemoryType; label: string; color: string }[] = [
   { value: 'observation', label: 'Observation', color: '#6b7280' },
   { value: 'milestone',   label: 'Milestone',   color: '#eab308' },
   { value: 'context',     label: 'Context',     color: '#7c3aed' },
+  { value: 'procedural',  label: 'Procedural',  color: '#0891b2' },
 ];
 
 const ORBIT_ZONES: { value: OrbitZone; label: string; color: string }[] = [
-  { value: 'corona',    label: 'Corona',    color: '#fbbf24' },
-  { value: 'inner',     label: 'Inner',     color: '#f97316' },
-  { value: 'habitable', label: 'Habitable', color: '#22c55e' },
-  { value: 'outer',     label: 'Outer',     color: '#60a5fa' },
-  { value: 'kuiper',    label: 'Kuiper',    color: '#a78bfa' },
-  { value: 'oort',      label: 'Oort',      color: '#9ca3af' },
+  { value: 'core',      label: 'Core',      color: '#fbbf24' },
+  { value: 'near',      label: 'Near',      color: '#f97316' },
+  { value: 'active',    label: 'Active',    color: '#22c55e' },
+  { value: 'archive',   label: 'Archive',   color: '#60a5fa' },
+  { value: 'fading',    label: 'Fading',    color: '#a78bfa' },
+  { value: 'forgotten', label: 'Forgotten', color: '#9ca3af' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -157,6 +159,16 @@ function PremiumSelect<T extends string>({
 
 export function SearchBar({ onSearch, isSearching, resultCount }: SearchBarProps) {
   injectSearchCSS();
+  const { t } = useTranslation();
+
+  const localizedTypes = useMemo(
+    () => MEMORY_TYPES.map(mt => ({ ...mt, label: t.memoryTypes[mt.value] ?? mt.label })),
+    [t],
+  );
+  const localizedZones = useMemo(
+    () => ORBIT_ZONES.map(oz => ({ ...oz, label: t.zones[oz.value]?.name ?? oz.label })),
+    [t],
+  );
 
   const [query,     setQuery]   = useState('');
   const [type,      setType]    = useState<MemoryType | ''>('');
@@ -246,8 +258,8 @@ export function SearchBar({ onSearch, isSearching, resultCount }: SearchBarProps
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            placeholder="Search the memory field…"
-            aria-label="Search memories"
+            placeholder={t.search.placeholder}
+            aria-label={t.search.placeholder}
             style={{
               width:        '100%',
               background:   'rgba(5,10,20,0.9)',
@@ -268,7 +280,7 @@ export function SearchBar({ onSearch, isSearching, resultCount }: SearchBarProps
             <button
               type="button"
               onClick={handleClear}
-              aria-label="Clear search"
+              aria-label={t.search.clear}
               style={{
                 position:    'absolute',
                 right:       '8px',
@@ -339,9 +351,9 @@ export function SearchBar({ onSearch, isSearching, resultCount }: SearchBarProps
                   animation:      'spin 0.7s linear infinite',
                 }}
               />
-              Scanning
+              {t.search.scanning}
             </span>
-          ) : 'Search'}
+          ) : t.search.button}
         </button>
       </div>
 
@@ -351,17 +363,17 @@ export function SearchBar({ onSearch, isSearching, resultCount }: SearchBarProps
         <PremiumSelect<MemoryType>
           value={type}
           onChange={(v) => { setType(v); handleFilterChange(v, zone); }}
-          options={MEMORY_TYPES}
-          placeholder="All types"
-          ariaLabel="Filter by type"
+          options={localizedTypes}
+          placeholder={t.search.allTypes}
+          ariaLabel={t.search.filterByType}
         />
 
         <PremiumSelect<OrbitZone>
           value={zone}
           onChange={(v) => { setZone(v); handleFilterChange(type, v); }}
-          options={ORBIT_ZONES}
-          placeholder="All zones"
-          ariaLabel="Filter by zone"
+          options={localizedZones}
+          placeholder={t.search.allZones}
+          ariaLabel={t.search.filterByZone}
         />
 
         {/* Result count */}
@@ -399,7 +411,7 @@ export function SearchBar({ onSearch, isSearching, resultCount }: SearchBarProps
                 {resultCount}
               </span>
               {' '}
-              {resultCount === 1 ? 'result' : 'results'}
+              {resultCount === 1 ? t.search.result : t.search.results}
             </span>
           </div>
         )}

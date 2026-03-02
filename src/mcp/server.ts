@@ -22,7 +22,14 @@ import {
   handleOrbit,
   handleForget,
   handleExport,
+  handleConstellation,
+  handleGalaxy,
+  handleAnalytics,
   handleSunResource,
+  handleObserve,
+  handleConsolidate,
+  handleResolveConflict,
+  handleTemporal,
 } from './tools/memory-tools.js';
 import { handleScan, handleSync } from './tools/ingestion-tools.js';
 import { handleDaemon, resetScheduler } from './tools/daemon-tool.js';
@@ -55,11 +62,11 @@ export function createStellarServer(): McpServer {
   server.tool(
     'status',
     'View the current state of your stellar memory system. Shows memories grouped by orbital zone ' +
-    '(corona = actively working, oort = nearly forgotten), and optionally lists registered data sources. ' +
+    '(core = actively working, forgotten = nearly forgotten), and optionally lists registered data sources. ' +
     'Use this to get a snapshot of what the system knows.\n\n' +
     '[AUTO-TRIGGER] Call at the start of every session alongside recall to restore full context.',
     {
-      zone: z.enum(['all', 'corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'])
+      zone: z.enum(['all', 'core', 'near', 'active', 'archive', 'fading', 'forgotten'])
         .optional()
         .describe('Filter memories to a specific orbital zone. Defaults to "all".'),
       limit: z.number().int().min(1).max(200)
@@ -111,6 +118,10 @@ export function createStellarServer(): McpServer {
         .describe('Only return memories within this distance in AU.'),
       limit: z.number().int().min(1).max(50).optional()
         .describe('Maximum number of memories to return. Defaults to 10.'),
+      include_universal: z.boolean().optional()
+        .describe('Also include universal memories from other projects. Default: false.'),
+      at: z.string().optional()
+        .describe('ISO date string. If provided, returns memories that were active at this point in time (temporal query) instead of normal recall.'),
     },
     (args) => handleRecall(args)
   );
@@ -218,6 +229,26 @@ export function createStellarServer(): McpServer {
     (args) => handleDaemon(args, registry)
   );
 
+  // ── Tool: constellation ───────────────────────────────────────────────────
+
+  server.tool(
+    'constellation',
+    'Explore the Knowledge Graph (constellation) of relationships between memories. ' +
+    'Use action="graph" to see the full graph around a memory, "related" to list connected memories, ' +
+    'or "extract" to auto-discover relationships from content similarity.',
+    {
+      id: z.string().min(1)
+        .describe('The memory ID to explore.'),
+      action: z.enum(['graph', 'related', 'extract']).optional()
+        .describe('"graph" — show constellation graph (default). "related" — list related memories. "extract" — auto-extract relationships.'),
+      depth: z.number().int().min(1).max(3).optional()
+        .describe('Graph traversal depth for action="graph". Default: 1.'),
+      limit: z.number().int().min(1).max(50).optional()
+        .describe('Max memories to return for action="related". Default: 10.'),
+    },
+    (args) => handleConstellation(args)
+  );
+
   // ── Tool: export ──────────────────────────────────────────────────────────
 
   server.tool(
@@ -227,13 +258,149 @@ export function createStellarServer(): McpServer {
       type: z.enum(['all', 'decision', 'observation', 'task', 'context', 'error', 'milestone'])
         .optional()
         .describe('Filter by memory type. Defaults to all.'),
-      zone: z.enum(['all', 'corona', 'inner', 'habitable', 'outer', 'kuiper', 'oort'])
+      zone: z.enum(['all', 'core', 'near', 'active', 'archive', 'fading', 'forgotten'])
         .optional()
         .describe('Filter by orbital zone. Defaults to all.'),
       format: z.enum(['json', 'markdown']).optional()
         .describe('Output format. Defaults to json.'),
     },
     (args) => handleExport(args)
+  );
+
+  // ── Tool: galaxy ───────────────────────────────────────────────────────────
+
+  server.tool(
+    'galaxy',
+    'Manage multiple projects (star systems) in your stellar memory galaxy.\n\n' +
+    'Actions:\n' +
+    '  switch          — switch the active project at runtime (no restart needed)\n' +
+    '  list            — list all projects with memory counts and stats\n' +
+    '  create          — create a new project\n' +
+    '  stats           — detailed statistics for a project\n' +
+    '  mark_universal  — mark a memory as universal (visible in all projects)\n' +
+    '  universal_context — retrieve universal memories from other projects\n' +
+    '  candidates      — detect memories that are good candidates to become universal',
+    {
+      action: z.enum(['switch', 'list', 'create', 'stats', 'mark_universal', 'universal_context', 'candidates'])
+        .describe('Action to perform.'),
+      project: z.string().optional()
+        .describe('Project name. Required for switch/create; optional for stats/universal_context/candidates (defaults to current).'),
+      memory_id: z.string().optional()
+        .describe('Memory ID. Required for mark_universal.'),
+      is_universal: z.boolean().optional()
+        .describe('Whether to mark as universal (true) or project-specific (false). Default: true.'),
+      limit: z.number().int().min(1).max(100).optional()
+        .describe('Maximum results to return for universal_context. Default: 10.'),
+    },
+    (args) => handleGalaxy(args)
+  );
+
+  // ── Tool: analytics ───────────────────────────────────────────────────────
+
+  server.tool(
+    'analytics',
+    'Get insights and analytics about your memory system. Includes survival curves, topic clusters, ' +
+    'health metrics, and recommendations.\n\n' +
+    'Reports:\n' +
+    '  summary   — full analytics summary (zone/type distribution, quality, recall rate)\n' +
+    '  health    — health metrics + actionable recommendations\n' +
+    '  topics    — topic cluster heatmap (most active topics)\n' +
+    '  survival  — memory survival curve by age bucket\n' +
+    '  movements — orbit movement timeline (which memories moved most)\n' +
+    '  full      — full text report combining all analytics',
+    {
+      report: z.enum(['summary', 'health', 'topics', 'survival', 'movements', 'full'])
+        .describe('Type of analytics report to generate.'),
+      project: z.string().optional()
+        .describe('Project to analyse. Defaults to the current active project.'),
+      days: z.number().int().min(1).max(365).optional()
+        .describe('Lookback window in days for report="movements". Default: 30.'),
+    },
+    (args) => handleAnalytics(args)
+  );
+
+  // ── Tool: observe ─────────────────────────────────────────────────────────
+
+  server.tool(
+    'observe',
+    'Process a conversation chunk to automatically extract and store memories. ' +
+    'The Observer phase extracts key facts, decisions, and errors. ' +
+    'The Reflector phase compares against existing memories to categorize as novel, reinforcing, or conflicting.',
+    {
+      conversation: z.string().min(1)
+        .describe('The conversation text to observe and extract memories from.'),
+      project: z.string().optional()
+        .describe('Project context. Defaults to the current active project.'),
+    },
+    (args) => handleObserve(args)
+  );
+
+  // ── Tool: consolidate ─────────────────────────────────────────────────────
+
+  server.tool(
+    'consolidate',
+    'Find and merge similar memories to reduce redundancy and improve quality. ' +
+    'Memories with high similarity are combined into richer single memories. ' +
+    'Use dry_run=true (default) to preview candidates before merging.',
+    {
+      project: z.string().optional()
+        .describe('Project context. Defaults to the current active project.'),
+      dry_run: z.boolean().optional()
+        .describe('If true, only report candidates without merging. Default: true.'),
+    },
+    (args) => handleConsolidate(args)
+  );
+
+  // ── Tool: resolve_conflict ────────────────────────────────────────────────
+
+  server.tool(
+    'resolve_conflict',
+    'View and resolve memory conflicts. Conflicts are detected when new memories contradict existing ones.\n\n' +
+    'Actions:\n' +
+    '  list    — list all unresolved conflicts\n' +
+    '  resolve — resolve a conflict (supersede, dismiss, or keep_both)\n' +
+    '  dismiss — dismiss a conflict without changes',
+    {
+      action: z.enum(['list', 'resolve', 'dismiss'])
+        .describe('Action to perform: list conflicts, resolve one, or dismiss one.'),
+      conflict_id: z.string().optional()
+        .describe('Conflict ID. Required for resolve/dismiss actions.'),
+      resolution: z.string().optional()
+        .describe('Human-readable description of how the conflict was resolved.'),
+      resolve_action: z.enum(['supersede', 'dismiss', 'keep_both']).optional()
+        .describe('How to resolve: supersede the older memory, dismiss without changes, or keep both. Default: supersede.'),
+      project: z.string().optional()
+        .describe('Project context. Defaults to the current active project.'),
+    },
+    (args) => handleResolveConflict(args)
+  );
+
+  // ── Tool: temporal ────────────────────────────────────────────────────────
+
+  server.tool(
+    'temporal',
+    'Query memories at a specific point in time or view how knowledge has evolved. ' +
+    'Supports temporal browsing and evolution chain tracking.\n\n' +
+    'Actions:\n' +
+    '  at         — get memories that were active at a specific timestamp\n' +
+    '  chain      — view the full evolution chain of a memory\n' +
+    '  summary    — temporal summary (active vs superseded counts)\n' +
+    '  set_bounds — set valid_from / valid_until bounds on a memory',
+    {
+      action: z.enum(['at', 'chain', 'summary', 'set_bounds'])
+        .describe('Action to perform.'),
+      timestamp: z.string().optional()
+        .describe('ISO date string. Required for action="at".'),
+      memory_id: z.string().optional()
+        .describe('Memory ID. Required for action="chain" and "set_bounds".'),
+      valid_from: z.string().optional()
+        .describe('ISO date. For set_bounds — when the memory became valid.'),
+      valid_until: z.string().optional()
+        .describe('ISO date. For set_bounds — when the memory stopped being valid.'),
+      project: z.string().optional()
+        .describe('Project context. Defaults to the current active project.'),
+    },
+    (args) => handleTemporal(args)
   );
 
   return server;

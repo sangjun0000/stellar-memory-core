@@ -1,33 +1,34 @@
 import type { ZoneStat, OrbitZone } from '../api/client';
+import { useTranslation } from '../i18n/context';
 
 // ── Zone color palette ──────────────────────────────────────────────────────
 const ZONE_COLORS: Record<OrbitZone, string> = {
-  corona:    '#fbbf24',
-  inner:     '#f97316',
-  habitable: '#22c55e',
-  outer:     '#60a5fa',
-  kuiper:    '#a78bfa',
-  oort:      '#9ca3af',
+  core:      '#fbbf24',
+  near:      '#f97316',
+  active:    '#22c55e',
+  archive:   '#60a5fa',
+  fading:    '#a78bfa',
+  forgotten: '#9ca3af',
 };
 
 // Orbital radius hint — used to render the mini position dot on the bar rail.
 // Values are 0-1, representing distance from centre.
 const ZONE_RADIUS: Record<OrbitZone, number> = {
-  corona:    0.04,
-  inner:     0.18,
-  habitable: 0.38,
-  outer:     0.58,
-  kuiper:    0.78,
-  oort:      0.95,
+  core:      0.04,
+  near:      0.18,
+  active:    0.38,
+  archive:   0.58,
+  fading:    0.78,
+  forgotten: 0.95,
 };
 
 const ZONE_LABELS: Record<OrbitZone, string> = {
-  corona:    'Corona',
-  inner:     'Inner',
-  habitable: 'Habitable',
-  outer:     'Outer',
-  kuiper:    'Kuiper',
-  oort:      'Oort',
+  core:      'Core',
+  near:      'Near',
+  active:    'Active',
+  archive:   'Archive',
+  fading:    'Fading',
+  forgotten: 'Forgotten',
 };
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -40,11 +41,12 @@ interface ZoneStatsProps {
 
 // ── Component ───────────────────────────────────────────────────────────────
 export function ZoneStats({ zones, total, onZoneClick, activeZone }: ZoneStatsProps) {
+  const { t } = useTranslation();
   return (
     <div className="panel flex flex-col" style={{ overflow: 'hidden' }}>
       {/* Header */}
       <div className="panel-header flex items-center justify-between">
-        <span>Orbital Zones</span>
+        <span>{t.zoneStats.header}</span>
         <span
           className="font-mono text-xs"
           style={{
@@ -54,7 +56,7 @@ export function ZoneStats({ zones, total, onZoneClick, activeZone }: ZoneStatsPr
             letterSpacing: '0.05em',
           }}
         >
-          {total} total
+          {total} {t.zoneLabels.total}
         </span>
       </div>
 
@@ -101,7 +103,7 @@ export function ZoneStats({ zones, total, onZoneClick, activeZone }: ZoneStatsPr
               <circle cx="6" cy="6" r="3.5" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
               <circle cx="6" cy="6" r="5.5" fill="none" stroke="rgba(148,163,184,0.2)" strokeWidth="0.6" />
             </svg>
-            <span style={{ fontWeight: 500 }}>All zones</span>
+            <span style={{ fontWeight: 500 }}>{t.zoneLabels.all}</span>
           </div>
           <span style={{ fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace' }}>
             {total}
@@ -112,7 +114,7 @@ export function ZoneStats({ zones, total, onZoneClick, activeZone }: ZoneStatsPr
         {zones.map((z) => {
           const color = ZONE_COLORS[z.zone];
           const radius = ZONE_RADIUS[z.zone];
-          const label = ZONE_LABELS[z.zone];
+          const label = t.zones[z.zone]?.name ?? ZONE_LABELS[z.zone];
           const pct = total > 0 ? (z.count / total) * 100 : 0;
           const isActive = activeZone === z.zone;
 
@@ -120,6 +122,7 @@ export function ZoneStats({ zones, total, onZoneClick, activeZone }: ZoneStatsPr
             <button
               key={z.zone}
               onClick={() => onZoneClick(z.zone)}
+              title={t.zones[z.zone]?.description ?? ''}
               className="w-full flex flex-col rounded transition-all"
               style={{
                 padding: '8px 10px',

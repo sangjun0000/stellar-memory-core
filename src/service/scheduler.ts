@@ -8,7 +8,7 @@
  *   - recalculateOrbits  : apply orbital physics (decay + gravity)
  *   - scanLocalFiles     : run the local file scanner on registered sources
  *   - syncCloudSources   : pull incremental updates from cloud connectors
- *   - cleanupOortCloud   : soft-delete memories in Oort zone older than threshold
+ *   - cleanupForgottenZone   : soft-delete memories in Forgotten zone older than threshold
  *
  * Design decisions:
  *   - Each task runs in isolation; a failure in one does not affect others.
@@ -21,9 +21,12 @@ import { createLogger } from '../utils/logger.js';
 import { recalculateOrbits } from '../engine/orbit.js';
 import { createMemory } from '../engine/planet.js';
 import { getConfig } from '../utils/config.js';
-import { getMemoriesInZone, softDeleteMemory, getAllDataSources } from '../storage/queries.js';
+import { getMemoriesInZone, softDeleteMemory, getAllDataSources, getMemoriesByProject } from '../storage/queries.js';
 import { StellarScanner } from '../scanner/index.js';
 import type { CloudConnector } from '../scanner/cloud/types.js';
+import { scoreAllMemories } from '../engine/quality.js';
+import { runConsolidation } from '../engine/consolidation.js';
+import { detectProceduralPattern, createProceduralMemory, getProceduralMemories } from '../engine/procedural.js';
 
 const log = createLogger('scheduler');
 
@@ -40,6 +43,12 @@ export interface ScheduleConfig {
   cloudSyncInterval: number;
   /** Oort cloud cleanup period (ms). Default: 24 hours */
   cleanupInterval: number;
+  /** Quality scoring period (ms). Default: 4 hours */
+  qualityScoringInterval: number;
+  /** Memory consolidation period (ms). Default: 6 hours */
+  consolidationInterval: number;
+  /** Procedural pattern detection period (ms). Default: 12 hours */
+  proceduralDetectionInterval: number;
   /** Project name used for orbit recalc and cleanup. Default: config.defaultProject */
   project?: string;
   /** How old (in days) an Oort memory must be before it is cleaned up. Default: 30 days */
@@ -47,11 +56,14 @@ export interface ScheduleConfig {
 }
 
 export const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
-  orbitRecalcInterval: 60 * 60 * 1000,       // 1 hour
-  localScanInterval:   30 * 60 * 1000,        // 30 min
-  cloudSyncInterval:   2  * 60 * 60 * 1000,   // 2 hours
-  cleanupInterval:     24 * 60 * 60 * 1000,   // 24 hours
-  oortCleanupAgeDays:  30,
+  orbitRecalcInterval:         60 * 60 * 1000,       // 1 hour
+  localScanInterval:           30 * 60 * 1000,        // 30 min
+  cloudSyncInterval:           2  * 60 * 60 * 1000,   // 2 hours
+  cleanupInterval:             24 * 60 * 60 * 1000,   // 24 hours
+  qualityScoringInterval:      4  * 60 * 60 * 1000,   // 4 hours
+  consolidationInterval:       6  * 60 * 60 * 1000,   // 6 hours
+  proceduralDetectionInterval: 12 * 60 * 60 * 1000,   // 12 hours
+  oortCleanupAgeDays:          30,
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +74,10 @@ export type ScheduledTask =
   | 'recalculateOrbits'
   | 'scanLocalFiles'
   | 'syncCloudSources'
-  | 'cleanupOortCloud';
+  | 'cleanupForgottenZone'
+  | 'scoreMemoryQuality'
+  | 'runConsolidation'
+  | 'detectProceduralPatterns';
 
 // ---------------------------------------------------------------------------
 // DaemonStatus (re-exported for daemon.ts)
@@ -104,10 +119,13 @@ export class StellarScheduler {
     this.connectors = connectors;
 
     this.taskStatus = {
-      recalculateOrbits: makeBlankStatus(),
-      scanLocalFiles:    makeBlankStatus(),
-      syncCloudSources:  makeBlankStatus(),
-      cleanupOortCloud:  makeBlankStatus(),
+      recalculateOrbits:       makeBlankStatus(),
+      scanLocalFiles:          makeBlankStatus(),
+      syncCloudSources:        makeBlankStatus(),
+      cleanupForgottenZone:        makeBlankStatus(),
+      scoreMemoryQuality:      makeBlankStatus(),
+      runConsolidation:        makeBlankStatus(),
+      detectProceduralPatterns: makeBlankStatus(),
     };
   }
 
@@ -139,8 +157,17 @@ export class StellarScheduler {
     this.schedule('syncCloudSources', this.config.cloudSyncInterval,
       () => this.syncCloudSources());
 
-    this.schedule('cleanupOortCloud', this.config.cleanupInterval,
-      () => this.cleanupOortCloud());
+    this.schedule('cleanupForgottenZone', this.config.cleanupInterval,
+      () => this.cleanupForgottenZone());
+
+    this.schedule('scoreMemoryQuality', this.config.qualityScoringInterval,
+      () => this.scoreMemoryQuality());
+
+    this.schedule('runConsolidation', this.config.consolidationInterval,
+      () => this.runConsolidationTask());
+
+    this.schedule('detectProceduralPatterns', this.config.proceduralDetectionInterval,
+      () => this.detectProceduralPatterns());
   }
 
   stop(): void {
@@ -224,10 +251,13 @@ export class StellarScheduler {
 
   private getTaskFn(task: ScheduledTask): () => Promise<void> {
     switch (task) {
-      case 'recalculateOrbits': return () => this.recalculateOrbits();
-      case 'scanLocalFiles':    return () => this.scanLocalFiles();
-      case 'syncCloudSources':  return () => this.syncCloudSources();
-      case 'cleanupOortCloud':  return () => this.cleanupOortCloud();
+      case 'recalculateOrbits':       return () => this.recalculateOrbits();
+      case 'scanLocalFiles':          return () => this.scanLocalFiles();
+      case 'syncCloudSources':        return () => this.syncCloudSources();
+      case 'cleanupForgottenZone':        return () => this.cleanupForgottenZone();
+      case 'scoreMemoryQuality':      return () => this.scoreMemoryQuality();
+      case 'runConsolidation':        return () => this.runConsolidationTask();
+      case 'detectProceduralPatterns': return () => this.detectProceduralPatterns();
     }
   }
 
@@ -333,8 +363,8 @@ export class StellarScheduler {
     void cfg;
   }
 
-  private async cleanupOortCloud(): Promise<void> {
-    const oortMemories = getMemoriesInZone(this.config.project, 'oort');
+  private async cleanupForgottenZone(): Promise<void> {
+    const oortMemories = getMemoriesInZone(this.config.project, 'forgotten');
     const cutoff = new Date(
       Date.now() - this.config.oortCleanupAgeDays * 24 * 60 * 60 * 1000
     );
@@ -356,6 +386,64 @@ export class StellarScheduler {
       inspected: oortMemories.length,
       removed,
       cutoffDays: this.config.oortCleanupAgeDays,
+    });
+  }
+
+  private async scoreMemoryQuality(): Promise<void> {
+    const result = scoreAllMemories(this.config.project);
+    log.info('Quality scoring complete', {
+      project:    this.config.project,
+      scored:     result.scored,
+      avgQuality: result.avgQuality.toFixed(3),
+    });
+  }
+
+  private async runConsolidationTask(): Promise<void> {
+    const result = await runConsolidation(this.config.project);
+    log.info('Consolidation pass complete', {
+      project:              this.config.project,
+      groupsFound:          result.groupsFound,
+      memoriesConsolidated: result.memoriesConsolidated,
+      newMemoriesCreated:   result.newMemoriesCreated,
+    });
+  }
+
+  private async detectProceduralPatterns(): Promise<void> {
+    const memories = getMemoriesByProject(this.config.project);
+    const patterns = detectProceduralPattern(memories, this.config.project);
+
+    // Get existing procedural memories to avoid duplicates
+    const existing = getProceduralMemories(this.config.project);
+    const existingRules = new Set(existing.map(m => {
+      const match = m.content.match(/^Rule:\s*(.+?)(\n|$)/);
+      return match ? match[1].trim().toLowerCase() : m.summary.toLowerCase();
+    }));
+
+    let created = 0;
+    for (const pattern of patterns) {
+      const ruleKey = pattern.suggestedRule.toLowerCase();
+      if (existingRules.has(ruleKey)) continue;
+
+      const evidence = memories
+        .filter(m => m.tags.some(t => pattern.pattern.includes(`"${t}"`)))
+        .map(m => m.summary);
+
+      try {
+        createProceduralMemory(pattern.suggestedRule, evidence, this.config.project);
+        existingRules.add(ruleKey);
+        created++;
+      } catch (err) {
+        log.warn('Failed to create procedural memory', {
+          pattern: pattern.pattern,
+          error:   String(err),
+        });
+      }
+    }
+
+    log.info('Procedural pattern detection complete', {
+      project:        this.config.project,
+      patternsFound:  patterns.length,
+      rulesCreated:   created,
     });
   }
 }

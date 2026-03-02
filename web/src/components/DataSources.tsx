@@ -1,22 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import type { DataSource } from '../api/client';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatRelative(iso: string | null): string {
-  if (!iso) return 'never';
-  const diff = Date.now() - new Date(iso).getTime();
-  const sec  = Math.floor(diff / 1000);
-  if (sec < 60)   return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60)   return `${min}m ago`;
-  const hr  = Math.floor(min / 60);
-  if (hr  < 24)   return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
-}
+import { useTranslation } from '../i18n/context';
 
 // Status dot colors (raw values for inline styles so we can add glow)
 const STATUS_COLOR: Record<DataSource['status'], string> = {
@@ -25,22 +10,20 @@ const STATUS_COLOR: Record<DataSource['status'], string> = {
   error:    '#ef4444',
 };
 
-const STATUS_LABEL: Record<DataSource['status'], string> = {
-  active:   'Active',
-  inactive: 'Inactive',
-  error:    'Error',
-};
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
 function StatusDot({ status }: { status: DataSource['status'] }) {
+  const { t } = useTranslation();
   const color = STATUS_COLOR[status];
   const isActive = status === 'active';
+  const statusLabel = status === 'active' ? t.dataSources.statusActive
+    : status === 'inactive' ? t.dataSources.statusInactive
+    : t.dataSources.statusError;
   return (
     <span
-      title={STATUS_LABEL[status]}
+      title={statusLabel}
       style={{
         display: 'inline-block',
         width: '7px',
@@ -56,6 +39,7 @@ function StatusDot({ status }: { status: DataSource['status'] }) {
 }
 
 function SourceCard({ src }: { src: DataSource }) {
+  const { t, formatRelative: formatRel } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const isError = src.status === 'error';
   const borderColor = isError
@@ -119,9 +103,9 @@ function SourceCard({ src }: { src: DataSource }) {
         }}
       >
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {src.file_count}&nbsp;file{src.file_count !== 1 ? 's' : ''}
+          {src.file_count}&nbsp;{src.file_count !== 1 ? t.dataSources.files : t.dataSources.file}
         </span>
-        <span>scanned {formatRelative(src.last_scanned_at)}</span>
+        <span>{t.dataSources.scanned} {formatRel(src.last_scanned_at)}</span>
         {isError && src.error && (
           <span
             style={{
@@ -150,6 +134,7 @@ interface DataSourcesProps {
 }
 
 export function DataSources({ project }: DataSourcesProps) {
+  const { t } = useTranslation();
   const [sources, setSources]     = useState<DataSource[]>([]);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
@@ -201,7 +186,7 @@ export function DataSources({ project }: DataSourcesProps) {
           (e.currentTarget as HTMLButtonElement).style.color = '';
         }}
       >
-        <span>Data Sources</span>
+        <span>{t.dataSources.header}</span>
         <span
           aria-hidden="true"
           style={{
@@ -243,7 +228,7 @@ export function DataSources({ project }: DataSourcesProps) {
                   animation: 'statusDotPulse 1.5s ease-in-out infinite',
                 }}
               >
-                SCANNING...
+                {t.dataSources.scanning}
               </span>
             </div>
           )}
@@ -282,7 +267,7 @@ export function DataSources({ project }: DataSourcesProps) {
                 <circle cx="14" cy="14" r="2" fill="#94a3b8" opacity="0.5" />
               </svg>
               <span style={{ fontSize: '11px', color: 'rgba(148,163,184,0.35)', letterSpacing: '0.05em' }}>
-                No sources registered
+                {t.dataSources.noSources}
               </span>
             </div>
           )}

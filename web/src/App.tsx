@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from './api/client';
-import type { Memory, SunState, ZoneStat, OrbitZone } from './api/client';
+import type { Memory, SunState, ZoneStat, OrbitZone, ConstellationEdge } from './api/client';
+import { useTranslation } from './i18n/context';
 import { Layout } from './components/Layout';
 import { SolarSystem } from './components/SolarSystem';
 import { MemoryDetail } from './components/MemoryDetail';
@@ -9,6 +10,14 @@ import { SearchBar } from './components/SearchBar';
 import type { SearchFilters } from './components/SearchBar';
 import { DataSources } from './components/DataSources';
 import { StatsBar } from './components/StatsBar';
+import { ProjectSwitcher } from './components/ProjectSwitcher';
+import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { ConflictsPanel } from './components/ConflictsPanel';
+import { ConsolidationPanel } from './components/ConsolidationPanel';
+import { ObservationLog } from './components/ObservationLog';
+import { ProceduralRules } from './components/ProceduralRules';
+import { TemporalTimeline } from './components/TemporalTimeline';
+import { OnboardingScreen } from './components/OnboardingScreen';
 
 // ---------------------------------------------------------------------------
 // Polling intervals (ms)
@@ -22,14 +31,16 @@ const POLL_SUN_MS      = 60_000;  // 60 s
 // ---------------------------------------------------------------------------
 
 function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void }) {
+  const { t } = useTranslation();
+
   if (!sun) {
     return (
       <div className="panel h-full flex flex-col">
         <div className="panel-header flex items-center justify-between">
-          <span>Sun State</span>
+          <span>{t.sun.header}</span>
           <button onClick={onClose} className="text-gray-400 hover:text-white">&#x2715;</button>
         </div>
-        <div className="p-4 text-sm text-gray-500">No sun state committed yet.</div>
+        <div className="p-4 text-sm text-gray-500">{t.sun.noState}</div>
       </div>
     );
   }
@@ -37,21 +48,21 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
   return (
     <div className="panel h-full flex flex-col">
       <div className="panel-header flex items-center justify-between">
-        <span>Sun State &mdash; {sun.project}</span>
-        <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
+        <span>{t.sun.header} &mdash; {sun.project}</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label={t.common.close}>
           &#x2715;
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
         {sun.current_work && (
           <div>
-            <div className="text-gray-500 mb-1">Current Work</div>
+            <div className="text-gray-500 mb-1">{t.sun.currentWork}</div>
             <p className="text-gray-300 leading-relaxed">{sun.current_work}</p>
           </div>
         )}
         {sun.recent_decisions.length > 0 && (
           <div>
-            <div className="text-gray-500 mb-1">Recent Decisions</div>
+            <div className="text-gray-500 mb-1">{t.sun.recentDecisions}</div>
             <ul className="space-y-1">
               {sun.recent_decisions.map((d, i) => (
                 <li key={i} className="text-gray-400 flex gap-1">
@@ -63,7 +74,7 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
         )}
         {sun.next_steps.length > 0 && (
           <div>
-            <div className="text-gray-500 mb-1">Next Steps</div>
+            <div className="text-gray-500 mb-1">{t.sun.nextSteps}</div>
             <ul className="space-y-1">
               {sun.next_steps.map((s, i) => (
                 <li key={i} className="text-gray-400 flex gap-1">
@@ -75,7 +86,7 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
         )}
         {sun.active_errors.length > 0 && (
           <div>
-            <div className="text-gray-500 mb-1">Active Errors</div>
+            <div className="text-gray-500 mb-1">{t.sun.activeErrors}</div>
             <ul className="space-y-1">
               {sun.active_errors.map((e, i) => (
                 <li key={i} className="text-red-400">{e}</li>
@@ -84,10 +95,10 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
           </div>
         )}
         <div className="text-gray-600 pt-1">
-          Tokens: {sun.token_count} &middot; Committed:{' '}
+          {t.sun.tokens}: {sun.token_count} &middot; {t.sun.committed}:{' '}
           {sun.last_commit_at
             ? new Date(sun.last_commit_at).toLocaleString()
-            : 'never'}
+            : t.sun.never}
         </div>
       </div>
     </div>
@@ -99,8 +110,12 @@ function SunDetail({ sun, onClose }: { sun: SunState | null; onClose: () => void
 // ---------------------------------------------------------------------------
 
 type DetailPanel = { type: 'memory'; memory: Memory } | { type: 'sun' } | null;
+type AppTab = 'solar' | 'analytics' | 'conflicts' | 'rules';
+
+const TAB_KEYS: AppTab[] = ['solar', 'analytics', 'conflicts', 'rules'];
 
 export default function App() {
+  const { t } = useTranslation();
   const [memories, setMemories]             = useState<Memory[]>([]);
   const [sun, setSun]                       = useState<SunState | null>(null);
   const [zones, setZones]                   = useState<ZoneStat[]>([]);
@@ -113,6 +128,17 @@ export default function App() {
   const [loading, setLoading]               = useState(true);
   const [isRefreshing, setIsRefreshing]     = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt]   = useState<number | null>(null);
+  const [constellationEdges, setConstellationEdges] = useState<ConstellationEdge[]>([]);
+  const [activeTab, setActiveTab]           = useState<AppTab>('solar');
+  // Analytics / health stats for StatsBar enrichment
+  const [avgQuality, setAvgQuality]         = useState<number | null>(null);
+  const [conflictCount, setConflictCount]   = useState<number>(0);
+  const [proceduralCount, setProceduralCount] = useState<number>(0);
+  const [universalCount, setUniversalCount] = useState<number>(0);
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [resumeScanning, setResumeScanning] = useState(false);
 
   // Track active search so polling doesn't overwrite search results
   const activeSearchRef = useRef<SearchFilters | null>(null);
@@ -156,6 +182,22 @@ export default function App() {
       setSun(sunRes.data);
       setZones(zoneRes.data);
       setLastUpdatedAt(Date.now());
+
+      // Derive quick stats from memory list
+      const mems = memRes.data;
+      const procedural = mems.filter((m) => m.type === 'procedural').length;
+      const universal  = mems.filter((m) => m.is_universal).length;
+      setProceduralCount(procedural);
+      setUniversalCount(universal);
+
+      // Load health/conflict stats in background (non-blocking)
+      Promise.all([
+        api.getMemoryHealth(proj).catch(() => null),
+        api.getConflicts(proj).catch(() => null),
+      ]).then(([healthRes, conflictRes]) => {
+        if (healthRes) setAvgQuality(healthRes.data.qualityAvg ?? null);
+        if (conflictRes) setConflictCount(conflictRes.total ?? 0);
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to connect to API');
     } finally {
@@ -168,8 +210,36 @@ export default function App() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    void loadAll(project);
+    const init = async () => {
+      await loadAll(project);
+
+      // Check if onboarding should be shown
+      const skipped = localStorage.getItem('stellar-onboarding-skipped');
+      if (skipped) return;
+
+      // Check if a scan is already in progress
+      try {
+        const scanStatus = await api.getScanStatus();
+        if (scanStatus.data.isScanning) {
+          setResumeScanning(true);
+          setShowOnboarding(true);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void init();
   }, [loadAll, project]);
+
+  // Show onboarding when memories list is empty (after loading completes)
+  useEffect(() => {
+    if (loading) return;
+    const skipped = localStorage.getItem('stellar-onboarding-skipped');
+    if (!skipped && memories.length === 0 && !showOnboarding) {
+      setShowOnboarding(true);
+    }
+  }, [loading, memories.length, showOnboarding]);
 
   // Memories poll (30 s)
   useEffect(() => {
@@ -263,6 +333,20 @@ export default function App() {
   }, [project, loadAll]);
 
   // ---------------------------------------------------------------------------
+  // Constellation — load edges when a memory is selected
+  // ---------------------------------------------------------------------------
+
+  const loadConstellation = useCallback(async (memoryId: string) => {
+    try {
+      const res = await api.getConstellation(memoryId, project);
+      setConstellationEdges(res.data.edges);
+    } catch {
+      // Constellation unavailable — show no lines
+      setConstellationEdges([]);
+    }
+  }, [project]);
+
+  // ---------------------------------------------------------------------------
   // Forget
   // ---------------------------------------------------------------------------
 
@@ -322,17 +406,16 @@ export default function App() {
   // Sidebar
   const sidebar = (
     <div className="space-y-2">
-      {/* Project selector */}
+      {/* Project switcher */}
       <div className="panel">
-        <div className="panel-header">Project</div>
+        <div className="panel-header">{t.sidebar.project}</div>
         <div className="p-2">
-          <input
-            type="text"
-            value={project}
-            onChange={(e) => setProject(e.target.value)}
-            onBlur={() => loadAll(project)}
-            className="w-full bg-space-950 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-gray-500"
-            aria-label="Project name"
+          <ProjectSwitcher
+            currentProject={project}
+            onProjectChange={(p) => {
+              setProject(p);
+              void loadAll(p);
+            }}
           />
         </div>
       </div>
@@ -350,13 +433,13 @@ export default function App() {
 
       {/* Actions */}
       <div className="panel">
-        <div className="panel-header">Actions</div>
+        <div className="panel-header">{t.sidebar.actions}</div>
         <div className="p-2 space-y-1">
           <button
             onClick={handleOrbitRecalc}
             className="w-full text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded px-2 py-1.5 text-left transition-colors"
           >
-            Recalculate orbits
+            {t.sidebar.recalculateOrbits}
           </button>
         </div>
       </div>
@@ -373,7 +456,93 @@ export default function App() {
         lastUpdatedAt={lastUpdatedAt}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
+        avgQuality={avgQuality}
+        conflictCount={conflictCount}
+        proceduralCount={proceduralCount}
+        universalCount={universalCount}
       />
+
+      {/* Tab bar */}
+      <div
+        style={{
+          flexShrink:   0,
+          display:      'flex',
+          alignItems:   'center',
+          gap:          '2px',
+          padding:      '4px 10px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background:   'rgba(5,10,20,0.6)',
+        }}
+      >
+        {TAB_KEYS.map((tab) => {
+          const isActive = activeTab === tab;
+          const tabInfo = t.tabs[tab];
+          // conflict tab gets red badge if there are unresolved conflicts
+          const badge = tab === 'conflicts' && conflictCount > 0 ? conflictCount : null;
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                display:      'flex',
+                flexDirection: 'column',
+                alignItems:   'flex-start',
+                gap:          '1px',
+                padding:      '4px 12px',
+                borderRadius: '6px',
+                border:       isActive
+                  ? '1px solid rgba(96,165,250,0.3)'
+                  : '1px solid transparent',
+                background:   isActive ? 'rgba(96,165,250,0.1)' : 'transparent',
+                color:        isActive ? '#93c5fd' : '#6b7280',
+                fontSize:     '11px',
+                cursor:       'pointer',
+                fontWeight:   isActive ? 600 : 400,
+                transition:   'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (isActive) return;
+                const el = e.currentTarget as HTMLElement;
+                el.style.color = '#9ca3af';
+                el.style.background = 'rgba(255,255,255,0.04)';
+              }}
+              onMouseLeave={(e) => {
+                if (isActive) return;
+                const el = e.currentTarget as HTMLElement;
+                el.style.color = '#6b7280';
+                el.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                {tabInfo.label}
+                {badge != null && (
+                  <span style={{
+                    fontSize:    '9px',
+                    fontFamily:  'monospace',
+                    fontWeight:  700,
+                    color:       '#f87171',
+                    background:  'rgba(239,68,68,0.15)',
+                    border:      '1px solid rgba(239,68,68,0.3)',
+                    borderRadius: '999px',
+                    padding:     '0px 4px',
+                    lineHeight:  '14px',
+                  }}>
+                    {badge}
+                  </span>
+                )}
+              </span>
+              <span style={{
+                fontSize:  '9px',
+                fontWeight: 400,
+                color:     isActive ? 'rgba(147,197,253,0.6)' : 'rgba(107,114,128,0.6)',
+                lineHeight: 1.2,
+              }}>
+                {tabInfo.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Search bar */}
       <div className="flex-shrink-0 p-2 border-b border-gray-800">
@@ -402,7 +571,59 @@ export default function App() {
       <div className="flex-1 relative min-h-0 overflow-hidden">
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
-            Loading...
+            {t.common.loading}
+          </div>
+        ) : activeTab === 'analytics' ? (
+          /* Analytics Dashboard */
+          <div className="absolute inset-0">
+            <AnalyticsDashboard project={project} />
+          </div>
+        ) : activeTab === 'conflicts' ? (
+          /* Conflicts tab — ConflictsPanel + sub-sections */
+          <div className="absolute inset-0 flex overflow-hidden">
+            {/* Main conflicts column */}
+            <div
+              style={{
+                flex: '0 0 50%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              <ConflictsPanel project={project} />
+            </div>
+            {/* Side column — Consolidation + Observations */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div
+                style={{
+                  flex: '0 0 50%', overflow: 'hidden',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <ConsolidationPanel project={project} />
+              </div>
+              <div
+                style={{
+                  flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                }}
+              >
+                <div
+                  style={{
+                    flexShrink: 0, padding: '8px 14px',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    fontSize: '11px', fontWeight: 600, color: '#e5e7eb', letterSpacing: '0.05em',
+                  }}
+                >
+                  {t.observation.header}
+                </div>
+                <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                  <ObservationLog project={project} />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'rules' ? (
+          /* Rules tab */
+          <div className="absolute inset-0 overflow-hidden">
+            <ProceduralRules project={project} />
           </div>
         ) : (
           <>
@@ -410,108 +631,35 @@ export default function App() {
               memories={visibleMemories}
               sun={sun}
               selectedId={selectedId}
-              onSelectMemory={(m) => setDetail(m ? { type: 'memory', memory: m } : null)}
-              onSelectSun={() => setDetail({ type: 'sun' })}
+              onSelectMemory={(m) => {
+                setDetail(m ? { type: 'memory', memory: m } : null);
+                if (m) {
+                  void loadConstellation(m.id);
+                } else {
+                  setConstellationEdges([]);
+                }
+              }}
+              onSelectSun={() => {
+                setDetail({ type: 'sun' });
+                setConstellationEdges([]);
+              }}
               onDragEnd={handleDragEnd}
               totalCount={memories.length}
+              constellationEdges={constellationEdges}
             />
-            {memories.length === 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'none',
-                  zIndex: 10,
+            {showOnboarding && memories.length === 0 && (
+              <OnboardingScreen
+                resumeScanning={resumeScanning}
+                onSkip={() => {
+                  localStorage.setItem('stellar-onboarding-skipped', 'true');
+                  setShowOnboarding(false);
                 }}
-              >
-                <div
-                  style={{
-                    maxWidth: 420,
-                    padding: '32px 36px',
-                    background: 'rgba(10, 22, 40, 0.82)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '16px',
-                    backdropFilter: 'blur(20px)',
-                    boxShadow: '0 8px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-                    textAlign: 'center',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      margin: '0 auto 16px',
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle at 40% 35%, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.08) 60%, transparent)',
-                      border: '1px solid rgba(251, 191, 36, 0.35)',
-                      boxShadow: '0 0 24px rgba(251, 191, 36, 0.2)',
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: '#e5e7eb',
-                      letterSpacing: '0.05em',
-                      marginBottom: 12,
-                    }}
-                  >
-                    STELLAR MEMORY IS EMPTY
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: '#9ca3af',
-                      lineHeight: 1.7,
-                      marginBottom: 20,
-                    }}
-                  >
-                    Memories are created automatically as you work with Claude,
-                    or you can scan a directory to import existing files.
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: '#6b7280',
-                      lineHeight: 1.7,
-                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-                      paddingTop: 14,
-                    }}
-                  >
-                    <div style={{ marginBottom: 6, color: '#7c8db5', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                      ORBIT ZONES
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      {[
-                        { label: 'Corona', color: '#fbbf24', desc: 'Critical' },
-                        { label: 'Inner',  color: '#f97316', desc: 'Important' },
-                        { label: 'Habitable', color: '#22c55e', desc: 'Active' },
-                        { label: 'Outer',  color: '#60a5fa', desc: 'Reference' },
-                        { label: 'Kuiper', color: '#a78bfa', desc: 'Archived' },
-                        { label: 'Oort',   color: '#9ca3af', desc: 'Fading' },
-                      ].map((z) => (
-                        <div key={z.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              background: z.color,
-                              boxShadow: `0 0 6px ${z.color}88`,
-                            }}
-                          />
-                          <span style={{ color: z.color, opacity: 0.85 }}>{z.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                onComplete={() => {
+                  setShowOnboarding(false);
+                  setResumeScanning(false);
+                  void loadAll(project);
+                }}
+              />
             )}
           </>
         )}
@@ -520,13 +668,34 @@ export default function App() {
   );
 
   // Detail panel
+  const hasTemporal =
+    detail?.type === 'memory' &&
+    (detail.memory.valid_from != null ||
+      detail.memory.valid_until != null ||
+      detail.memory.superseded_by != null);
+
   const detailPanel =
     detail?.type === 'memory' ? (
-      <MemoryDetail
-        memory={detail.memory}
-        onClose={() => setDetail(null)}
-        onForget={handleForget}
-      />
+      <div className="h-full flex flex-col overflow-hidden">
+        <div style={{ flex: hasTemporal ? '0 0 60%' : '1 1 auto', overflow: 'hidden' }}>
+          <MemoryDetail
+            key={detail.memory.id}
+            memory={detail.memory}
+            onClose={() => setDetail(null)}
+            onForget={handleForget}
+          />
+        </div>
+        {hasTemporal && (
+          <div
+            style={{
+              flex: '0 0 40%', overflow: 'hidden',
+              borderTop: '1px solid rgba(167,139,250,0.15)',
+            }}
+          >
+            <TemporalTimeline memoryId={detail.memory.id} project={project} />
+          </div>
+        )}
+      </div>
     ) : detail?.type === 'sun' ? (
       <SunDetail sun={sun} onClose={() => setDetail(null)} />
     ) : null;

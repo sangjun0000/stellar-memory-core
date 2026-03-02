@@ -1,14 +1,14 @@
 // Memory types
-export type MemoryType = 'decision' | 'observation' | 'task' | 'context' | 'error' | 'milestone';
+export type MemoryType = 'decision' | 'observation' | 'task' | 'context' | 'error' | 'milestone' | 'procedural';
 
 // Orbit zones
 export const ORBIT_ZONES = {
-  corona:    { min: 0.1,  max: 1.0,  label: 'Corona (Working Memory)' },
-  inner:     { min: 1.0,  max: 5.0,  label: 'Inner Planets (Recent & Important)' },
-  habitable: { min: 5.0,  max: 15.0, label: 'Habitable Zone (Active Knowledge)' },
-  outer:     { min: 15.0, max: 40.0, label: 'Outer Planets (Background Knowledge)' },
-  kuiper:    { min: 40.0, max: 70.0, label: 'Kuiper Belt (Fading Memories)' },
-  oort:      { min: 70.0, max: 100.0, label: 'Oort Cloud (Nearly Forgotten)' },
+  core:      { min: 0.1,  max: 1.0,  label: 'Core Memory' },
+  near:      { min: 1.0,  max: 5.0,  label: 'Recent Memory' },
+  active:    { min: 5.0,  max: 15.0, label: 'Active Memory' },
+  archive:   { min: 15.0, max: 40.0, label: 'Stored Memory' },
+  fading:    { min: 40.0, max: 70.0, label: 'Fading Memory' },
+  forgotten: { min: 70.0, max: 100.0, label: 'Forgotten Memory' },
 } as const;
 
 export type OrbitZone = keyof typeof ORBIT_ZONES;
@@ -21,6 +21,7 @@ export const IMPACT_DEFAULTS: Record<MemoryType, number> = {
   task:        0.5,
   context:     0.4,
   observation: 0.3,
+  procedural:  0.5,
 };
 
 // Importance weights
@@ -55,6 +56,16 @@ export interface Memory {
   deleted_at: string | null;
   // Phase 2: optional in-memory embedding (not persisted in memories table)
   embedding?: Float32Array;
+  // Temporal awareness
+  valid_from?: string;
+  valid_until?: string;
+  superseded_by?: string;
+  // Consolidation
+  consolidated_into?: string;
+  // Quality scoring
+  quality_score?: number;
+  // Multi-project
+  is_universal?: boolean;
 }
 
 // Vector search result returned by searchByVector in vec.ts
@@ -95,6 +106,74 @@ export interface ImportanceComponents {
   impact: number;
   relevance: number;
   total: number;
+}
+
+// Knowledge Graph — Constellation
+export type RelationType = 'uses' | 'caused_by' | 'part_of' | 'contradicts' | 'supersedes' | 'related_to' | 'depends_on' | 'derived_from';
+
+export interface ConstellationEdge {
+  id: string;
+  source_id: string;       // memory ID
+  target_id: string;       // memory ID
+  relation: RelationType;
+  weight: number;           // 0.0-1.0
+  project: string;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+// Temporal Awareness
+export interface TemporalInfo {
+  valid_from?: string;      // ISO date — when this fact became true
+  valid_until?: string;     // ISO date — when this fact stopped being true
+  superseded_by?: string;   // memory ID that replaced this one
+}
+
+// Conflict Detection
+export interface MemoryConflict {
+  id: string;
+  memory_id: string;        // the new memory
+  conflicting_memory_id: string;  // the existing memory it conflicts with
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  resolution?: string;
+  project: string;
+  created_at: string;
+  resolved_at?: string;
+}
+
+// Quality Scoring
+export interface QualityScore {
+  overall: number;          // 0.0-1.0
+  specificity: number;      // detail level
+  actionability: number;    // can be acted upon
+  uniqueness: number;       // how different from others
+  freshness: number;        // recently verified
+}
+
+// Memory Analytics
+export interface MemoryAnalytics {
+  total_memories: number;
+  zone_distribution: Record<string, number>;
+  type_distribution: Record<string, number>;
+  avg_quality: number;
+  avg_importance: number;
+  recall_success_rate: number;
+  consolidation_count: number;
+  conflict_count: number;
+  top_tags: Array<{ tag: string; count: number }>;
+  activity_timeline: Array<{ date: string; created: number; accessed: number; forgotten: number }>;
+}
+
+// Observation Log
+export interface ObservationEntry {
+  id: string;
+  content: string;
+  extracted_memories: string[];   // IDs of memories created
+  source: 'conversation' | 'reflection';
+  project: string;
+  created_at: string;
 }
 
 // Stellar config
