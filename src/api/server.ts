@@ -12,6 +12,13 @@ import sunRouter from './routes/sun.js';
 import systemRouter from './routes/system.js';
 import { scanRouter, sourcesRouter } from './routes/scan.js';
 import orbitRouter from './routes/orbit.js';
+import constellationRouter from './routes/constellation.js';
+import projectsRouter from './routes/projects.js';
+import analyticsRouter from './routes/analytics.js';
+import temporalRouter from './routes/temporal.js';
+import conflictsRouter from './routes/conflicts.js';
+import observationsRouter from './routes/observations.js';
+import consolidationRouter from './routes/consolidation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = resolve(__dirname, '..', '..', 'web', 'dist');
@@ -29,14 +36,14 @@ initDatabase(config.dbPath);
 
 const app = new Hono();
 
-// CORS — restrict to localhost origins only
+// CORS — allow any localhost origin (Vite dev, Electron, any port)
 app.use('/*', cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:21547',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:21547',
-  ],
+  origin: (origin) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return origin;
+    }
+    return undefined;
+  },
   allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
 
@@ -50,6 +57,13 @@ app.route('/api/system', systemRouter);
 app.route('/api/scan', scanRouter);
 app.route('/api/sources', sourcesRouter);
 app.route('/api/orbit', orbitRouter);
+app.route('/api/constellation', constellationRouter);
+app.route('/api/projects', projectsRouter);
+app.route('/api/analytics', analyticsRouter);
+app.route('/api/temporal', temporalRouter);
+app.route('/api/conflicts', conflictsRouter);
+app.route('/api/observations', observationsRouter);
+app.route('/api/consolidation', consolidationRouter);
 
 // ---------------------------------------------------------------------------
 // Static web dashboard (serve web/dist/ if it exists)
@@ -63,6 +77,7 @@ if (hasWebDist) {
 
   // SPA fallback — non-API, non-asset routes return index.html
   app.get('*', (c) => {
+    if (c.req.path.startsWith('/api/')) return c.notFound();
     const indexPath = join(WEB_DIST, 'index.html');
     const html = readFileSync(indexPath, 'utf-8');
     return c.html(html);

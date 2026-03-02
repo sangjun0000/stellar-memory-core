@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
-import { spawn, ChildProcess } from 'child_process';
+import { app, BrowserWindow, shell, ipcMain, dialog, utilityProcess } from 'electron';
 import { join } from 'path';
+import { existsSync } from 'fs';
+import { createServer } from 'net';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -9,26 +10,49 @@ import { join } from 'path';
 const API_PORT = 21547;
 const API_URL = `http://localhost:${API_PORT}`;
 
-let apiProcess: ChildProcess | null = null;
+let apiProcess: Electron.UtilityProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
 // ---------------------------------------------------------------------------
-// API server lifecycle — uses system Node.js 24 (not Electron's Node 20)
+// Port availability check
 // ---------------------------------------------------------------------------
 
-function startApiServer(): ChildProcess {
-  // dist/api/server.js relative to project root
-  // electron/main.ts is compiled to dist-electron/main.js
+function checkPort(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// API server lifecycle — uses Electron's built-in Node.js (no system Node)
+// ---------------------------------------------------------------------------
+
+function startApiServer(): Electron.UtilityProcess {
   const projectRoot = join(__dirname, '..');
   const serverScript = join(projectRoot, 'dist', 'api', 'server.js');
 
-  const proc = spawn('node', [serverScript], {
+  // Validate server script exists
+  if (!existsSync(serverScript)) {
+    dialog.showErrorBox(
+      'Stellar Memory — 시작 오류',
+      `API 서버 파일을 찾을 수 없습니다:\n${serverScript}\n\n빌드가 완료되었는지 확인해주세요.`,
+    );
+    app.quit();
+    throw new Error(`Server script not found: ${serverScript}`);
+  }
+
+  const proc = utilityProcess.fork(serverScript, [], {
     cwd: projectRoot,
     env: {
       ...process.env,
       STELLAR_API_PORT: String(API_PORT),
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: 'pipe',
   });
 
   proc.stdout?.on('data', (data: Buffer) => {
@@ -37,8 +61,17 @@ function startApiServer(): ChildProcess {
   proc.stderr?.on('data', (data: Buffer) => {
     console.error(`[api] ${data.toString().trim()}`);
   });
-  proc.on('error', (err) => {
-    console.error('[api] Failed to start API server:', err.message);
+
+  proc.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`[api] Server exited with code ${code}`);
+      dialog.showErrorBox(
+        'Stellar Memory — 서버 오류',
+        `API 서버가 예기치 않게 종료되었습니다 (코드: ${code}).\n\n앱을 다시 시작해주세요.`,
+      );
+      apiProcess = null;
+      app.quit();
+    }
   });
 
   return proc;
@@ -100,6 +133,17 @@ ipcMain.handle('open-path', async (_event, filePath: string) => {
 // ---------------------------------------------------------------------------
 
 app.whenReady().then(async () => {
+  // Check port availability before starting server
+  const portAvailable = await checkPort(API_PORT);
+  if (!portAvailable) {
+    dialog.showErrorBox(
+      'Stellar Memory — 포트 충돌',
+      `포트 ${API_PORT}이 이미 사용 중입니다.\n\n다른 프로그램이 해당 포트를 사용하고 있는지 확인해주세요.`,
+    );
+    app.quit();
+    return;
+  }
+
   console.log('[stellar] Starting API server...');
   apiProcess = startApiServer();
 
@@ -108,6 +152,11 @@ app.whenReady().then(async () => {
     console.log('[stellar] API server ready');
   } catch (err) {
     console.error('[stellar] Failed to start API server:', err);
+    dialog.showErrorBox(
+      'Stellar Memory — 서버 시작 실패',
+      `API 서버가 시간 내에 시작되지 않았습니다.\n\n로그를 확인하거나 앱을 다시 시작해주세요.`,
+    );
+    cleanup();
     app.quit();
     return;
   }
@@ -137,7 +186,7 @@ app.on('before-quit', () => {
 
 function cleanup() {
   if (apiProcess) {
-    apiProcess.kill('SIGTERM');
+    apiProcess.kill();
     apiProcess = null;
   }
 }
