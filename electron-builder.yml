@@ -7,6 +7,7 @@ directories:
 
 asar: true
 asarUnpack:
+  - "dist/**/*"
   - "node_modules/sqlite-vec/**/*"
   - "node_modules/**/*.node"
 

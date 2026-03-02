@@ -34,7 +34,10 @@ function checkPort(port: number): Promise<boolean> {
 
 function startApiServer(): Electron.UtilityProcess {
   const projectRoot = join(__dirname, '..');
-  const serverScript = join(projectRoot, 'dist', 'api', 'server.js');
+  // In packaged app, asarUnpack extracts dist/ to app.asar.unpacked/dist/
+  const serverScript = app.isPackaged
+    ? join(projectRoot + '.unpacked', 'dist', 'api', 'server.js')
+    : join(projectRoot, 'dist', 'api', 'server.js');
 
   // Validate server script exists
   if (!existsSync(serverScript)) {
