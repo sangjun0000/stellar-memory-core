@@ -10,6 +10,8 @@ asarUnpack:
   - "node_modules/sqlite-vec/**/*"
   - "node_modules/**/*.node"
 
+npmRebuild: false
+
 files:
   - dist/**/*
   - dist-electron/**/*
