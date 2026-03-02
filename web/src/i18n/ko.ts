@@ -96,6 +96,15 @@ const ko: Translations = {
     file: '파일',
     files: '파일',
     scanned: '스캔',
+    addSource: '폴더 추가',
+    pathPlaceholder: 'C:\\Users\\... 또는 폴더 경로',
+    scan: '스캔',
+    cancel: '취소',
+    scanProgress: '스캔 중...',
+    scanComplete: '스캔 완료',
+    created: '생성',
+    memories: '기억',
+    scanError: '스캔 실패',
   },
 
   // ── ProjectSwitcher ───────────────────────────────────────────

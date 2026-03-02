@@ -97,6 +97,15 @@ const en = {
     file: 'file',
     files: 'files',
     scanned: 'scanned',
+    addSource: 'Add folder',
+    pathPlaceholder: 'C:\\Users\\... or folder path',
+    scan: 'Scan',
+    cancel: 'Cancel',
+    scanProgress: 'Scanning...',
+    scanComplete: 'Scan complete',
+    created: 'created',
+    memories: 'memories',
+    scanError: 'Scan failed',
   },
 
   // ── ProjectSwitcher ───────────────────────────────────────────
