@@ -5,11 +5,7 @@ copyright: Copyright © 2025-2026
 directories:
   output: release
 
-asar: true
-asarUnpack:
-  - "dist/**/*"
-  - "node_modules/sqlite-vec/**/*"
-  - "node_modules/**/*.node"
+asar: false
 
 npmRebuild: false
 
