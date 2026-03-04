@@ -5,7 +5,14 @@ data/*.db-wal
 data/*.db-shm
 *.tsbuildinfo
 .env
+.env.*
 web/dist/
 web/node_modules/
 dist-electron/
 release/
+.claude/settings.local.json
+reports/
+screenshots/
+benchmarks/results/*.json
+benchmarks/results/*.md
+!benchmarks/results/.gitkeep
