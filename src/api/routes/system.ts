@@ -6,6 +6,7 @@ import { recalculateOrbits } from '../../engine/orbit.js';
 import { getConfig } from '../../utils/config.js';
 import { ORBIT_ZONES } from '../../engine/types.js';
 import type { OrbitZone } from '../../engine/types.js';
+import { emitOrbitRecalculated } from '../websocket.js';
 
 const app = new Hono();
 
@@ -49,6 +50,7 @@ app.post('/orbit', (c) => {
   const config = getConfig();
 
   const changes = recalculateOrbits(project, config);
+  emitOrbitRecalculated(project, { changes_count: changes.length });
 
   return c.json({
     ok: true,

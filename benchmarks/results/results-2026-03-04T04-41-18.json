@@ -1,0 +1,368 @@
+{
+  "runAt": "2026-03-04T04:41:18.636Z",
+  "nodeVersion": "v24.13.1",
+  "platform": "win32 x64",
+  "decay": {
+    "name": "Importance Decay Verification",
+    "passed": true,
+    "details": [
+      {
+        "hoursElapsed": 0,
+        "expectedScore": 1,
+        "actualScore": 0.9999999946516421,
+        "error": 5.348357867696052e-9,
+        "passed": true
+      },
+      {
+        "hoursElapsed": 1,
+        "expectedScore": 0.9904191474668262,
+        "actualScore": 0.9904191474668262,
+        "error": 0,
+        "passed": true
+      },
+      {
+        "hoursElapsed": 24,
+        "expectedScore": 0.7937005259840998,
+        "actualScore": 0.7937005259840998,
+        "error": 0,
+        "passed": true
+      },
+      {
+        "hoursElapsed": 72,
+        "expectedScore": 0.5,
+        "actualScore": 0.5,
+        "error": 0,
+        "passed": true
+      },
+      {
+        "hoursElapsed": 168,
+        "expectedScore": 0.19842513149602492,
+        "actualScore": 0.19842513149602492,
+        "error": 0,
+        "passed": true
+      },
+      {
+        "hoursElapsed": 720,
+        "expectedScore": 0.0009765625,
+        "actualScore": 0.0009765625,
+        "error": 0,
+        "passed": true
+      }
+    ],
+    "distanceMappingAccuracy": 1
+  },
+  "latency": [
+    {
+      "datasetSize": 100,
+      "keyword": {
+        "method": "FTS5 keyword",
+        "p50": 2.532699999999977,
+        "p95": 4.403699999999958,
+        "p99": 5.885600000000011,
+        "mean": 2.7607099999999956,
+        "min": 2.2438000000000216,
+        "max": 5.885600000000011,
+        "iterations": 50
+      },
+      "hybrid": {
+        "method": "Hybrid (FTS5 + vector merge)",
+        "p50": 2.4079000000000406,
+        "p95": 5.024900000000002,
+        "p99": 6.722399999999993,
+        "mean": 2.8497159999999995,
+        "min": 2.218399999999974,
+        "max": 6.722399999999993,
+        "iterations": 50
+      },
+      "summary": "100 memories: keyword p50=2.53ms, hybrid p50=2.41ms"
+    },
+    {
+      "datasetSize": 500,
+      "keyword": {
+        "method": "FTS5 keyword",
+        "p50": 15.969100000000026,
+        "p95": 20.975299999999834,
+        "p99": 26.342499999999973,
+        "mean": 17.044340000000012,
+        "min": 13.386499999999955,
+        "max": 26.342499999999973,
+        "iterations": 50
+      },
+      "hybrid": {
+        "method": "Hybrid (FTS5 + vector merge)",
+        "p50": 15.561799999999948,
+        "p95": 24.741899999999987,
+        "p99": 28.91579999999999,
+        "mean": 17.073429999999977,
+        "min": 13.466800000000148,
+        "max": 28.91579999999999,
+        "iterations": 50
+      },
+      "summary": "500 memories: keyword p50=15.97ms, hybrid p50=15.56ms"
+    },
+    {
+      "datasetSize": 1000,
+      "keyword": {
+        "method": "FTS5 keyword",
+        "p50": 34.90110000000004,
+        "p95": 46.69479999999976,
+        "p99": 48.86839999999984,
+        "mean": 35.38035600000006,
+        "min": 29.185100000000602,
+        "max": 48.86839999999984,
+        "iterations": 50
+      },
+      "hybrid": {
+        "method": "Hybrid (FTS5 + vector merge)",
+        "p50": 33.17729999999938,
+        "p95": 43.37219999999979,
+        "p99": 54.72990000000027,
+        "mean": 35.23769800000005,
+        "min": 29.4984000000004,
+        "max": 54.72990000000027,
+        "iterations": 50
+      },
+      "summary": "1000 memories: keyword p50=34.90ms, hybrid p50=33.18ms"
+    }
+  ],
+  "accuracy": {
+    "name": "Retrieval Accuracy",
+    "queriesRun": 10,
+    "precisionAt5": 0.6933333333333332,
+    "precisionAt10": 0.6833333333333333,
+    "recallAt10": 0.42833333333333334,
+    "f1Score": 0.5265867066466766,
+    "perQueryResults": [
+      {
+        "query": "database",
+        "description": "Database-related memories",
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.7,
+        "recallAt10": 0.7,
+        "retrieved": [
+          "4d9f52c0-62cc-4d77-97ca-260681fc994b",
+          "fd8c65c5-adc2-4304-8a64-1f757a323b6a",
+          "f54996e4-cb1f-48b3-a313-0a6833d894c9",
+          "9af7c9c7-7af8-41ce-b300-66be2d25a835",
+          "44b486a5-4ccf-4c71-bd0e-99533ed78827",
+          "df7144c6-5274-4cbd-97b3-774b60b3fbd8",
+          "6c2a39b1-0dd9-4954-9487-7a0037435f9d",
+          "1abca7d0-0336-4091-a063-d3ed4c761121",
+          "a91e8a19-5f72-4bfd-a56f-fecc204d3e97",
+          "2c13e230-55a3-4551-8507-3409a8b5a4d2"
+        ],
+        "expected": [
+          "6c2a39b1-0dd9-4954-9487-7a0037435f9d",
+          "cbe44bd5-0a5e-4ef9-8446-87c080ea3154",
+          "4d9f52c0-62cc-4d77-97ca-260681fc994b",
+          "191946a3-1c63-435a-bec2-d6031ec5e2fa",
+          "d6cc90c5-ec5b-4d3f-b2ff-366944406f8e",
+          "2c13e230-55a3-4551-8507-3409a8b5a4d2",
+          "fd8c65c5-adc2-4304-8a64-1f757a323b6a",
+          "9af7c9c7-7af8-41ce-b300-66be2d25a835",
+          "44b486a5-4ccf-4c71-bd0e-99533ed78827",
+          "df7144c6-5274-4cbd-97b3-774b60b3fbd8"
+        ]
+      },
+      {
+        "query": "JWT authentication",
+        "description": "JWT authentication memories",
+        "precisionAt5": 1,
+        "precisionAt10": 1,
+        "recallAt10": 0.3333333333333333,
+        "retrieved": [
+          "6916aca6-4f61-4ff0-9055-fb7735fd8b5e"
+        ],
+        "expected": [
+          "d50591a4-9213-49e2-ade2-0fcf40379f53",
+          "6916aca6-4f61-4ff0-9055-fb7735fd8b5e",
+          "8d124008-f4a1-417a-a79d-6d5f67f79fc1"
+        ]
+      },
+      {
+        "query": "React performance",
+        "description": "React performance optimization",
+        "precisionAt5": 1,
+        "precisionAt10": 1,
+        "recallAt10": 0.6666666666666666,
+        "retrieved": [
+          "2e8d0c32-8388-4fc9-8bc6-810926b550fc",
+          "81f13f47-800f-4d2c-b3ce-1e7c2489a2c9"
+        ],
+        "expected": [
+          "81f13f47-800f-4d2c-b3ce-1e7c2489a2c9",
+          "2e8d0c32-8388-4fc9-8bc6-810926b550fc",
+          "d7fdd0bc-ef11-453c-ae3d-9d8e0273ec5e"
+        ]
+      },
+      {
+        "query": "deployment docker",
+        "description": "Container deployment",
+        "precisionAt5": 1,
+        "precisionAt10": 1,
+        "recallAt10": 0.25,
+        "retrieved": [
+          "191946a3-1c63-435a-bec2-d6031ec5e2fa"
+        ],
+        "expected": [
+          "191946a3-1c63-435a-bec2-d6031ec5e2fa",
+          "40bbfbce-8751-4b20-a0c3-efafdf4a61ec",
+          "6012aba5-77e7-41c5-8174-1294d44fdacf",
+          "08766aa8-65f6-4292-9750-07a5be2f4bf2"
+        ]
+      },
+      {
+        "query": "API endpoints",
+        "description": "API endpoints and design",
+        "precisionAt5": 0.3333333333333333,
+        "precisionAt10": 0.3333333333333333,
+        "recallAt10": 0.2,
+        "retrieved": [
+          "6b1f3614-da4f-46c3-a076-adba1286b242",
+          "07c6e073-7ddb-4d7d-a010-bb51d735c23f",
+          "891cf644-96c8-4281-a79f-45e658875886"
+        ],
+        "expected": [
+          "07c6e073-7ddb-4d7d-a010-bb51d735c23f",
+          "ea067b41-cb38-497a-8307-54733f42960f",
+          "195f6ac0-be55-4a4a-a964-6c2dcfd3c3c9",
+          "7520ae54-16f3-4cd4-954d-be7234d801a1",
+          "78f9233e-7824-4228-8251-e1408d52ab29"
+        ]
+      },
+      {
+        "query": "testing",
+        "description": "Testing related memories",
+        "precisionAt5": 1,
+        "precisionAt10": 1,
+        "recallAt10": 0.8,
+        "retrieved": [
+          "4db23fb2-7dfc-4c1f-bd06-786b6ab16eef",
+          "fa3f2e07-1384-45b3-bd5e-5dad7c6a5164",
+          "4b531325-3a1a-4ed2-bea0-0ab52ba8008e",
+          "fe28eceb-3544-474a-8254-c32a8bf3ce0b"
+        ],
+        "expected": [
+          "fe28eceb-3544-474a-8254-c32a8bf3ce0b",
+          "fa3f2e07-1384-45b3-bd5e-5dad7c6a5164",
+          "6c6cf90f-92fd-4759-b0b2-a2e0d31689d2",
+          "4b531325-3a1a-4ed2-bea0-0ab52ba8008e",
+          "4db23fb2-7dfc-4c1f-bd06-786b6ab16eef"
+        ]
+      },
+      {
+        "query": "Redis caching",
+        "description": "Redis and caching",
+        "precisionAt5": 1,
+        "precisionAt10": 1,
+        "recallAt10": 0.3333333333333333,
+        "retrieved": [
+          "74b9693a-7184-4ca9-b719-1358ab80ad0d"
+        ],
+        "expected": [
+          "74b9693a-7184-4ca9-b719-1358ab80ad0d",
+          "1abca7d0-0336-4091-a063-d3ed4c761121",
+          "e2ec65e6-e209-44fe-a413-847c6c52ccc6"
+        ]
+      },
+      {
+        "query": "error bug",
+        "description": "Bugs and errors",
+        "precisionAt5": 0,
+        "precisionAt10": 0,
+        "recallAt10": 0,
+        "retrieved": [],
+        "expected": [
+          "d50591a4-9213-49e2-ade2-0fcf40379f53",
+          "81f13f47-800f-4d2c-b3ce-1e7c2489a2c9",
+          "4470f096-7179-479c-af12-2d1b73b4a828",
+          "170926b8-0480-4b0e-ac86-d9a1536b70be",
+          "195f6ac0-be55-4a4a-a964-6c2dcfd3c3c9",
+          "d8a7b564-47bb-49ed-83cd-6baf4e9f4cf6",
+          "2c13e230-55a3-4551-8507-3409a8b5a4d2",
+          "5f0878ac-8bbe-4a19-b08b-7e5c017104c3",
+          "81ad7849-cbe6-4c95-ba17-269242226d17",
+          "fd8c65c5-adc2-4304-8a64-1f757a323b6a"
+        ]
+      },
+      {
+        "query": "monitoring",
+        "description": "Monitoring and observability",
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.8,
+        "recallAt10": 1,
+        "retrieved": [
+          "e2e48308-4890-4c54-9a72-40cc4126a961",
+          "514ec5f7-eede-4921-9a4e-bd60d454fd54",
+          "d8a7b564-47bb-49ed-83cd-6baf4e9f4cf6",
+          "66098671-0f19-4a02-a730-4edd1759bd94",
+          "a91e8a19-5f72-4bfd-a56f-fecc204d3e97"
+        ],
+        "expected": [
+          "d8a7b564-47bb-49ed-83cd-6baf4e9f4cf6",
+          "a91e8a19-5f72-4bfd-a56f-fecc204d3e97",
+          "e2e48308-4890-4c54-9a72-40cc4126a961",
+          "66098671-0f19-4a02-a730-4edd1759bd94"
+        ]
+      },
+      {
+        "query": "architecture decision",
+        "description": "Architecture decisions",
+        "precisionAt5": 0,
+        "precisionAt10": 0,
+        "recallAt10": 0,
+        "retrieved": [],
+        "expected": [
+          "6c2a39b1-0dd9-4954-9487-7a0037435f9d",
+          "74b9693a-7184-4ca9-b719-1358ab80ad0d",
+          "e3a9e190-6cc9-400d-83fe-bd002d9958ca",
+          "40bbfbce-8751-4b20-a0c3-efafdf4a61ec",
+          "d6cc90c5-ec5b-4d3f-b2ff-366944406f8e",
+          "17538010-e0ec-4a3c-9471-1d0c0c5ee00d",
+          "0f0661e5-2d4d-449a-bcf7-a377aad00902",
+          "08766aa8-65f6-4292-9750-07a5be2f4bf2",
+          "a61fd561-84ac-4552-ab4a-3e74c7fce4b7",
+          "53d3a634-9470-4348-a5aa-352c1d3e3b17"
+        ]
+      }
+    ]
+  },
+  "cache": {
+    "name": "Corona Cache Effectiveness",
+    "totalMemories": 90,
+    "coronaSize": 90,
+    "coreCount": 5,
+    "nearCount": 35,
+    "hitRateTests": [
+      {
+        "scenario": "Hot queries (core zone terms)",
+        "queries": 50,
+        "hits": 50,
+        "misses": 0,
+        "hitRate": 1,
+        "avgHitTimeMs": 0.014526000000114437,
+        "avgMissTimeMs": 0
+      },
+      {
+        "scenario": "Mixed queries (near zone terms)",
+        "queries": 50,
+        "hits": 50,
+        "misses": 0,
+        "hitRate": 1,
+        "avgHitTimeMs": 0.03535000000005312,
+        "avgMissTimeMs": 0
+      },
+      {
+        "scenario": "Cold queries (distant memory terms)",
+        "queries": 20,
+        "hits": 20,
+        "misses": 0,
+        "hitRate": 1,
+        "avgHitTimeMs": 0.027645000000075016,
+        "avgMissTimeMs": 0
+      }
+    ],
+    "warmupTimeMs": 3.6284999999998035,
+    "avgQueryTimeMs": 0.02584033333341419
+  }
+}

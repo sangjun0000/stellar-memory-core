@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getSunState } from '../../storage/queries.js';
 import { commitToSun } from '../../engine/sun.js';
+import { emitSunUpdated } from '../websocket.js';
 
 const app = new Hono();
 
@@ -43,6 +44,7 @@ app.post('/commit', async (c) => {
   commitToSun(project, { current_work, decisions, next_steps, errors, context });
 
   const updated = getSunState(project);
+  emitSunUpdated(project, updated);
   return c.json({ ok: true, data: updated });
 });
 

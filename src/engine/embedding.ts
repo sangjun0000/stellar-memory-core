@@ -26,6 +26,73 @@ const MAX_CHARS  = 2000; // roughly 512 tokens for mixed Korean/English text
 let _pipeline: unknown = null;
 let _loading: Promise<unknown> | null = null;
 
+// ── Progress tracking ────────────────────────────────────────────────────────
+
+let _downloadStartTime = 0;
+let _lastProgressPct   = -1;
+
+function _formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function _formatTime(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
+interface ProgressInfo {
+  status: string;
+  name?: string;
+  file?: string;
+  progress?: number;
+  loaded?: number;
+  total?: number;
+}
+
+function _onDownloadProgress(info: ProgressInfo): void {
+  const { status, file, progress, loaded, total } = info;
+
+  if (status === 'initiate' && _downloadStartTime === 0) {
+    _downloadStartTime = Date.now();
+    console.error('[stellar-memory] Downloading embedding model (~90 MB, first run only)...');
+    console.error('[stellar-memory] This will be cached for future sessions.');
+  }
+
+  if (status === 'progress' && progress != null) {
+    const pct = Math.min(100, Math.round(progress));
+
+    // Throttle: only log every 10% increment
+    if (pct >= _lastProgressPct + 10 || pct === 100) {
+      _lastProgressPct = pct;
+      const elapsed  = (Date.now() - _downloadStartTime) / 1000;
+      const eta      = pct > 0 ? (elapsed / pct) * (100 - pct) : 0;
+      const sizeInfo = loaded != null && total != null
+        ? `  ${_formatBytes(loaded)} / ${_formatBytes(total)}`
+        : '';
+      const etaInfo  = eta > 1 ? `  ETA: ${_formatTime(eta)}` : '';
+      const fileName = (file ?? '').split('/').pop() ?? '';
+      const label    = fileName ? ` [${fileName}]` : '';
+      console.error(`[stellar-memory] Downloading${label}: ${pct}%${sizeInfo}${etaInfo}`);
+    }
+  }
+
+  if (status === 'done' && file) {
+    const fileName = file.split('/').pop() ?? file;
+    console.error(`[stellar-memory] Downloaded: ${fileName}`);
+  }
+
+  if (status === 'ready') {
+    const elapsed = _downloadStartTime > 0
+      ? ` in ${((Date.now() - _downloadStartTime) / 1000).toFixed(1)}s`
+      : '';
+    console.error(`[stellar-memory] Embedding model ready${elapsed}`);
+    _downloadStartTime = 0;
+    _lastProgressPct   = -1;
+  }
+}
+
 /**
  * Load and cache the feature-extraction pipeline.
  * Subsequent calls return the same promise / resolved value.
@@ -44,7 +111,8 @@ async function getPipeline(): Promise<unknown> {
       env.cacheDir = process.env['TRANSFORMERS_CACHE'] ?? undefined;
 
       const pipe = await pipeline('feature-extraction', MODEL_NAME, {
-        quantized: true, // use the int8-quantized model for faster inference
+        quantized: true,          // use the int8-quantized model for faster inference
+        progress_callback: _onDownloadProgress,
       });
 
       _pipeline = pipe;

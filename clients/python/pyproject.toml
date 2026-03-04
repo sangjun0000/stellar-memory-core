@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stellar-memory"
+version = "0.1.0"
+description = "Python client SDK for the Stellar Memory persistent AI memory system"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["memory", "ai", "mcp", "llm", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+dependencies = [
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",   # httpx request mocking
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/stellar-memory"
+Repository = "https://github.com/your-org/stellar-memory"
+
+[tool.hatch.build.targets.wheel]
+packages = ["stellar_memory"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

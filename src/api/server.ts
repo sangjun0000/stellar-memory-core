@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { initDatabase } from '../storage/database.js';
 import { getConfig } from '../utils/config.js';
+import { createWebSocketServer, handleUpgrade } from './websocket.js';
 import memoriesRouter from './routes/memories.js';
 import sunRouter from './routes/sun.js';
 import systemRouter from './routes/system.js';
@@ -48,7 +49,12 @@ app.use('/*', cors({
 }));
 
 // Health check
-app.get('/api/health', (c) => c.json({ name: 'stellar-memory-api', version: '0.4.0', status: 'ok' }));
+app.get('/api/health', (c) => c.json({
+  name: 'stellar-memory-api',
+  version: '0.5.0',
+  status: 'ok',
+  uptime: process.uptime(),
+}));
 
 // Routers
 app.route('/api/memories', memoriesRouter);
@@ -99,6 +105,11 @@ app.notFound((c) => c.json({ ok: false, error: 'Not found' }, 404));
 
 const port = parseInt(process.env.STELLAR_API_PORT ?? '21547', 10);
 
-serve({ fetch: app.fetch, port }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`[stellar-api] listening on http://localhost:${info.port}`);
+  console.log(`[stellar-api] WebSocket available at ws://localhost:${info.port}/ws`);
 });
+
+// Initialize WebSocket server and attach upgrade handler
+createWebSocketServer();
+server.on('upgrade', handleUpgrade);

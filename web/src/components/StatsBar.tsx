@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import type { ZoneStat, OrbitZone } from '../api/client';
 import { useTranslation } from '../i18n/context';
+import type { WsStatus } from '../hooks/useWebSocket';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -70,6 +71,44 @@ interface StatsBarProps {
   conflictCount?:   number;
   proceduralCount?: number;
   universalCount?:  number;
+  // WebSocket connection status
+  wsStatus?:        WsStatus;
+}
+
+// ---------------------------------------------------------------------------
+// WS status indicator (inline in StatsBar)
+// ---------------------------------------------------------------------------
+
+const WS_STATUS_CONFIG: Record<WsStatus, { color: string; label: string }> = {
+  connected:    { color: '#22c55e', label: 'Live' },
+  connecting:   { color: '#f59e0b', label: 'Connecting…' },
+  reconnecting: { color: '#f59e0b', label: 'Reconnecting…' },
+  disconnected: { color: '#6b7280', label: 'Polling' },
+};
+
+function WsIndicator({ status }: { status: WsStatus }) {
+  const cfg = WS_STATUS_CONFIG[status];
+  return (
+    <div
+      title={`WebSocket: ${cfg.label}`}
+      style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, cursor: 'default' }}
+    >
+      <span
+        style={{
+          display:      'inline-block',
+          width:        '6px',
+          height:       '6px',
+          borderRadius: '50%',
+          background:   cfg.color,
+          boxShadow:    status === 'connected' ? `0 0 6px ${cfg.color}` : 'none',
+          animation:    status === 'connected' ? 'statsbar-blink 2s ease-in-out infinite' : 'none',
+        }}
+      />
+      <span style={{ fontSize: '10px', color: cfg.color, fontFamily: 'monospace', fontWeight: 600 }}>
+        {cfg.label}
+      </span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +346,7 @@ export function StatsBar({
   conflictCount,
   proceduralCount,
   universalCount,
+  wsStatus,
 }: StatsBarProps) {
   injectStatsCss();
   const { t, formatRelative: formatRel } = useTranslation();
@@ -485,6 +525,11 @@ export function StatsBar({
             </span>
           </div>
         )}
+
+        <HudDivider />
+
+        {/* WebSocket status indicator */}
+        {wsStatus && <WsIndicator status={wsStatus} />}
 
         <HudDivider />
 

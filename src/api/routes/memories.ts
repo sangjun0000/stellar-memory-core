@@ -10,6 +10,7 @@ import { distanceToImportance } from '../../engine/orbit.js';
 import { updateMemoryOrbit, insertOrbitLog } from '../../storage/queries.js';
 import type { OrbitChange } from '../../engine/types.js';
 import { createMemory, recallMemoriesAsync, forgetMemory } from '../../engine/planet.js';
+import { emitMemoryCreated, emitMemoryDeleted, emitMemoryUpdated } from '../websocket.js';
 
 const app = new Hono();
 
@@ -147,6 +148,7 @@ app.post('/', async (c) => {
   }
 
   const memory = createMemory({ project, content, summary, type, impact, tags });
+  emitMemoryCreated(project, memory);
 
   return c.json({ ok: true, data: memory }, 201);
 });
@@ -179,6 +181,7 @@ app.post('/:id/forget', async (c) => {
 
   try {
     forgetMemory(id, mode);
+    emitMemoryDeleted(existing.project, { id, mode });
     return c.json({ ok: true, id, mode });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Forget failed';
@@ -225,6 +228,8 @@ app.patch('/:id/orbit', async (c) => {
     trigger: 'manual',
   };
   insertOrbitLog(change);
+
+  emitMemoryUpdated(memory.project, { id, new_distance: newDistance, new_importance: newImportance });
 
   return c.json({
     ok: true,

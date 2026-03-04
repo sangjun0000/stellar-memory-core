@@ -4,7 +4,38 @@ import { initDatabase } from './storage/database.js';
 import { getConfig } from './utils/config.js';
 import { autoCommitOnClose } from './engine/sun.js';
 
+/**
+ * Validate that the runtime environment meets Stellar Memory's requirements.
+ * Exits with a human-readable error message if anything is missing.
+ */
+function validateEnvironment(): void {
+  // Check Node.js version (requires 22+ for node:sqlite)
+  const [major] = process.versions.node.split('.').map(Number);
+  if (major < 22) {
+    console.error(
+      `[stellar-memory] ERROR: Node.js 22 or higher is required.\n` +
+      `  Detected: Node.js ${process.versions.node}\n` +
+      `  Upgrade:  nvm install 22 && nvm use 22\n` +
+      `            or visit https://nodejs.org/en/download`
+    );
+    process.exit(1);
+  }
+
+  // node:sqlite is available since Node 22.5.0 — check the minor version.
+  const nodeVersion = process.versions.node.split('.').map(Number);
+  const [, minor] = nodeVersion;
+  if (major === 22 && minor < 5) {
+    console.error(
+      `[stellar-memory] ERROR: Node.js 22.5.0 or higher is required for node:sqlite.\n` +
+      `  Detected: Node.js ${process.versions.node}\n` +
+      `  Upgrade:  nvm install 22 && nvm use 22`
+    );
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
+  validateEnvironment();
   const config = getConfig();
 
   // Initialize SQLite database (creates schema on first run)

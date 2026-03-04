@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "stellar-memory": {
+      "command": "node",
+      "args": ["/absolute/path/to/stellar-memory/dist/index.js"],
+      "env": {
+        "STELLAR_PROJECT": "my-project"
+      }
+    }
+  }
+}

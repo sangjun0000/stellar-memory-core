@@ -1,0 +1,33 @@
+services:
+  stellar-memory:
+    image: stellar-memory:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stellar-memory
+    restart: unless-stopped
+    ports:
+      - "21547:21547"
+    volumes:
+      - stellar-data:/data
+    environment:
+      STELLAR_DB_PATH: /data/stellar.db
+      STELLAR_API_PORT: 21547
+      STELLAR_PROJECT: default
+      STELLAR_SUN_TOKEN_BUDGET: 800
+      STELLAR_DECAY_HALF_LIFE: 72
+      STELLAR_WEIGHT_RECENCY: 0.30
+      STELLAR_WEIGHT_FREQUENCY: 0.20
+      STELLAR_WEIGHT_IMPACT: 0.30
+      STELLAR_WEIGHT_RELEVANCE: 0.20
+      TRANSFORMERS_CACHE: /data/.cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:21547/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  stellar-data:
+    driver: local

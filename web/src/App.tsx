@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from './api/client';
 import type { Memory, SunState, ZoneStat, OrbitZone, ConstellationEdge } from './api/client';
 import { useTranslation } from './i18n/context';
+import { useWebSocket } from './hooks/useWebSocket';
 import { Layout } from './components/Layout';
 import { SolarSystem } from './components/SolarSystem';
 import { MemoryDetail } from './components/MemoryDetail';
@@ -143,6 +144,9 @@ export default function App() {
   // Track active search so polling doesn't overwrite search results
   const activeSearchRef = useRef<SearchFilters | null>(null);
 
+  // WebSocket real-time connection
+  const { status: wsStatus, lastEvent } = useWebSocket();
+
   // ---------------------------------------------------------------------------
   // Data loaders
   // ---------------------------------------------------------------------------
@@ -206,7 +210,48 @@ export default function App() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Polling — set up after initial load completes
+  // WebSocket event handler — react to real-time events
+  // ---------------------------------------------------------------------------
+
+  const projectRef = useRef(project);
+  useEffect(() => { projectRef.current = project; }, [project]);
+
+  useEffect(() => {
+    if (!lastEvent) return;
+
+    const { type, project: eventProject } = lastEvent;
+
+    // Only handle events for the current project (or global events)
+    if (eventProject && eventProject !== projectRef.current) return;
+
+    switch (type) {
+      case 'memory:created':
+      case 'memory:deleted':
+      case 'orbit:recalculated':
+        // Refresh memories list and zones
+        void refreshMemories(projectRef.current);
+        api.getZoneStats(projectRef.current)
+          .then((res) => setZones(res.data))
+          .catch(() => undefined);
+        setLastUpdatedAt(Date.now());
+        break;
+
+      case 'memory:updated':
+        // Lightweight: just refresh memories
+        void refreshMemories(projectRef.current);
+        setLastUpdatedAt(Date.now());
+        break;
+
+      case 'sun:updated':
+        // Update sun state directly from event data if available
+        void refreshSun(projectRef.current);
+        setLastUpdatedAt(Date.now());
+        break;
+    }
+  }, [lastEvent, refreshMemories, refreshSun]);
+
+  // ---------------------------------------------------------------------------
+  // Polling — set up after initial load completes (fallback when WS unavailable)
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -241,17 +286,19 @@ export default function App() {
     }
   }, [loading, memories.length, showOnboarding]);
 
-  // Memories poll (30 s)
+  // Memories poll — 30s normally, 5min when WebSocket is connected (fallback)
   useEffect(() => {
-    const id = setInterval(() => void refreshMemories(project), POLL_MEMORIES_MS);
+    const interval = wsStatus === 'connected' ? POLL_MEMORIES_MS * 10 : POLL_MEMORIES_MS;
+    const id = setInterval(() => void refreshMemories(project), interval);
     return () => clearInterval(id);
-  }, [refreshMemories, project]);
+  }, [refreshMemories, project, wsStatus]);
 
-  // Sun poll (60 s)
+  // Sun poll — 60s normally, 5min when WebSocket is connected (fallback)
   useEffect(() => {
-    const id = setInterval(() => void refreshSun(project), POLL_SUN_MS);
+    const interval = wsStatus === 'connected' ? POLL_SUN_MS * 5 : POLL_SUN_MS;
+    const id = setInterval(() => void refreshSun(project), interval);
     return () => clearInterval(id);
-  }, [refreshSun, project]);
+  }, [refreshSun, project, wsStatus]);
 
   // ---------------------------------------------------------------------------
   // Manual refresh handler
@@ -460,6 +507,7 @@ export default function App() {
         conflictCount={conflictCount}
         proceduralCount={proceduralCount}
         universalCount={universalCount}
+        wsStatus={wsStatus}
       />
 
       {/* Tab bar */}
