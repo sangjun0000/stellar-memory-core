@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import type { Memory, SunState, OrbitZone, ConstellationEdge } from '../api/client';
 import { MEMORY_COLORS } from './Planet';
 
+// Threshold above which 3D view is replaced by a list fallback for performance
+const PERF_THRESHOLD = 200;
+
 // Minimum pointer distance (px) before a press becomes a drag
 const DRAG_THRESHOLD = 6;
 
@@ -1400,8 +1403,161 @@ export interface SolarSystemProps {
   constellationEdges?: ConstellationEdge[];
 }
 
+// ---------------------------------------------------------------------------
+// List view fallback — shown when memory count > PERF_THRESHOLD
+// ---------------------------------------------------------------------------
+
+function MemoryListFallback({
+  memories,
+  selectedId,
+  onSelectMemory,
+  onForce3D,
+}: {
+  memories: Memory[];
+  selectedId: string | null;
+  onSelectMemory: (memory: Memory | null) => void;
+  onForce3D: () => void;
+}) {
+  return (
+    <div
+      className="absolute inset-0 flex flex-col"
+      style={{ background: '#020810', color: '#e5e7eb' }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          flexShrink: 0,
+          padding: '10px 14px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: '#94a3b8',
+        }}
+      >
+        <span>
+          {memories.length} memories — list view (3D paused for performance)
+        </span>
+        <button
+          onClick={onForce3D}
+          style={{
+            padding: '3px 10px',
+            borderRadius: '6px',
+            border: '1px solid rgba(96,165,250,0.3)',
+            background: 'rgba(96,165,250,0.1)',
+            color: '#93c5fd',
+            fontSize: '10px',
+            cursor: 'pointer',
+          }}
+          aria-label="Force 3D view"
+        >
+          Force 3D
+        </button>
+      </div>
+
+      {/* Scrollable list */}
+      <div
+        role="list"
+        aria-label="Memory list"
+        className="flex-1 overflow-y-auto"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
+      >
+        {memories.map((m) => {
+          const color = MEMORY_COLORS[m.type] ?? '#6b7280';
+          const isSelected = m.id === selectedId;
+          return (
+            <button
+              key={m.id}
+              role="listitem"
+              onClick={() => onSelectMemory(isSelected ? null : m)}
+              aria-selected={isSelected}
+              aria-label={`${m.type}: ${(m.summary || m.content).slice(0, 60)}`}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                width: '100%',
+                padding: '8px 14px',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                background: isSelected ? 'rgba(96,165,250,0.08)' : 'transparent',
+                border: 'none',
+                borderLeft: isSelected ? `3px solid ${color}` : '3px solid transparent',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+              }}
+            >
+              {/* Type color dot */}
+              <span
+                aria-hidden="true"
+                style={{
+                  display: 'inline-block',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background: color,
+                  flexShrink: 0,
+                  marginTop: '4px',
+                  boxShadow: `0 0 6px ${color}88`,
+                }}
+              />
+              <span style={{ flex: 1, overflow: 'hidden' }}>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: '11px',
+                    color: '#e5e7eb',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {m.summary || m.content.slice(0, 80)}
+                </span>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: '10px',
+                    color: 'rgba(148,163,184,0.4)',
+                    marginTop: '1px',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {m.type} · {m.distance.toFixed(1)} AU · imp {m.importance.toFixed(2)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function SolarSystem(props: SolarSystemProps) {
   const { memories, totalCount } = props;
+  const [force3D, setForce3D] = useState(false);
+
+  // Default to list view when memory count exceeds threshold
+  const use3D = force3D || memories.length <= PERF_THRESHOLD;
+
+  if (!use3D) {
+    return (
+      <MemoryListFallback
+        memories={memories}
+        selectedId={props.selectedId}
+        onSelectMemory={props.onSelectMemory}
+        onForce3D={() => setForce3D(true)}
+      />
+    );
+  }
 
   return (
     <div
@@ -1410,6 +1566,28 @@ export function SolarSystem(props: SolarSystemProps) {
       onKeyDown={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
     >
+      {/* Performance warning when forced */}
+      {force3D && memories.length > PERF_THRESHOLD && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 14,
+            zIndex: 20,
+            fontSize: '10px',
+            color: '#f97316',
+            background: 'rgba(249,115,22,0.1)',
+            border: '1px solid rgba(249,115,22,0.3)',
+            borderRadius: '6px',
+            padding: '3px 8px',
+            pointerEvents: 'none',
+          }}
+          aria-live="polite"
+        >
+          {memories.length} memories — performance may be reduced
+        </div>
+      )}
+
       <CanvasErrorBoundary>
         <Canvas
           camera={{ position: [0, 10, 22], fov: 52, near: 0.1, far: 250 }}

@@ -2,10 +2,9 @@
  * mcp/server.ts — Thin factory that wires tool handlers to the MCP server.
  *
  * Responsibilities:
- *   1. Instantiate McpServer, ConnectorRegistry.
+ *   1. Instantiate McpServer.
  *   2. Register the stellar://sun resource.
  *   3. Register each tool, forwarding parsed args to the appropriate handler.
- *   4. Pass the shared ConnectorRegistry to handlers that need it (sync, daemon).
  *
  * Business logic lives in mcp/tools/. This file contains no logic beyond wiring.
  */
@@ -13,7 +12,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { ConnectorRegistry } from './connector-registry.js';
 import {
   handleStatus,
   handleCommit,
@@ -31,16 +29,15 @@ import {
   handleResolveConflict,
   handleTemporal,
 } from './tools/memory-tools.js';
-import { handleScan, handleSync } from './tools/ingestion-tools.js';
-import { handleDaemon, resetScheduler } from './tools/daemon-tool.js';
+import { handleScan } from './tools/ingestion-tools.js';
+import { handleDaemon } from './tools/daemon-tool.js';
 
 // ---------------------------------------------------------------------------
 // Server factory
 // ---------------------------------------------------------------------------
 
 export function createStellarServer(): McpServer {
-  const server   = new McpServer({ name: 'stellar-memory', version: '0.3.0' });
-  const registry = new ConnectorRegistry();
+  const server = new McpServer({ name: 'stellar-memory', version: '0.4.0' });
 
   // ── Resource: stellar://sun ───────────────────────────────────────────────
 
@@ -193,40 +190,18 @@ export function createStellarServer(): McpServer {
     (args) => handleScan(args)
   );
 
-  // ── Tool: sync ────────────────────────────────────────────────────────────
-
-  server.tool(
-    'sync',
-    'Pull documents from cloud services into stellar memory. ' +
-    'If credentials are provided, the service is connected first before syncing.',
-    {
-      service: z.enum(['google-drive', 'notion', 'github', 'slack']).optional()
-        .describe('Specific service to connect and/or sync.'),
-      since: z.string().optional()
-        .describe('Relative time ("24h", "7d") or ISO date. Default: "24h".'),
-      credentials: z.record(z.string()).optional()
-        .describe('Service credentials. If provided, connects to the service before syncing.'),
-    },
-    (args) => {
-      const result = handleSync(args, registry);
-      // Rebuild scheduler with updated registry whenever credentials change
-      if (args.credentials !== undefined) resetScheduler();
-      return result;
-    }
-  );
-
   // ── Tool: daemon ──────────────────────────────────────────────────────────
 
   server.tool(
     'daemon',
     'Control the background scheduler daemon. ' +
-    'The scheduler automatically recalculates orbits, runs local scans, syncs cloud sources, ' +
+    'The scheduler automatically recalculates orbits, runs local scans, ' +
     'and cleans up the Oort cloud on configurable intervals.',
     {
       action: z.enum(['status', 'start', 'stop'])
         .describe('"status" — show state, "start" — start scheduler, "stop" — stop scheduler.'),
     },
-    (args) => handleDaemon(args, registry)
+    (args) => handleDaemon(args)
   );
 
   // ── Tool: constellation ───────────────────────────────────────────────────

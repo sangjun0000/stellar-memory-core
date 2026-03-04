@@ -80,6 +80,66 @@ export function OnboardingScreen({ onSkip, onComplete, resumeScanning }: Props) 
   // Start scan (SSE)
   // -------------------------------------------------------------------
 
+  const startMetaScan = useCallback(async (paths?: string[]) => {
+    setPhase('scanning');
+    setError(null);
+    abortRef.current = false;
+
+    try {
+      const res = await api.startMetaScan({
+        paths: paths ?? ['C:\\'],
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+        setError(err.error ?? `HTTP ${res.status}`);
+        setPhase('idle');
+        return;
+      }
+
+      if (!res.body) {
+        setError('No response stream');
+        setPhase('idle');
+        return;
+      }
+
+      // Read SSE stream (same logic as full scan)
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (abortRef.current) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+              handleSSEEvent(currentEvent, parsed);
+            } catch {
+              // ignore malformed JSON
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (!abortRef.current) {
+        setError(err instanceof Error ? err.message : 'Connection failed');
+        setPhase('idle');
+      }
+    }
+  }, []);
+
   const startScan = useCallback(async (mode: 'full' | 'folders', paths?: string[]) => {
     setPhase('scanning');
     setError(null);
@@ -263,11 +323,35 @@ export function OnboardingScreen({ onSkip, onComplete, resumeScanning }: Props) 
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => void startMetaScan()}
+              style={{
+                flex: 1, maxWidth: 160, padding: '14px 16px', borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05))',
+                border: '1px solid rgba(251,191,36,0.35)',
+                color: '#fbbf24', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                fontFamily: 'monospace', transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(251,191,36,0.6)';
+                (e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(251,191,36,0.2)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(251,191,36,0.35)';
+                (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+              }}
+            >
+              <div style={{ marginBottom: 4 }}>{t.onboarding.quickScan}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 400 }}>
+                {t.onboarding.quickScanDesc.split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
+              </div>
+            </button>
+
             <button
               onClick={() => void startScan('full')}
               style={{
-                flex: 1, maxWidth: 200, padding: '14px 16px', borderRadius: 12,
+                flex: 1, maxWidth: 160, padding: '14px 16px', borderRadius: 12,
                 background: 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(96,165,250,0.05))',
                 border: '1px solid rgba(96,165,250,0.3)',
                 color: '#93c5fd', cursor: 'pointer', fontSize: 12, fontWeight: 600,
@@ -291,7 +375,7 @@ export function OnboardingScreen({ onSkip, onComplete, resumeScanning }: Props) 
             <button
               onClick={() => setPhase('selecting_folders')}
               style={{
-                flex: 1, maxWidth: 200, padding: '14px 16px', borderRadius: 12,
+                flex: 1, maxWidth: 160, padding: '14px 16px', borderRadius: 12,
                 background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))',
                 border: '1px solid rgba(34,197,94,0.25)',
                 color: '#86efac', cursor: 'pointer', fontSize: 12, fontWeight: 600,

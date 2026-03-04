@@ -20,6 +20,9 @@ import {
 } from '../storage/queries.js';
 import { getDatabase } from '../storage/database.js';
 import { corona } from './corona.js';
+import { qualityOrbitAdjustment } from './quality.js';
+import { getProceduralDecayMultiplier } from './procedural.js';
+import type { MemoryType } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Scoring primitives
@@ -28,10 +31,13 @@ import { corona } from './corona.js';
 /**
  * Calculate recency score using exponential decay.
  *
- * Formula: 0.5 ^ (hoursSince / halfLifeHours)
+ * Formula: 0.5 ^ (hoursSince / effectiveHalfLife)
  *   - At t=0          → score = 1.0
  *   - At t=halfLife   → score = 0.5
  *   - At t=2×halfLife → score = 0.25
+ *
+ * Procedural memories use a slower decay rate (halfLife / 0.3 ≈ 240h for default 72h)
+ * so hard-won knowledge persists longer.
  *
  * Returns a value in [0, 1].
  */
@@ -39,6 +45,7 @@ export function recencyScore(
   lastAccessedAt: string | null,
   createdAt: string,
   halfLifeHours: number = 72,
+  memoryType?: MemoryType,
 ): number {
   const referenceTime = lastAccessedAt ?? createdAt;
   // Append 'Z' only when there is no existing timezone designator so that
@@ -50,7 +57,13 @@ export function recencyScore(
   if (isNaN(refMs)) throw new Error(`Invalid reference date: "${referenceTime}"`);
   const now = new Date();
   const hoursSince = (now.getTime() - refMs) / (1000 * 60 * 60);
-  return Math.pow(0.5, Math.max(0, hoursSince) / halfLifeHours);
+
+  // Procedural memories decay ~3.3x slower than normal
+  const effectiveHalfLife = memoryType === 'procedural'
+    ? halfLifeHours / getProceduralDecayMultiplier()
+    : halfLifeHours;
+
+  return Math.pow(0.5, Math.max(0, hoursSince) / effectiveHalfLife);
 }
 
 /**
@@ -91,7 +104,7 @@ export function calculateImportance(
     throw new Error(`Weights must sum to 1.0, got ${weightSum.toFixed(3)}`);
   }
 
-  const rec  = recencyScore(memory.last_accessed_at, memory.created_at, config.decayHalfLifeHours);
+  const rec  = recencyScore(memory.last_accessed_at, memory.created_at, config.decayHalfLifeHours, memory.type);
   const freq = frequencyScore(memory.access_count, config.frequencySaturationPoint);
   const imp  = memory.impact;
 
@@ -255,7 +268,9 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
   for (const memory of memories) {
     const components    = calculateImportance(memory, sunText, config);
     const newImportance = components.total;
-    const newDistance   = importanceToDistance(newImportance);
+    // Apply quality-based orbit adjustment: low-quality memories drift further out
+    const qualityScore  = memory.quality_score ?? 0.5;
+    const newDistance    = importanceToDistance(newImportance) * qualityOrbitAdjustment(qualityScore);
     const velocity      = newDistance - memory.distance;
 
     // Skip negligible drifts to avoid write churn.

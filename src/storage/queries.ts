@@ -306,6 +306,25 @@ export function getMemoriesByProject(
   return rows.map((r) => deserializeMemory(asRawMemory(r)));
 }
 
+/**
+ * Get memories created within the last `hoursAgo` hours for a project.
+ * Used by auto-commit on shutdown to summarize the current session.
+ */
+export function getRecentMemories(project: string, hoursAgo: number = 3): Memory[] {
+  const db = getDatabase();
+  const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString();
+
+  const rows = db.prepare(`
+    SELECT * FROM memories
+    WHERE project = ?
+      AND deleted_at IS NULL
+      AND created_at > ?
+    ORDER BY created_at DESC
+  `).all(project, cutoff) as unknown[];
+
+  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+}
+
 export function getMemoriesInZone(project: string, zone: OrbitZone): Memory[] {
   const db = getDatabase();
   const { min, max } = ORBIT_ZONES[zone];
@@ -396,6 +415,7 @@ export function searchMemories(
     WHERE memories_fts MATCH ?
       AND m.project = ?
       AND m.deleted_at IS NULL
+      AND (m.valid_until IS NULL OR m.valid_until > datetime('now'))
     ORDER BY rank
     LIMIT ?
   `).all(escapedQuery, project, limit) as unknown[];
@@ -424,6 +444,7 @@ export function searchMemoriesInRange(
     WHERE memories_fts MATCH ?
       AND m.project = ?
       AND m.deleted_at IS NULL
+      AND (m.valid_until IS NULL OR m.valid_until > datetime('now'))
       AND m.distance >= ?
       AND m.distance < ?
     ORDER BY rank
@@ -707,6 +728,45 @@ export function getConstellation(
 
   const nodes = getMemoryByIds([...visitedNodeIds]);
   return { nodes, edges: allEdges };
+}
+
+/**
+ * Get all constellation neighbors for a batch of memory IDs.
+ * Returns a map from memory ID → set of neighbor IDs.
+ */
+export function getEdgesForBatch(
+  memoryIds: string[],
+  project: string,
+): Map<string, Set<string>> {
+  if (memoryIds.length === 0) return new Map();
+  const db = getDatabase();
+  const placeholders = memoryIds.map(() => '?').join(', ');
+
+  const rows = db.prepare(`
+    SELECT source_id, target_id FROM constellation_edges
+    WHERE (source_id IN (${placeholders}) OR target_id IN (${placeholders}))
+      AND project = ?
+  `).all(...memoryIds, ...memoryIds, project) as unknown[];
+
+  const idSet = new Set(memoryIds);
+  const result = new Map<string, Set<string>>();
+
+  for (const r of rows) {
+    const row = r as { source_id: string; target_id: string };
+    // For each memory in our batch, record its neighbor
+    if (idSet.has(row.source_id)) {
+      const neighbors = result.get(row.source_id) ?? new Set();
+      neighbors.add(row.target_id);
+      result.set(row.source_id, neighbors);
+    }
+    if (idSet.has(row.target_id)) {
+      const neighbors = result.get(row.target_id) ?? new Set();
+      neighbors.add(row.source_id);
+      result.set(row.target_id, neighbors);
+    }
+  }
+
+  return result;
 }
 
 export function deleteEdge(id: string): void {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation, type Language } from '../i18n/context';
 
 interface LayoutProps {
@@ -12,13 +12,19 @@ function LanguageToggle() {
   const options: Language[] = ['en', 'ko'];
 
   return (
-    <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+    <div
+      role="group"
+      aria-label={lang === 'en' ? 'Language selector' : '언어 선택'}
+      style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}
+    >
       {options.map((l) => {
         const isActive = lang === l;
         return (
           <button
             key={l}
             onClick={() => setLang(l)}
+            aria-pressed={isActive}
+            aria-label={l === 'en' ? 'English' : '한국어'}
             style={{
               padding: '2px 8px',
               fontSize: '10px',
@@ -29,6 +35,7 @@ function LanguageToggle() {
               border: 'none',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
+              minHeight: '28px',
             }}
           >
             {t.language[l]}
@@ -39,14 +46,22 @@ function LanguageToggle() {
   );
 }
 
+// Mobile panel tabs: sidebar | main | detail
+type MobileTab = 'sidebar' | 'main' | 'detail';
+
 export function Layout({ sidebar, main, detail }: LayoutProps) {
   const { t } = useTranslation();
+  const [mobileTab, setMobileTab] = useState<MobileTab>('main');
+
+  // When detail becomes available, switch to it on mobile
+  const activeTab: MobileTab = detail && mobileTab === 'detail' ? 'detail' : mobileTab;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#020408' }}>
       {/* ── Top bar ── */}
       <header
-        className="flex-shrink-0 flex items-center px-5 gap-4"
+        className="flex-shrink-0 flex items-center px-3 sm:px-5 gap-2 sm:gap-4"
+        role="banner"
         style={{
           height: '52px',
           background: 'linear-gradient(180deg, #0a1628 0%, #050a14 100%)',
@@ -58,8 +73,8 @@ export function Layout({ sidebar, main, detail }: LayoutProps) {
       >
         {/* Brand lockup */}
         <div className="flex items-center gap-2.5">
-          {/* Animated star */}
           <span
+            aria-hidden="true"
             className="text-yellow-400 select-none"
             style={{
               fontSize: '18px',
@@ -85,22 +100,22 @@ export function Layout({ sidebar, main, detail }: LayoutProps) {
           </span>
         </div>
 
-        {/* Separator */}
-        <div style={{ width: '1px', height: '16px', background: 'rgba(75,85,99,0.6)' }} />
-
+        {/* Separator + subtitle — hidden on small screens */}
+        <div className="hidden sm:block" style={{ width: '1px', height: '16px', background: 'rgba(75,85,99,0.6)' }} />
         <span
-          className="text-xs tracking-wider"
+          className="hidden sm:block text-xs tracking-wider"
           style={{ color: 'rgba(148,163,184,0.5)', letterSpacing: '0.12em' }}
         >
           {t.layout.subtitle}
         </span>
 
-        {/* Right-side status pip + language toggle */}
-        <div className="ml-auto flex items-center gap-3">
+        {/* Right-side controls */}
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <LanguageToggle />
-          <div style={{ width: '1px', height: '14px', background: 'rgba(75,85,99,0.4)' }} />
-          <div className="flex items-center gap-2">
+          <div className="hidden sm:block" style={{ width: '1px', height: '14px', background: 'rgba(75,85,99,0.4)' }} />
+          <div className="flex items-center gap-1.5 sm:gap-2" aria-label={t.layout.online} title={t.layout.online}>
             <span
+              aria-hidden="true"
               style={{
                 width: '6px',
                 height: '6px',
@@ -109,43 +124,97 @@ export function Layout({ sidebar, main, detail }: LayoutProps) {
                 boxShadow: '0 0 8px rgba(34,197,94,0.8)',
                 animation: 'statusPulse 2s ease-in-out infinite',
                 display: 'inline-block',
+                flexShrink: 0,
               }}
             />
-            <span className="text-xs" style={{ color: 'rgba(148,163,184,0.4)', fontSize: '10px', letterSpacing: '0.08em' }}>
+            <span
+              className="hidden sm:inline text-xs"
+              style={{ color: 'rgba(148,163,184,0.4)', fontSize: '10px', letterSpacing: '0.08em' }}
+            >
               {t.layout.online}
             </span>
           </div>
         </div>
       </header>
 
+      {/* ── Mobile tab bar (< md) ── */}
+      <nav
+        className="flex md:hidden flex-shrink-0"
+        aria-label="Panel navigation"
+        style={{
+          borderBottom: '1px solid rgba(96,165,250,0.12)',
+          background: 'rgba(5,10,20,0.95)',
+        }}
+      >
+        {(['sidebar', 'main', 'detail'] as MobileTab[]).map((tab) => {
+          // Hide "detail" tab when there's no detail panel
+          if (tab === 'detail' && !detail) return null;
+          const isActive = activeTab === tab;
+          const labels: Record<MobileTab, string> = {
+            sidebar: t.sidebar.project,
+            main: t.tabs.solar.label,
+            detail: t.memoryDetail.close.length > 0 ? 'Detail' : 'Detail',
+          };
+          return (
+            <button
+              key={tab}
+              onClick={() => setMobileTab(tab)}
+              aria-selected={isActive}
+              role="tab"
+              style={{
+                flex: 1,
+                padding: '8px 4px',
+                fontSize: '11px',
+                fontWeight: isActive ? 600 : 400,
+                color: isActive ? '#93c5fd' : '#6b7280',
+                background: isActive ? 'rgba(96,165,250,0.08)' : 'transparent',
+                border: 'none',
+                borderBottom: isActive ? '2px solid #60a5fa' : '2px solid transparent',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                minHeight: '44px',
+              }}
+            >
+              {labels[tab]}
+            </button>
+          );
+        })}
+      </nav>
+
       {/* ── Body ── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ── Left sidebar ── */}
+        {/* ── Left sidebar ── desktop always visible, mobile controlled by tab ── */}
         <aside
-          className="flex-shrink-0 overflow-y-auto"
+          aria-label={t.sidebar.project}
+          className={`flex-shrink-0 overflow-y-auto ${activeTab === 'sidebar' ? 'flex' : 'hidden'} md:flex flex-col`}
           style={{
             width: '232px',
             background: 'linear-gradient(180deg, #0a1628 0%, #050a14 100%)',
             borderRight: '1px solid rgba(96, 165, 250, 0.12)',
             boxShadow: '2px 0 20px rgba(0,0,0,0.4)',
             padding: '10px 8px',
-            display: 'flex',
-            flexDirection: 'column',
             gap: '8px',
           }}
         >
           {sidebar}
         </aside>
 
-        {/* ── Main canvas ── */}
-        <main role="main" className="flex-1 relative overflow-hidden">{main}</main>
+        {/* ── Main canvas ── desktop always visible, mobile controlled by tab ── */}
+        <main
+          role="main"
+          className={`flex-1 relative overflow-hidden ${activeTab === 'main' ? 'flex' : 'hidden'} md:flex flex-col`}
+        >
+          {main}
+        </main>
 
-        {/* ── Right detail panel ── */}
+        {/* ── Right detail panel ── desktop conditional, mobile controlled by tab ── */}
         {detail && (
           <aside
-            className="flex-shrink-0 overflow-hidden"
+            aria-label="Memory detail"
+            className={`flex-shrink-0 overflow-hidden ${activeTab === 'detail' ? 'flex' : 'hidden'} md:flex flex-col`}
             style={{
-              width: '384px',
+              width: '100%',
+              maxWidth: '384px',
               background: 'linear-gradient(180deg, #0a1628 0%, #050a14 100%)',
               borderLeft: '1px solid rgba(96, 165, 250, 0.12)',
               boxShadow: '-2px 0 20px rgba(0,0,0,0.4), -1px 0 0 rgba(96,165,250,0.06)',
@@ -176,6 +245,13 @@ export function Layout({ sidebar, main, detail }: LayoutProps) {
         @keyframes dotActivePulse {
           0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
           50%       { box-shadow: 0 0 8px 2px currentColor; opacity: 0.8; }
+        }
+        /* Ensure detail panel on desktop has fixed width, not full width */
+        @media (min-width: 768px) {
+          aside[aria-label="Memory detail"] {
+            width: 384px !important;
+            max-width: 384px !important;
+          }
         }
       `}</style>
     </div>

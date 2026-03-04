@@ -80,32 +80,32 @@ describe('importanceToDistance', () => {
 });
 
 describe('getOrbitZone', () => {
-  it('returns Corona for distance 0.5', () => {
-    expect(getOrbitZone(0.5)).toContain('Corona');
+  it('returns Core Memory for distance 0.5', () => {
+    expect(getOrbitZone(0.5)).toBe('Core Memory');
   });
 
-  it('returns Inner for distance 3.0', () => {
-    expect(getOrbitZone(3.0)).toContain('Inner');
+  it('returns Recent Memory for distance 3.0', () => {
+    expect(getOrbitZone(3.0)).toBe('Recent Memory');
   });
 
-  it('returns Habitable for distance 10.0', () => {
-    expect(getOrbitZone(10.0)).toContain('Habitable');
+  it('returns Active Memory for distance 10.0', () => {
+    expect(getOrbitZone(10.0)).toBe('Active Memory');
   });
 
-  it('returns Outer for distance 25.0', () => {
-    expect(getOrbitZone(25.0)).toContain('Outer');
+  it('returns Stored Memory for distance 25.0', () => {
+    expect(getOrbitZone(25.0)).toBe('Stored Memory');
   });
 
-  it('returns Kuiper for distance 55.0', () => {
-    expect(getOrbitZone(55.0)).toContain('Kuiper');
+  it('returns Fading Memory for distance 55.0', () => {
+    expect(getOrbitZone(55.0)).toBe('Fading Memory');
   });
 
-  it('returns Oort for distance 85.0', () => {
-    expect(getOrbitZone(85.0)).toContain('Oort');
+  it('returns Forgotten Memory for distance 85.0', () => {
+    expect(getOrbitZone(85.0)).toBe('Forgotten Memory');
   });
 
-  it('returns Oort for distance beyond 100', () => {
-    expect(getOrbitZone(150)).toContain('Oort');
+  it('returns Forgotten Memory for distance beyond 100', () => {
+    expect(getOrbitZone(150)).toBe('Forgotten Memory');
   });
 });
 

@@ -30,6 +30,9 @@ import {
   getSunState,
   getMemoryByIds,
   getMemoryByContentHash,
+  updateQualityScore,
+  getEdgesForBatch,
+  getMemoriesByProject,
 } from '../storage/queries.js';
 import { getConfig } from '../utils/config.js';
 import {
@@ -45,6 +48,9 @@ import { insertEmbedding, searchByVector, deleteEmbedding } from '../storage/vec
 import { getDatabase, withTransaction } from '../storage/database.js';
 import { createLogger } from '../utils/logger.js';
 import { corona } from './corona.js';
+import { calculateQuality } from './quality.js';
+import { trackBgError } from '../mcp/tools/memory-tools.js';
+import { runConsolidation } from './consolidation.js';
 
 const log = createLogger('planet');
 
@@ -146,9 +152,30 @@ export function createMemory(data: {
   // The vector index will be populated within seconds after the model loads.
   scheduleEmbedding(memory.id, memory.content + ' ' + summary);
 
+  // Calculate and persist initial quality score
+  try {
+    const quality = calculateQuality(memory);
+    updateQualityScore(memory.id, quality.overall);
+  } catch {
+    // Quality scoring is non-critical — don't block creation
+  }
+
   // If the new memory lands in the corona zone, cache it immediately.
   if (memory.distance < 5.0) {
     corona.upsert(memory);
+  }
+
+  // Auto-consolidation: trigger background consolidation when project
+  // memory count exceeds 100 to keep the memory system lean.
+  try {
+    const projectMemories = getMemoriesByProject(data.project);
+    if (projectMemories.length > 100) {
+      runConsolidation(data.project).catch(() => {
+        try { trackBgError('consolidation'); } catch { /* ignore */ }
+      });
+    }
+  } catch {
+    // Non-critical — skip silently
   }
 
   return memory;
@@ -170,6 +197,7 @@ function scheduleEmbedding(memoryId: string, text: string): void {
     })
     .catch(() => {
       // Model not loaded / network error — FTS5 fallback remains active
+      try { trackBgError('embedding'); } catch { /* ignore circular import at startup */ }
     });
 }
 
@@ -336,11 +364,13 @@ export async function recallMemoriesAsync(
     minDistance?: number;
     maxDistance?: number;
     limit?: number;
+    excludeIds?: Set<string>;
   },
 ): Promise<Memory[]> {
   const limit = options?.limit ?? 10;
   const scored: ScoredMemory[] = [];
-  const seenIds = new Set<string>();
+  // Pre-seed seenIds with exclusions (e.g., corona IDs already shown in Sun)
+  const seenIds = new Set<string>(options?.excludeIds ?? []);
 
   // ── Tier 1: Corona cache (in-memory, ~0ms) ─────────────────────────────
   const coronaResults = corona.search(query, limit * 2);
@@ -417,6 +447,25 @@ export async function recallMemoriesAsync(
       });
       seenIds.add(m.id);
     }
+  }
+
+  // ── Constellation edge boost ──────────────────────────────────────────
+  // Memories connected via knowledge graph edges get a score boost.
+  try {
+    const scoredIds = scored.map(s => s.memory.id);
+    const edgeMap = getEdgesForBatch(scoredIds, project);
+    const EDGE_BOOST = 0.07;
+
+    for (const entry of scored) {
+      const neighbors = edgeMap.get(entry.memory.id);
+      if (neighbors && neighbors.size > 0) {
+        // Boost proportional to number of connections (capped at 3)
+        const edgeCount = Math.min(neighbors.size, 3);
+        entry.score += edgeCount * EDGE_BOOST;
+      }
+    }
+  } catch {
+    // Constellation tables may not exist — skip boost silently
   }
 
   // ── Sort by composite score descending ─────────────────────────────────

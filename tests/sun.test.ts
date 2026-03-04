@@ -195,9 +195,9 @@ describe('sun — working context management', () => {
       };
 
       const result = formatSunContent(sun, [coreMemory], [nearMemory]);
-      expect(result).toContain('CORE IDENTITY');
+      expect(result).toContain('CORE');
       expect(result).toContain('Core memory summary');
-      expect(result).toContain('ACTIVE CONTEXT');
+      expect(result).toContain('NEAR');
       expect(result).toContain('Nearby memory summary');
     });
   });

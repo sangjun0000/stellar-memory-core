@@ -88,6 +88,26 @@ function ensureCorona(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Async background task error tracking
+// ---------------------------------------------------------------------------
+
+const bgErrors = {
+  embedding: 0,
+  constellation: 0,
+  consolidation: 0,
+};
+
+/** Increment a background error counter. Called from fire-and-forget tasks. */
+export function trackBgError(category: keyof typeof bgErrors): void {
+  bgErrors[category]++;
+}
+
+/** Get background error stats snapshot. */
+export function getBgErrorStats(): typeof bgErrors {
+  return { ...bgErrors };
+}
+
+// ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
@@ -178,6 +198,10 @@ export async function handleStatus(args: {
       if (avgQuality !== null) statsLine.push(`avg quality: ${(avgQuality * 100).toFixed(0)}%`);
       if (unresolvedConflicts.length > 0) statsLine.push(`conflicts: ${unresolvedConflicts.length}`);
       if (proceduralCount > 0) statsLine.push(`procedural: ${proceduralCount}`);
+      // Background error stats
+      const errors = getBgErrorStats();
+      const totalBgErrors = errors.embedding + errors.constellation + errors.consolidation;
+      if (totalBgErrors > 0) statsLine.push(`bg errors: ${totalBgErrors}`);
       if (statsLine.length > 0) lines.push(`  ${statsLine.join('  |  ')}`);
 
       if (filtered.length === 0) {
@@ -308,10 +332,17 @@ export async function handleRecall(args: {
     if (args.at) {
       results = getContextAtTime(proj, args.at).slice(0, limit);
     } else {
+      // Exclude memories already visible in the Sun resource (corona cache)
+      // to avoid token-wasting duplication between Sun and recall output.
+      const coreIds = corona.getCoreMemories().map(m => m.id);
+      const nearIds = corona.getNearMemories().map(m => m.id);
+      const excludeIds = new Set([...coreIds, ...nearIds]);
+
       results = await recallMemoriesAsync(proj, args.query, {
         type:        memoryType,
         maxDistance: args.max_au,
         limit,
+        excludeIds,
       });
     }
 
@@ -334,14 +365,13 @@ export async function handleRecall(args: {
     ];
 
     for (const m of results) {
-      const preview = m.content.slice(0, 150) + (m.content.length > 150 ? '…' : '');
+      const preview = m.content.slice(0, 100) + (m.content.length > 100 ? '…' : '');
       const tags    = m.tags.length > 0 ? ` [${m.tags.join(', ')}]` : '';
-      const tier    = (m.metadata as Record<string, unknown>)?._tier as string | undefined;
-      const tierTag = tier ? `[${tier}] ` : '';
-      lines.push(`${tierTag}[${m.type.toUpperCase()}] ${m.summary}${tags} | ${formatDistance(m.distance)} | ${m.id}`);
+      const shortId = m.id.slice(0, 8);
+      lines.push(`[${m.type.toUpperCase()}] ${m.summary}${tags} | ${formatDistance(m.distance)} | ${shortId}`);
       lines.push(`  ${preview}`);
 
-      // Include related memories (constellation) for each result
+      // Include top 3 related memories (constellation)
       const related = findRelatedMemories(m.id, proj, 3);
       if (related.length > 0) {
         lines.push(`  Related: ${related.map(r => `${r.summary.slice(0, 40)} (${r.id.slice(0, 8)})`).join(', ')}`);
@@ -393,7 +423,7 @@ export async function handleRemember(args: {
     // Background: auto-extract relationships with existing memories.
     // Fire-and-forget — does not block the response.
     extractRelationships(memory, proj).catch(() => {
-      // Embedding or DB unavailable — ignore silently
+      trackBgError('constellation');
     });
 
     // Set valid_from to now on the new memory

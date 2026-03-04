@@ -3,6 +3,9 @@ import { api } from '../api/client';
 import type { DataSource } from '../api/client';
 import { useTranslation } from '../i18n/context';
 
+const SSE_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 3;
+
 // Status dot colors (raw values for inline styles so we can add glow)
 const STATUS_COLOR: Record<DataSource['status'], string> = {
   active:   '#22c55e',
@@ -196,33 +199,32 @@ export function DataSources({ project }: DataSourcesProps) {
     if (showAddForm) setTimeout(() => inputRef.current?.focus(), 50);
   }, [showAddForm]);
 
-  // Start scan via SSE
-  const startScan = useCallback(async () => {
-    const path = scanPath.trim();
-    if (!path) return;
+  // Scan mode: 'quick' (meta) or 'deep' (full)
+  const [scanMode, setScanMode] = useState<'quick' | 'deep'>('quick');
 
-    setScan({ ...INITIAL_SCAN, phase: 'scanning' });
+  // Read SSE stream with timeout — resolves when stream ends or times out
+  const readSseStream = useCallback(async (reader: ReadableStreamDefaultReader<Uint8Array>): Promise<'done' | 'timeout'> => {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let lastActivityAt = Date.now();
+
+    const timeoutId = setInterval(() => {
+      if (Date.now() - lastActivityAt > SSE_TIMEOUT_MS) {
+        reader.cancel().catch(() => undefined);
+      }
+    }, 1000);
 
     try {
-      const res = await api.startFullScan({
-        mode: 'folders',
-        paths: [path],
-        includeGit: true,
-      });
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        setScan(s => ({ ...s, phase: 'error', errorMessage: 'No response stream' }));
-        return;
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
       while (true) {
-        const { done, value } = await reader.read();
+        const readPromise = reader.read();
+        const timeoutPromise = new Promise<{ done: true; value: undefined }>(resolve =>
+          setTimeout(() => resolve({ done: true, value: undefined }), SSE_TIMEOUT_MS),
+        );
+
+        const { done, value } = await Promise.race([readPromise, timeoutPromise]);
         if (done) break;
 
+        lastActivityAt = Date.now();
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
@@ -233,7 +235,6 @@ export function DataSources({ project }: DataSourcesProps) {
             const data = JSON.parse(line.slice(5).trim());
 
             if (data.totalScannedFiles !== undefined) {
-              // scan:complete or scan:cancelled
               setScan(s => ({
                 ...s,
                 phase: 'done',
@@ -253,7 +254,6 @@ export function DataSources({ project }: DataSourcesProps) {
                 percentComplete: data.percentComplete ?? s.percentComplete,
               }));
             } else if (data.totalFiles !== undefined) {
-              // collected phase
               setScan(s => ({ ...s, totalFiles: data.totalFiles }));
             }
           } catch {
@@ -261,14 +261,76 @@ export function DataSources({ project }: DataSourcesProps) {
           }
         }
       }
-
-      // Reload sources after scan
-      void load();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Scan failed';
-      setScan(s => ({ ...s, phase: 'error', errorMessage: msg }));
+      return 'done';
+    } finally {
+      clearInterval(timeoutId);
     }
-  }, [scanPath, load]);
+  }, []);
+
+  // Start scan via SSE with timeout + exponential backoff retry
+  const startScan = useCallback(async () => {
+    const path = scanPath.trim();
+    if (!path) return;
+
+    setScan({ ...INITIAL_SCAN, phase: 'scanning' });
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+        // Check scan was not cancelled
+        setScan(s => {
+          if (s.phase !== 'scanning') return s;
+          return { ...s, errorMessage: undefined };
+        });
+      }
+
+      try {
+        const res = scanMode === 'quick'
+          ? await api.startMetaScan({ paths: [path] })
+          : await api.startFullScan({
+              mode: 'folders',
+              paths: [path],
+              includeGit: true,
+            });
+
+        const reader = res.body?.getReader();
+        if (!reader) {
+          if (attempt < MAX_RETRIES) continue;
+          setScan(s => ({ ...s, phase: 'error', errorMessage: 'No response stream' }));
+          return;
+        }
+
+        const result = await readSseStream(reader);
+
+        if (result === 'timeout') {
+          if (attempt < MAX_RETRIES) {
+            // Retry after timeout
+            setScan(s => ({ ...s, phase: 'scanning', errorMessage: `Retrying (${attempt + 1}/${MAX_RETRIES})…` }));
+            continue;
+          }
+          setScan(s => ({
+            ...s,
+            phase: 'error',
+            errorMessage: `Scan timed out after ${SSE_TIMEOUT_MS / 1000}s`,
+          }));
+          return;
+        }
+
+        // Success — reload sources
+        void load();
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Scan failed';
+        if (attempt < MAX_RETRIES) {
+          setScan(s => ({ ...s, phase: 'scanning', errorMessage: `Retrying (${attempt + 1}/${MAX_RETRIES})…` }));
+          continue;
+        }
+        setScan(s => ({ ...s, phase: 'error', errorMessage: msg }));
+        return;
+      }
+    }
+  }, [scanPath, scanMode, load, readSseStream]);
 
   const cancelScan = useCallback(async () => {
     try { await api.cancelScan(); } catch { /* ignore */ }
@@ -293,6 +355,8 @@ export function DataSources({ project }: DataSourcesProps) {
       >
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-controls="data-sources-body"
           style={{
             cursor: 'pointer',
             background: 'transparent',
@@ -304,6 +368,7 @@ export function DataSources({ project }: DataSourcesProps) {
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
+            minHeight: '32px',
           }}
         >
           <span>{t.dataSources.header}</span>
@@ -324,6 +389,7 @@ export function DataSources({ project }: DataSourcesProps) {
         {scan.phase === 'idle' && !showAddForm && (
           <button
             onClick={(e) => { e.stopPropagation(); setShowAddForm(true); setCollapsed(false); }}
+            aria-label={t.dataSources.addSource}
             title={t.dataSources.addSource}
             style={{
               width: '20px',
@@ -384,6 +450,7 @@ export function DataSources({ project }: DataSourcesProps) {
                 value={scanPath}
                 onChange={(e) => setScanPath(e.target.value)}
                 placeholder={t.dataSources.pathPlaceholder}
+                aria-label={t.dataSources.pathPlaceholder}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && scanPath.trim()) void startScan();
                   if (e.key === 'Escape') { setShowAddForm(false); setScanPath(''); }
@@ -400,6 +467,41 @@ export function DataSources({ project }: DataSourcesProps) {
                   boxSizing: 'border-box',
                 }}
               />
+              {/* Scan mode toggle */}
+              <div style={{ display: 'flex', gap: '2px', marginBottom: '2px' }}>
+                <button
+                  onClick={() => setScanMode('quick')}
+                  style={{
+                    flex: 1,
+                    padding: '3px 6px',
+                    borderRadius: '4px 0 0 4px',
+                    border: `1px solid ${scanMode === 'quick' ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    background: scanMode === 'quick' ? 'rgba(251,191,36,0.12)' : 'transparent',
+                    color: scanMode === 'quick' ? '#fbbf24' : '#6b7280',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.dataSources.quickScan}
+                </button>
+                <button
+                  onClick={() => setScanMode('deep')}
+                  style={{
+                    flex: 1,
+                    padding: '3px 6px',
+                    borderRadius: '0 4px 4px 0',
+                    border: `1px solid ${scanMode === 'deep' ? 'rgba(96,165,250,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    background: scanMode === 'deep' ? 'rgba(96,165,250,0.12)' : 'transparent',
+                    color: scanMode === 'deep' ? '#93c5fd' : '#6b7280',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.dataSources.deepScan}
+                </button>
+              </div>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button
                   onClick={() => void startScan()}
@@ -408,9 +510,9 @@ export function DataSources({ project }: DataSourcesProps) {
                     flex: 1,
                     padding: '4px 8px',
                     borderRadius: '6px',
-                    border: '1px solid rgba(96,165,250,0.4)',
-                    background: 'rgba(96,165,250,0.12)',
-                    color: '#93c5fd',
+                    border: `1px solid ${scanMode === 'quick' ? 'rgba(251,191,36,0.4)' : 'rgba(96,165,250,0.4)'}`,
+                    background: scanMode === 'quick' ? 'rgba(251,191,36,0.12)' : 'rgba(96,165,250,0.12)',
+                    color: scanMode === 'quick' ? '#fbbf24' : '#93c5fd',
                     fontSize: '11px',
                     cursor: scanPath.trim() ? 'pointer' : 'not-allowed',
                     opacity: scanPath.trim() ? 1 : 0.5,
@@ -466,7 +568,12 @@ export function DataSources({ project }: DataSourcesProps) {
 
               {/* Stats */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
-                <span>{t.dataSources.scanProgress} {scan.percentComplete.toFixed(1)}%</span>
+                <span>
+                  {scan.errorMessage
+                    ? <span style={{ color: '#f97316' }}>{scan.errorMessage}</span>
+                    : <>{t.dataSources.scanProgress} {scan.percentComplete.toFixed(1)}%</>
+                  }
+                </span>
                 <span>{scan.scannedFiles} / {scan.totalFiles || '?'}</span>
               </div>
 

@@ -7,7 +7,7 @@
  * Tasks:
  *   - recalculateOrbits  : apply orbital physics (decay + gravity)
  *   - scanLocalFiles     : run the local file scanner on registered sources
- *   - syncCloudSources   : pull incremental updates from cloud connectors
+ *   - scoreMemoryQuality : score quality of all memories
  *   - cleanupForgottenZone   : soft-delete memories in Forgotten zone older than threshold
  *
  * Design decisions:
@@ -19,11 +19,9 @@
 
 import { createLogger } from '../utils/logger.js';
 import { recalculateOrbits } from '../engine/orbit.js';
-import { createMemory } from '../engine/planet.js';
 import { getConfig } from '../utils/config.js';
 import { getMemoriesInZone, softDeleteMemory, getAllDataSources, getMemoriesByProject } from '../storage/queries.js';
 import { StellarScanner } from '../scanner/index.js';
-import type { CloudConnector } from '../scanner/cloud/types.js';
 import { scoreAllMemories } from '../engine/quality.js';
 import { runConsolidation } from '../engine/consolidation.js';
 import { detectProceduralPattern, createProceduralMemory, getProceduralMemories } from '../engine/procedural.js';
@@ -39,8 +37,6 @@ export interface ScheduleConfig {
   orbitRecalcInterval: number;
   /** Local file scan period (ms). Default: 30 minutes */
   localScanInterval: number;
-  /** Cloud sync period (ms). Default: 2 hours */
-  cloudSyncInterval: number;
   /** Oort cloud cleanup period (ms). Default: 24 hours */
   cleanupInterval: number;
   /** Quality scoring period (ms). Default: 4 hours */
@@ -58,7 +54,6 @@ export interface ScheduleConfig {
 export const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
   orbitRecalcInterval:         60 * 60 * 1000,       // 1 hour
   localScanInterval:           30 * 60 * 1000,        // 30 min
-  cloudSyncInterval:           2  * 60 * 60 * 1000,   // 2 hours
   cleanupInterval:             24 * 60 * 60 * 1000,   // 24 hours
   qualityScoringInterval:      4  * 60 * 60 * 1000,   // 4 hours
   consolidationInterval:       6  * 60 * 60 * 1000,   // 6 hours
@@ -73,7 +68,6 @@ export const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
 export type ScheduledTask =
   | 'recalculateOrbits'
   | 'scanLocalFiles'
-  | 'syncCloudSources'
   | 'cleanupForgottenZone'
   | 'scoreMemoryQuality'
   | 'runConsolidation'
@@ -103,12 +97,11 @@ export interface TaskStatus {
 
 export class StellarScheduler {
   private readonly config: Required<ScheduleConfig>;
-  private readonly connectors: CloudConnector[];
   private timers: Map<ScheduledTask, ReturnType<typeof setInterval>> = new Map();
   private running = false;
   private taskStatus: Record<ScheduledTask, TaskStatus>;
 
-  constructor(config: Partial<ScheduleConfig> = {}, connectors: CloudConnector[] = []) {
+  constructor(config: Partial<ScheduleConfig> = {}) {
     this.config = {
       ...DEFAULT_SCHEDULE_CONFIG,
       oortCleanupAgeDays: 30,
@@ -116,12 +109,9 @@ export class StellarScheduler {
       ...config,
     } as Required<ScheduleConfig>;
 
-    this.connectors = connectors;
-
     this.taskStatus = {
       recalculateOrbits:       makeBlankStatus(),
       scanLocalFiles:          makeBlankStatus(),
-      syncCloudSources:        makeBlankStatus(),
       cleanupForgottenZone:        makeBlankStatus(),
       scoreMemoryQuality:      makeBlankStatus(),
       runConsolidation:        makeBlankStatus(),
@@ -144,7 +134,6 @@ export class StellarScheduler {
       project:              this.config.project,
       orbitRecalcInterval:  this.config.orbitRecalcInterval,
       localScanInterval:    this.config.localScanInterval,
-      cloudSyncInterval:    this.config.cloudSyncInterval,
       cleanupInterval:      this.config.cleanupInterval,
     });
 
@@ -153,9 +142,6 @@ export class StellarScheduler {
 
     this.schedule('scanLocalFiles', this.config.localScanInterval,
       () => this.scanLocalFiles());
-
-    this.schedule('syncCloudSources', this.config.cloudSyncInterval,
-      () => this.syncCloudSources());
 
     this.schedule('cleanupForgottenZone', this.config.cleanupInterval,
       () => this.cleanupForgottenZone());
@@ -253,7 +239,6 @@ export class StellarScheduler {
     switch (task) {
       case 'recalculateOrbits':       return () => this.recalculateOrbits();
       case 'scanLocalFiles':          return () => this.scanLocalFiles();
-      case 'syncCloudSources':        return () => this.syncCloudSources();
       case 'cleanupForgottenZone':        return () => this.cleanupForgottenZone();
       case 'scoreMemoryQuality':      return () => this.scoreMemoryQuality();
       case 'runConsolidation':        return () => this.runConsolidationTask();
@@ -303,64 +288,6 @@ export class StellarScheduler {
         );
       }
     }
-  }
-
-  private async syncCloudSources(): Promise<void> {
-    if (this.connectors.length === 0) {
-      log.debug('No cloud connectors registered — skipping sync');
-      return;
-    }
-
-    const cfg  = getConfig();
-    const proj = this.config.project;
-
-    for (const connector of this.connectors) {
-      if (!connector.isAuthenticated()) {
-        log.warn('Connector not authenticated — skipping', { connector: connector.type });
-        continue;
-      }
-
-      try {
-        log.info('Syncing cloud connector', { connector: connector.type });
-        const docs = await connector.fetchDocuments();
-        let created = 0;
-
-        for (const doc of docs) {
-          try {
-            const input = connector.toMemory(doc);
-            createMemory({
-              project: proj,
-              content: input.content,
-              summary: input.summary,
-              type:    input.type,
-              tags:    input.tags,
-            });
-            created++;
-          } catch (memErr) {
-            log.warn('Failed to create memory from doc', {
-              connector: connector.type,
-              docId:     doc.id,
-            });
-          }
-        }
-
-        log.info('Cloud sync complete', {
-          connector: connector.type,
-          fetched:   docs.length,
-          created,
-        });
-      } catch (err) {
-        // Failure in one connector must not affect others (isolation principle)
-        log.error(
-          `Cloud sync failed for ${connector.type}`,
-          err instanceof Error ? err : new Error(String(err))
-        );
-      }
-    }
-
-    // cfg is read above; suppress unused-variable warning if getConfig was only
-    // needed for future use. Reference it so TS doesn't complain.
-    void cfg;
   }
 
   private async cleanupForgottenZone(): Promise<void> {

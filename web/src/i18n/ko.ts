@@ -99,6 +99,8 @@ const ko: Translations = {
     addSource: '폴더 추가',
     pathPlaceholder: 'C:\\Users\\... 또는 폴더 경로',
     scan: '스캔',
+    quickScan: '빠른',
+    deepScan: '상세',
     cancel: '취소',
     scanProgress: '스캔 중...',
     scanComplete: '스캔 완료',
@@ -179,6 +181,8 @@ const ko: Translations = {
   onboarding: {
     welcome: 'Stellar Memory에 오신 것을 환영합니다',
     emptyDesc: '태양계가 비어 있습니다.\n파일을 스캔하여 기억으로 채우세요.',
+    quickScan: '빠른 스캔',
+    quickScanDesc: '파일 구조만 읽어서\n빠르게 배치',
     fullScan: '전체 스캔',
     fullScanDesc: '전체 홈 디렉토리\n탐색',
     selectFolders: '폴더 선택',

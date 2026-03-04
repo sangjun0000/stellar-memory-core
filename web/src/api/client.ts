@@ -360,6 +360,14 @@ export const api = {
       body: JSON.stringify(config),
     }),
 
+  // Meta Scan (quick scan — metadata only)
+  startMetaScan: (config: { paths?: string[] }) =>
+    fetch(`${BASE_URL}/api/scan/meta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    }),
+
   getScanStatus: () =>
     get<{ data: { isScanning: boolean; startedAt?: number; progress?: { scannedFiles: number; createdMemories: number; totalFiles: number; currentFile: string; percentComplete: number } } }>('/api/scan/status'),
 

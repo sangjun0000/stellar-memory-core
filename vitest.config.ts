@@ -32,5 +32,6 @@ export default defineConfig({
   plugins: [nodeSqlitePlugin()],
   test: {
     globals: false,
+    exclude: ['**/node_modules/**', '**/dist/**', 'web/**'],
   },
 });

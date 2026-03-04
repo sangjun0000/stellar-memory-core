@@ -2,6 +2,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createStellarServer } from './mcp/server.js';
 import { initDatabase } from './storage/database.js';
 import { getConfig } from './utils/config.js';
+import { autoCommitOnClose } from './engine/sun.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
@@ -11,6 +12,19 @@ async function main(): Promise<void> {
 
   // Create MCP server with all tools and resources registered
   const server = createStellarServer();
+
+  // ── Shutdown handlers ────────────────────────────────────────────────────
+  // Auto-commit sun state so the next session resumes with full context.
+  let shutdownDone = false;
+  const onShutdown = (): void => {
+    if (shutdownDone) return;
+    shutdownDone = true;
+    autoCommitOnClose(config.defaultProject);
+  };
+
+  process.on('exit', onShutdown);
+  process.on('SIGTERM', () => { onShutdown(); process.exit(0); });
+  process.on('SIGINT', () => { onShutdown(); process.exit(0); });
 
   // Connect via stdio transport (used by Claude Code / Claude Desktop)
   const transport = new StdioServerTransport();

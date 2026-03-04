@@ -39,7 +39,12 @@ class Corona {
 
     const memories = getMemoriesByProject(project);
     // memories are already sorted by distance ASC from the query
-    const toCache = memories.slice(0, MAX_CORONA_SIZE);
+    // Filter out expired memories (valid_until in the past)
+    const now = new Date().toISOString();
+    const validMemories = memories.filter(m =>
+      !m.valid_until || m.valid_until > now
+    );
+    const toCache = validMemories.slice(0, MAX_CORONA_SIZE);
 
     for (const mem of toCache) {
       this.cache.set(mem.id, mem);

@@ -16,6 +16,7 @@ import type { SunState, Memory } from './types.js';
 import {
   getSunState,
   upsertSunState,
+  getRecentMemories,
 } from '../storage/queries.js';
 import { estimateTokens } from '../utils/tokenizer.js';
 import { getConfig } from '../utils/config.js';
@@ -138,25 +139,43 @@ export function formatSunContent(
   const config = getConfig();
   const budget = config.sunTokenBudget;
 
-  const MAX_CORE_DISPLAY = 10;
-  const MAX_NEAR_DISPLAY = 10;
+  const MAX_CORE_DISPLAY = 5;
+  const MAX_NEAR_DISPLAY = 5;
+  const SUMMARY_LIMIT = 80;
+
+  /** Truncate summary to SUMMARY_LIMIT characters. */
+  const truncSummary = (s: string): string =>
+    s.length > SUMMARY_LIMIT ? s.slice(0, SUMMARY_LIMIT).trimEnd() + '…' : s;
 
   // Build candidate sections in priority order.
   const sections: string[] = [];
 
-  // 1. Header — always included.
-  sections.push(`[STELLAR MEMORY - project: ${sun.project}]`);
+  // 1. Header — always included. Add [STALE] warning if last commit > 24h ago.
+  let header = `[STELLAR MEMORY - project: ${sun.project}]`;
+  if (sun.last_commit_at) {
+    const lastCommitMs = new Date(
+      /[Zz]$|[+-]\d{2}:\d{2}$/.test(sun.last_commit_at)
+        ? sun.last_commit_at
+        : sun.last_commit_at + 'Z'
+    ).getTime();
+    const hoursSince = (Date.now() - lastCommitMs) / (1000 * 60 * 60);
+    if (hoursSince > 24) {
+      header += ` [STALE — last commit ${Math.floor(hoursSince)}h ago. Run commit to refresh.]`;
+    }
+  }
+  sections.push(header);
 
   // 2. CORE IDENTITY — core zone memories (distance < 1.0 AU).
+  // Compressed format: [TYPE] summary (no AU distance — saves tokens)
   if (coreMemories.length > 0) {
     const displayed = coreMemories.slice(0, MAX_CORE_DISPLAY);
     const lines = displayed
-      .map(m => `  [${m.distance.toFixed(1)} AU] ${m.summary}`)
+      .map(m => `  [${m.type.toUpperCase()}] ${truncSummary(m.summary)}`)
       .join('\n');
     const overflow = coreMemories.length > MAX_CORE_DISPLAY
-      ? `\n  (${coreMemories.length - MAX_CORE_DISPLAY} more)`
+      ? `\n  (+${coreMemories.length - MAX_CORE_DISPLAY} more)`
       : '';
-    sections.push(`\nCORE IDENTITY (${coreMemories.length}):\n${lines}${overflow}`);
+    sections.push(`\nCORE (${coreMemories.length}):\n${lines}${overflow}`);
   }
 
   // 3. Current work.
@@ -168,12 +187,12 @@ export function formatSunContent(
   if (nearMemories.length > 0) {
     const displayed = nearMemories.slice(0, MAX_NEAR_DISPLAY);
     const lines = displayed
-      .map(m => `  [${m.distance.toFixed(1)} AU] ${m.summary}`)
+      .map(m => `  [${m.type.toUpperCase()}] ${truncSummary(m.summary)}`)
       .join('\n');
     const overflow = nearMemories.length > MAX_NEAR_DISPLAY
-      ? `\n  (${nearMemories.length - MAX_NEAR_DISPLAY} more)`
+      ? `\n  (+${nearMemories.length - MAX_NEAR_DISPLAY} more)`
       : '';
-    sections.push(`\nACTIVE CONTEXT (${nearMemories.length}):\n${lines}${overflow}`);
+    sections.push(`\nNEAR (${nearMemories.length}):\n${lines}${overflow}`);
   }
 
   // 5. Recent decisions (max 3).
@@ -215,4 +234,68 @@ export function formatSunContent(
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-commit on process exit
+// ---------------------------------------------------------------------------
+
+/**
+ * Automatically commit the sun state from recent memories when the
+ * MCP server process is shutting down.
+ *
+ * This prevents session context from being lost when Claude's process
+ * ends (e.g., SIGTERM from Claude Desktop, pipe close from Claude Code).
+ *
+ * Uses synchronous DB calls only — async is unsafe in exit handlers.
+ */
+export function autoCommitOnClose(project: string): void {
+  try {
+    const recent = getRecentMemories(project, 3);
+    if (recent.length === 0) return;
+
+    // Group by type
+    const byType = new Map<string, string[]>();
+    for (const m of recent) {
+      const list = byType.get(m.type) ?? [];
+      list.push(m.summary);
+      byType.set(m.type, list);
+    }
+
+    // Build auto-commit fields
+    const current_work = byType.get('context')?.slice(0, 3).join('; ')
+      ?? byType.get('task')?.slice(0, 3).join('; ')
+      ?? `${recent.length} memories from last session`;
+
+    const decisions = byType.get('decision')?.slice(0, 5) ?? [];
+    const next_steps = byType.get('task')?.slice(0, 5) ?? [];
+    const errors = byType.get('error')?.slice(0, 3) ?? [];
+
+    const now = new Date().toISOString();
+    const existing = getSunState(project);
+
+    const updated: SunState = {
+      project,
+      content:          current_work,
+      current_work,
+      recent_decisions: decisions,
+      next_steps,
+      active_errors:    errors,
+      project_context:  existing?.project_context ?? '',
+      token_count:      0,
+      last_commit_at:   now,
+      updated_at:       now,
+    };
+
+    upsertSunState(updated);
+
+    process.stderr.write(
+      `[stellar-memory] Auto-committed sun state on shutdown (${recent.length} recent memories)\n`
+    );
+  } catch (err) {
+    // Exit handler must never throw — silently log and continue
+    process.stderr.write(
+      `[stellar-memory] Auto-commit failed: ${err instanceof Error ? err.message : String(err)}\n`
+    );
+  }
 }

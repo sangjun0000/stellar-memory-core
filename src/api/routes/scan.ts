@@ -5,6 +5,17 @@ import { StellarScanner, listDataSources, FULL_SCAN_EXTRA_EXCLUDES } from '../..
 import type { ScanProgressEvent } from '../../scanner/index.js';
 import { DEFAULT_SCAN_CONFIG } from '../../scanner/types.js';
 import type { ScanConfig, ScanResult } from '../../scanner/types.js';
+import {
+  scanMetadata,
+  calculateFileImportance,
+  categorizeImportance,
+  formatSize,
+  buildTags,
+} from '../../scanner/metadata-scanner.js';
+import type { MetaScanConfig } from '../../scanner/metadata-scanner.js';
+import { importanceToDistance } from '../../engine/orbit.js';
+import { insertMemory, getMemoryBySourcePath, updateMemoryOrbit } from '../../storage/queries.js';
+import { getConfig } from '../../utils/config.js';
 
 // ---------------------------------------------------------------------------
 // Module-level active scan state (prevents concurrent scans)
@@ -211,6 +222,176 @@ scanRouter.post('/full', async (c) => {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Scan failed';
+      try {
+        await stream.writeSSE({
+          event: 'scan:error',
+          data: JSON.stringify({ error: message, fatal: true }),
+        });
+      } catch {
+        // Stream already closed
+      }
+    } finally {
+      activeScan = null;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/scan/meta — metadata-only fast scan (SSE streaming)
+// ---------------------------------------------------------------------------
+
+scanRouter.post('/meta', async (c) => {
+  // Prevent concurrent scans (shares lock with full scan)
+  if (activeScan) {
+    return c.json({ ok: false, error: 'A scan is already in progress' }, 409);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ ok: false, error: 'Invalid JSON body' }, 400);
+  }
+
+  const paths = (body.paths as string[]) ?? ['C:\\'];
+
+  // Set up abort controller
+  const abortController = new AbortController();
+  activeScan = {
+    abortController,
+    startedAt: Date.now(),
+    progress: {
+      scannedFiles: 0,
+      createdMemories: 0,
+      totalFiles: 0,
+      currentFile: '',
+      percentComplete: 0,
+    },
+  };
+
+  const config = getConfig();
+
+  return streamSSE(c, async (stream) => {
+    let lastEmitMs = 0;
+    const THROTTLE_MS = 50; // faster emission for metadata scan
+    let scannedFiles = 0;
+    let createdMemories = 0;
+    const startMs = Date.now();
+
+    // Send start event
+    await stream.writeSSE({
+      event: 'scan:start',
+      data: JSON.stringify({
+        mode: 'meta',
+        paths,
+        estimatedScope: `${paths.join(', ')} (metadata only)`,
+      }),
+    });
+
+    const scanConfig: MetaScanConfig = {
+      paths,
+      abortSignal: abortController.signal,
+    };
+
+    try {
+      for await (const entry of scanMetadata(scanConfig)) {
+        if (abortController.signal.aborted) break;
+
+        scannedFiles++;
+
+        // Calculate importance from metadata
+        const importance = calculateFileImportance(entry);
+        const distance = importanceToDistance(importance);
+        const category = categorizeImportance(importance);
+        const tags = buildTags(entry);
+        const mtime = new Date(entry.mtimeMs).toISOString();
+
+        // Update module-level progress
+        if (activeScan) {
+          activeScan.progress.scannedFiles = scannedFiles;
+          activeScan.progress.createdMemories = createdMemories;
+          activeScan.progress.currentFile = entry.path;
+        }
+
+        // Check for existing memory by source_path (dedup)
+        const existing = getMemoryBySourcePath(entry.path);
+        if (existing) {
+          // Update importance/distance if changed significantly
+          if (Math.abs(existing.importance - importance) > 0.01) {
+            const velocity = distance - existing.distance;
+            updateMemoryOrbit(existing.id, distance, importance, velocity);
+          }
+        } else {
+          // Create new memory
+          insertMemory({
+            project: config.defaultProject,
+            content: entry.path,
+            summary: `${entry.name} (${formatSize(entry.size)}, ${mtime.slice(0, 10)})`,
+            type: 'context',
+            tags,
+            distance,
+            importance,
+            velocity: 0,
+            impact: importance, // use importance as impact for meta-scanned files
+            source: 'meta-scanner',
+            source_path: entry.path,
+            metadata: {
+              size: entry.size,
+              mtimeMs: entry.mtimeMs,
+              extension: entry.extension,
+              category,
+            },
+          });
+          createdMemories++;
+        }
+
+        // Throttle SSE emissions
+        const now = Date.now();
+        if (now - lastEmitMs >= THROTTLE_MS) {
+          lastEmitMs = now;
+          try {
+            await stream.writeSSE({
+              event: 'scan:progress',
+              data: JSON.stringify({
+                scannedFiles,
+                createdMemories,
+                totalFiles: 0, // unknown for streaming scan
+                currentFile: entry.path,
+                percentComplete: 0, // indeterminate
+              }),
+            });
+          } catch {
+            // Stream closed by client — abort
+            abortController.abort();
+          }
+        }
+      }
+
+      const durationMs = Date.now() - startMs;
+
+      if (abortController.signal.aborted) {
+        await stream.writeSSE({
+          event: 'scan:cancelled',
+          data: JSON.stringify({
+            totalScannedFiles: scannedFiles,
+            totalCreatedMemories: createdMemories,
+            durationMs,
+          }),
+        });
+      } else {
+        await stream.writeSSE({
+          event: 'scan:complete',
+          data: JSON.stringify({
+            totalScannedFiles: scannedFiles,
+            totalCreatedMemories: createdMemories,
+            totalSkippedFiles: 0,
+            totalErrorFiles: 0,
+            durationMs,
+          }),
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Meta scan failed';
       try {
         await stream.writeSSE({
           event: 'scan:error',

@@ -37,7 +37,7 @@ export function loadConfig(): StellarConfig {
   return {
     dbPath: resolveDbPath(),
     defaultProject: process.env['STELLAR_PROJECT'] ?? 'default',
-    sunTokenBudget: parseInt_(process.env['STELLAR_SUN_TOKEN_BUDGET'], 300),
+    sunTokenBudget: parseInt_(process.env['STELLAR_SUN_TOKEN_BUDGET'], 800),
     decayHalfLifeHours: parseFloat_(process.env['STELLAR_DECAY_HALF_LIFE'], 72),
     // Frequency saturation: number of accesses at which frequency score plateaus
     frequencySaturationPoint: parseInt_(process.env['STELLAR_FREQ_SAT_POINT'], 20),

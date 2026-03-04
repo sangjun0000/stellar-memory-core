@@ -20,7 +20,7 @@ vi.spyOn(process.stderr, 'write').mockReturnValue(true);
 // ---------------------------------------------------------------------------
 
 function makeScheduler(overrides: Partial<typeof DEFAULT_SCHEDULE_CONFIG> = {}) {
-  return new StellarScheduler({ ...DEFAULT_SCHEDULE_CONFIG, ...overrides }, []);
+  return new StellarScheduler({ ...DEFAULT_SCHEDULE_CONFIG, ...overrides });
 }
 
 // ---------------------------------------------------------------------------
@@ -44,8 +44,7 @@ describe('StellarScheduler', () => {
 
     expect(status.recalculateOrbits.runCount).toBe(0);
     expect(status.scanLocalFiles.runCount).toBe(0);
-    expect(status.syncCloudSources.runCount).toBe(0);
-    expect(status.cleanupOortCloud.runCount).toBe(0);
+    expect(status.cleanupForgottenZone.runCount).toBe(0);
 
     expect(status.recalculateOrbits.lastRunAt).toBeNull();
     expect(status.recalculateOrbits.lastError).toBeNull();
@@ -61,7 +60,6 @@ describe('StellarScheduler', () => {
     const scheduler = makeScheduler({
       orbitRecalcInterval: 1000,
       localScanInterval:   1000,
-      cloudSyncInterval:   1000,
       cleanupInterval:     1000,
     });
 
@@ -83,7 +81,6 @@ describe('StellarScheduler', () => {
     const scheduler = makeScheduler({
       orbitRecalcInterval: 5000,
       localScanInterval:   5000,
-      cloudSyncInterval:   5000,
       cleanupInterval:     5000,
     });
 
@@ -114,15 +111,13 @@ describe('StellarScheduler', () => {
   it('runNow() records errors in status without throwing', async () => {
     const scheduler = makeScheduler();
 
-    // Override cleanupOortCloud to throw (via a private-ish path — we
-    // test the observable state rather than internal implementation)
     const status = scheduler.getStatus();
-    expect(status.cleanupOortCloud.lastError).toBeNull();
+    expect(status.cleanupForgottenZone.lastError).toBeNull();
 
-    // syncCloudSources with no connectors should complete cleanly
-    await scheduler.runNow('syncCloudSources');
-    expect(scheduler.getStatus().syncCloudSources.runCount).toBe(1);
-    expect(scheduler.getStatus().syncCloudSources.lastError).toBeNull();
+    // cleanupForgottenZone on an empty DB should complete cleanly
+    await scheduler.runNow('cleanupForgottenZone');
+    expect(scheduler.getStatus().cleanupForgottenZone.runCount).toBe(1);
+    expect(scheduler.getStatus().cleanupForgottenZone.lastError).toBeNull();
   });
 
   it('recalculateOrbits task runs without error when DB is empty', async () => {
@@ -131,10 +126,10 @@ describe('StellarScheduler', () => {
     expect(scheduler.getStatus().recalculateOrbits.lastError).toBeNull();
   });
 
-  it('cleanupOortCloud task runs without error when DB is empty', async () => {
+  it('cleanupForgottenZone task runs without error when DB is empty', async () => {
     const scheduler = makeScheduler();
-    await scheduler.runNow('cleanupOortCloud');
-    expect(scheduler.getStatus().cleanupOortCloud.lastError).toBeNull();
+    await scheduler.runNow('cleanupForgottenZone');
+    expect(scheduler.getStatus().cleanupForgottenZone.lastError).toBeNull();
   });
 
   it('task status tracks lastDuration in milliseconds', async () => {
@@ -151,7 +146,6 @@ describe('DEFAULT_SCHEDULE_CONFIG', () => {
   it('has sensible default intervals', () => {
     expect(DEFAULT_SCHEDULE_CONFIG.orbitRecalcInterval).toBe(60 * 60 * 1000);
     expect(DEFAULT_SCHEDULE_CONFIG.localScanInterval).toBe(30 * 60 * 1000);
-    expect(DEFAULT_SCHEDULE_CONFIG.cloudSyncInterval).toBe(2 * 60 * 60 * 1000);
     expect(DEFAULT_SCHEDULE_CONFIG.cleanupInterval).toBe(24 * 60 * 60 * 1000);
   });
 

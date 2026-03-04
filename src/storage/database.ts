@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS memories (
   source_path TEXT,
   source_hash TEXT,
   content_hash TEXT,
+  valid_from TEXT,
+  valid_until TEXT,
+  superseded_by TEXT,
+  consolidated_into TEXT,
+  quality_score REAL DEFAULT 0.5,
+  is_universal INTEGER DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
@@ -117,6 +123,9 @@ CREATE INDEX IF NOT EXISTS idx_memories_project_importance
 CREATE INDEX IF NOT EXISTS idx_memories_deleted
   ON memories(deleted_at);
 
+CREATE INDEX IF NOT EXISTS idx_memories_project_created
+  ON memories(project, created_at);
+
 -- Knowledge Graph: Constellation edges
 CREATE TABLE IF NOT EXISTS constellation_edges (
   id TEXT PRIMARY KEY,
@@ -205,11 +214,11 @@ export function initDatabase(dbPath: string): DatabaseSync {
     process.stderr.write(`[stellar-memory] sqlite-vec not available: ${msg}\n`);
   }
 
-  // Migrate existing tables before running full DDL (adds missing columns)
-  try { migrateMemoriesTable(db); } catch { /* table may not exist yet */ }
-
   // Create all tables, triggers, and indexes
   db.exec(DDL);
+
+  // Migrate existing tables that predate newer columns
+  try { migrateMemoriesTable(db); } catch { /* ignore migration errors */ }
 
   // Create vector tables (separated so they run after the extension loads)
   try {

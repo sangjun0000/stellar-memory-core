@@ -100,6 +100,8 @@ const en = {
     addSource: 'Add folder',
     pathPlaceholder: 'C:\\Users\\... or folder path',
     scan: 'Scan',
+    quickScan: 'Quick',
+    deepScan: 'Deep',
     cancel: 'Cancel',
     scanProgress: 'Scanning...',
     scanComplete: 'Scan complete',
@@ -180,6 +182,8 @@ const en = {
   onboarding: {
     welcome: 'Welcome to Stellar Memory',
     emptyDesc: 'Your solar system is empty.\nScan files to populate it with memories.',
+    quickScan: 'Quick Scan',
+    quickScanDesc: 'Scan file structure\nfor fast placement',
     fullScan: 'Full Scan',
     fullScanDesc: 'Explore entire\nhome directory',
     selectFolders: 'Select Folders',
