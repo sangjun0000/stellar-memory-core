@@ -30,6 +30,8 @@ let _loading: Promise<unknown> | null = null;
 
 let _downloadStartTime = 0;
 let _lastProgressPct   = -1;
+let _currentFile       = '';
+let _loggedFiles       = new Set<string>();
 
 function _formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -53,18 +55,28 @@ interface ProgressInfo {
 
 function _onDownloadProgress(info: ProgressInfo): void {
   const { status, file, progress, loaded, total } = info;
+  const fileName = (file ?? '').split('/').pop() ?? '';
 
-  if (status === 'initiate' && _downloadStartTime === 0) {
-    _downloadStartTime = Date.now();
-    console.error('[stellar-memory] Downloading embedding model (~90 MB, first run only)...');
-    console.error('[stellar-memory] This will be cached for future sessions.');
+  if (status === 'initiate') {
+    if (_downloadStartTime === 0) {
+      _downloadStartTime = Date.now();
+      console.error('[stellar-memory] Downloading embedding model (~90 MB, first run only)...');
+      console.error('[stellar-memory] This will be cached for future sessions.');
+    }
+    // Reset per-file tracking when a new file starts
+    if (fileName && fileName !== _currentFile) {
+      _currentFile = fileName;
+      _lastProgressPct = -1;
+    }
   }
 
-  if (status === 'progress' && progress != null) {
-    const pct = Math.min(100, Math.round(progress));
+  if (status === 'progress' && progress != null && fileName) {
+    // Only show detailed progress for the main model file (onnx)
+    const isModelFile = fileName.endsWith('.onnx');
+    if (!isModelFile) return;
 
-    // Throttle: only log every 10% increment
-    if (pct >= _lastProgressPct + 10 || pct === 100) {
+    const pct = Math.min(100, Math.round(progress));
+    if (pct > _lastProgressPct + 10 || (pct === 100 && _lastProgressPct < 100)) {
       _lastProgressPct = pct;
       const elapsed  = (Date.now() - _downloadStartTime) / 1000;
       const eta      = pct > 0 ? (elapsed / pct) * (100 - pct) : 0;
@@ -72,15 +84,12 @@ function _onDownloadProgress(info: ProgressInfo): void {
         ? `  ${_formatBytes(loaded)} / ${_formatBytes(total)}`
         : '';
       const etaInfo  = eta > 1 ? `  ETA: ${_formatTime(eta)}` : '';
-      const fileName = (file ?? '').split('/').pop() ?? '';
-      const label    = fileName ? ` [${fileName}]` : '';
-      console.error(`[stellar-memory] Downloading${label}: ${pct}%${sizeInfo}${etaInfo}`);
+      console.error(`[stellar-memory] Downloading [${fileName}]: ${pct}%${sizeInfo}${etaInfo}`);
     }
   }
 
-  if (status === 'done' && file) {
-    const fileName = file.split('/').pop() ?? file;
-    console.error(`[stellar-memory] Downloaded: ${fileName}`);
+  if (status === 'done' && fileName && !_loggedFiles.has(fileName)) {
+    _loggedFiles.add(fileName);
   }
 
   if (status === 'ready') {
@@ -90,6 +99,8 @@ function _onDownloadProgress(info: ProgressInfo): void {
     console.error(`[stellar-memory] Embedding model ready${elapsed}`);
     _downloadStartTime = 0;
     _lastProgressPct   = -1;
+    _currentFile       = '';
+    _loggedFiles       = new Set();
   }
 }
 
@@ -108,7 +119,9 @@ async function getPipeline(): Promise<unknown> {
 
       // Allow the model to be stored in the default HuggingFace cache directory.
       // In CI/test environments TRANSFORMERS_CACHE can be set to override this.
-      env.cacheDir = process.env['TRANSFORMERS_CACHE'] ?? undefined;
+      if (process.env['TRANSFORMERS_CACHE']) {
+        env.cacheDir = process.env['TRANSFORMERS_CACHE'];
+      }
 
       const pipe = await pipeline('feature-extraction', MODEL_NAME, {
         quantized: true,          // use the int8-quantized model for faster inference
