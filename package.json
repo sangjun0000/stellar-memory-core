@@ -5,14 +5,30 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "stellar-memory": "dist/index.js"
+    "stellar-memory": "dist/cli/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sangjun0000/stellar-memory-core.git"
+  },
+  "homepage": "https://stellar-memory.com",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "scripts/check-node.mjs",
+    "scripts/setup.mjs",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
     "preinstall": "node scripts/check-node.mjs",
+    "postinstall": "node scripts/setup.mjs || true",
     "setup": "node scripts/setup.mjs",
+    "init": "node dist/cli/init.js",
     "build": "tsc",
     "build:web": "cd web && npx vite build",
     "build:electron": "tsc -p electron/tsconfig.json && node --input-type=commonjs -e \"require('fs').writeFileSync('dist-electron/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\"",

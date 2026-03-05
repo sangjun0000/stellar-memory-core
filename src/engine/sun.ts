@@ -249,8 +249,28 @@ export function formatSunContent(
  *
  * Uses synchronous DB calls only — async is unsafe in exit handlers.
  */
-export function autoCommitOnClose(project: string): void {
+/**
+ * Auto-commit modes:
+ *   - 'shutdown': final commit on process exit — always writes
+ *   - 'periodic': background timer — skips if a manual commit happened recently
+ */
+export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic' = 'shutdown'): void {
   try {
+    const existing = getSunState(project);
+
+    // Protect recent manual commits from being overwritten by auto-generated content.
+    // Shutdown: skip if commit < 30 min ago. Periodic: skip if commit < 10 min ago.
+    if (existing?.last_commit_at) {
+      const lastCommitMs = new Date(
+        /[Zz]$|[+-]\d{2}:\d{2}$/.test(existing.last_commit_at)
+          ? existing.last_commit_at
+          : existing.last_commit_at + 'Z'
+      ).getTime();
+      const minutesSince = (Date.now() - lastCommitMs) / (1000 * 60);
+      const threshold = mode === 'periodic' ? 5 : 30;
+      if (minutesSince < threshold) return;
+    }
+
     const recent = getRecentMemories(project, 3);
     if (recent.length === 0) return;
 
@@ -262,17 +282,27 @@ export function autoCommitOnClose(project: string): void {
       byType.set(m.type, list);
     }
 
-    // Build auto-commit fields
-    const current_work = byType.get('context')?.slice(0, 3).join('; ')
-      ?? byType.get('task')?.slice(0, 3).join('; ')
-      ?? `${recent.length} memories from last session`;
+    // Always merge with existing sun state — never overwrite.
+    // Keep existing current_work/decisions and supplement with new memories.
+    const current_work = existing?.current_work
+      ? existing.current_work
+      : byType.get('context')?.slice(0, 3).join('; ')
+        ?? byType.get('task')?.slice(0, 3).join('; ')
+        ?? `${recent.length} memories from last session`;
 
-    const decisions = byType.get('decision')?.slice(0, 5) ?? [];
-    const next_steps = byType.get('task')?.slice(0, 5) ?? [];
+    const newDecisions = byType.get('decision')?.slice(0, 5) ?? [];
+    const decisions = existing?.recent_decisions?.length
+      ? [...existing.recent_decisions, ...newDecisions.filter(d => !existing.recent_decisions.includes(d))].slice(0, 10)
+      : newDecisions;
+
+    const newSteps = byType.get('task')?.slice(0, 5) ?? [];
+    const next_steps = existing?.next_steps?.length
+      ? [...existing.next_steps, ...newSteps.filter(s => !existing.next_steps.includes(s))].slice(0, 10)
+      : newSteps;
+
     const errors = byType.get('error')?.slice(0, 3) ?? [];
 
     const now = new Date().toISOString();
-    const existing = getSunState(project);
 
     const updated: SunState = {
       project,
@@ -280,7 +310,7 @@ export function autoCommitOnClose(project: string): void {
       current_work,
       recent_decisions: decisions,
       next_steps,
-      active_errors:    errors,
+      active_errors:    errors.length > 0 ? errors : (existing?.active_errors ?? []),
       project_context:  existing?.project_context ?? '',
       token_count:      0,
       last_commit_at:   now,
@@ -290,7 +320,7 @@ export function autoCommitOnClose(project: string): void {
     upsertSunState(updated);
 
     process.stderr.write(
-      `[stellar-memory] Auto-committed sun state on shutdown (${recent.length} recent memories)\n`
+      `[stellar-memory] Auto-committed sun state (${mode}, ${recent.length} recent memories)\n`
     );
   } catch (err) {
     // Exit handler must never throw — silently log and continue

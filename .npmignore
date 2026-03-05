@@ -1,0 +1,27 @@
+# Source (dist/ is published, not src/)
+src/
+web/
+electron/
+tests/
+benchmarks/
+docs/
+
+# Config
+.github/
+.vscode/
+tsconfig.json
+vitest.config.ts
+electron-builder.yml
+docker-compose.yml
+Dockerfile
+.env*
+CLAUDE.md
+
+# Data
+data/
+*.db
+
+# Dev artifacts
+node_modules/
+dist-electron/
+coverage/
