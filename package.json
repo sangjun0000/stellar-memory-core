@@ -1,6 +1,6 @@
 {
   "name": "stellar-memory",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "AI memory system using celestial mechanics metaphor - MCP server for persistent context across sessions",
   "type": "module",
   "main": "dist/index.js",
