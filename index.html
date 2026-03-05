@@ -1,3278 +1,1293 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Free &amp; open-source AI memory system. Give any AI the ability to remember — install in 30 seconds or use in the cloud." />
-  <meta property="og:title" content="Stellar Memory — Free AI Memory for Everyone" />
-  <meta property="og:description" content="100% free, open-source AI memory. Install locally in 30 seconds or use our cloud service. No programming required." />
-  <meta property="og:url" content="https://stellar-memory.com/" />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="https://stellar-memory.com/social-preview.svg" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Stellar Memory — Free AI Memory for Everyone" />
-  <meta name="twitter:description" content="100% free, open-source AI memory. No programming required. Install in 30 seconds." />
-  <link rel="canonical" href="https://stellar-memory.com/" />
-  <meta name="robots" content="index, follow" />
-  <meta name="keywords" content="AI memory, LLM memory, stellar memory, celestial memory, MCP, AI agent memory, Python AI library, memory management, chrome extension, browser extension, chatgpt memory, claude memory" />
-  <meta name="author" content="sangjun0000" />
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Stellar Memory",
-    "description": "Celestial-structure-based AI memory management system. Give any AI human-like memory with 5 orbital zones, self-learning, and multimodal support.",
-    "applicationCategory": ["DeveloperApplication", "BrowserExtension"],
-    "operatingSystem": "Cross-platform",
-    "offers": [
-      {"@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD", "description": "Unlimited memories, unlimited agents, all features included. 100% free & open source."}
-    ],
-    "author": {
-      "@type": "Person",
-      "name": "sangjun0000",
-      "url": "https://github.com/sangjun0000"
-    },
-    "codeRepository": "https://github.com/sangjun0000/stellar-memory",
-    "programmingLanguage": "Python",
-    "license": "https://opensource.org/licenses/MIT",
-    "softwareVersion": "3.0.0",
-    "downloadUrl": "https://pypi.org/project/stellar-memory/",
-    "url": "https://stellar-memory.com/"
-  }
-  </script>
-  <title>Stellar Memory — Free AI Memory for Everyone</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stellar Memory — Persistent Memory for AI</title>
+  <meta name="description" content="Give your AI persistent memory across sessions. 91% fewer tokens, 100% context recall. Open source MCP server.">
+  <meta property="og:title" content="Stellar Memory — Persistent Memory for AI">
+  <meta property="og:description" content="Your AI forgets everything between sessions. Stellar Memory fixes that. 91% fewer tokens to restore context.">
+  <meta property="og:url" content="https://stellar-memory.com/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://stellar-memory.com/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ============================================================
-       RESET & BASE
-    ============================================================ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg-void:       #030712;
-      --bg-deep:       #060d1f;
-      --bg-surface:    #0c1a35;
-      --bg-card:       #0f2044;
-      --bg-card-hover: #132654;
-
-      --accent-gold:   #f0b429;
-      --accent-amber:  #f59e0b;
-      --accent-glow:   #fcd34d;
-      --accent-blue:   #3b82f6;
-      --accent-indigo: #6366f1;
-      --accent-cyan:   #06b6d4;
-      --accent-violet: #8b5cf6;
-      --accent-rose:   #f43f5e;
-      --accent-emerald:#10b981;
-
-      --text-primary:  #f0f4ff;
-      --text-secondary:#94a3b8;
-      --text-muted:    #475569;
-
-      --border-subtle: rgba(148, 163, 184, 0.08);
-      --border-card:   rgba(148, 163, 184, 0.12);
-
-      --font-sans: 'Inter', system-ui, sans-serif;
-      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 20px;
-
-      --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
-      --shadow-glow: 0 0 40px rgba(240,180,41,0.15);
+      --bg: #000000;
+      --bg-elevated: #0a0a0a;
+      --bg-card: #111111;
+      --bg-card-hover: #1a1a1a;
+      --text: #f5f5f7;
+      --text-secondary: #86868b;
+      --text-tertiary: #48484a;
+      --accent: #2997ff;
+      --accent-hover: #0077ed;
+      --green: #30d158;
+      --red: #ff453a;
+      --orange: #ff9f0a;
+      --purple: #bf5af2;
+      --border: rgba(255,255,255,0.08);
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', 'SF Mono', monospace;
     }
 
-    html { scroll-behavior: smooth; font-size: 16px; }
+    html { scroll-behavior: smooth; }
 
     body {
-      font-family: var(--font-sans);
-      background-color: var(--bg-void);
-      color: var(--text-primary);
-      line-height: 1.6;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
       overflow-x: hidden;
     }
 
-    /* Starfield background */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
-        radial-gradient(1px 1px at 25% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 40% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 55% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 70% 35%, rgba(255,255,255,0.6) 0%, transparent 100%),
-        radial-gradient(1px 1px at 85% 55%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 15% 75%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.7) 0%, transparent 100%),
-        radial-gradient(1px 1px at 5%  90%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 60% 50%, rgba(255,255,255,0.2) 0%, transparent 100%),
-        radial-gradient(1.5px 1.5px at 33% 40%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1.5px 1.5px at 78% 70%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 48% 92%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 92% 45%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 20% 5%,  rgba(255,255,255,0.6) 0%, transparent 100%);
-      pointer-events: none;
-      z-index: 0;
-    }
+    /* ── NAV ──────────────────────────────────────── */
 
-    /* ============================================================
-       LAYOUT UTILITIES
-    ============================================================ */
-    .container {
-      max-width: 1140px;
-      margin: 0 auto;
-      padding: 0 24px;
-      position: relative;
-      z-index: 1;
-    }
-
-    section { position: relative; z-index: 1; }
-
-    .section-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent-gold);
-      margin-bottom: 16px;
-    }
-    .section-label::before {
-      content: '';
-      display: inline-block;
-      width: 20px;
-      height: 1px;
-      background: var(--accent-gold);
-    }
-
-    .section-title {
-      font-size: clamp(1.75rem, 4vw, 2.5rem);
-      font-weight: 700;
-      line-height: 1.2;
-      margin-bottom: 16px;
-    }
-
-    .section-sub {
-      font-size: 1.05rem;
-      color: var(--text-secondary);
-      max-width: 560px;
-      line-height: 1.7;
-    }
-
-    /* ============================================================
-       NAV
-    ============================================================ */
     nav {
       position: fixed;
-      top: 0; left: 0; right: 0;
+      top: 0;
+      left: 0;
+      right: 0;
       z-index: 100;
-      padding: 16px 0;
-      transition: background 0.3s, backdrop-filter 0.3s;
-    }
-    nav.scrolled {
-      background: rgba(3, 7, 18, 0.85);
-      backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      background: rgba(0,0,0,0.72);
+      border-bottom: 1px solid var(--border);
     }
 
     .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 52px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
     .nav-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: var(--text-primary);
       font-weight: 700;
-      font-size: 1.1rem;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
     }
 
-    .nav-logo-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, var(--accent-gold), #b45309);
-      box-shadow: 0 0 12px rgba(240,180,41,0.5);
-      flex-shrink: 0;
-    }
+    .nav-logo span { color: var(--accent); }
 
     .nav-links {
       display: flex;
-      align-items: center;
       gap: 32px;
       list-style: none;
     }
 
     .nav-links a {
-      text-decoration: none;
       color: var(--text-secondary);
-      font-size: 0.9rem;
+      text-decoration: none;
+      font-size: 13px;
       font-weight: 500;
       transition: color 0.2s;
     }
-    .nav-links a:hover { color: var(--text-primary); }
+
+    .nav-links a:hover { color: var(--text); }
 
     .nav-cta {
-      background: var(--accent-gold);
-      color: #000 !important;
-      padding: 8px 18px;
-      border-radius: var(--radius-sm);
-      font-weight: 600 !important;
-      font-size: 0.875rem !important;
-      transition: background 0.2s, transform 0.15s !important;
-    }
-    .nav-cta:hover {
-      background: var(--accent-glow) !important;
-      transform: translateY(-1px);
+      background: var(--accent);
+      color: #fff !important;
+      padding: 6px 16px;
+      border-radius: 980px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.2s;
     }
 
-    .nav-hamburger {
-      display: none;
-      flex-direction: column;
-      gap: 5px;
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 4px;
-    }
-    .nav-hamburger span {
-      display: block;
-      width: 22px;
-      height: 2px;
-      background: var(--text-primary);
-      border-radius: 2px;
-      transition: 0.3s;
+    .nav-cta:hover { background: var(--accent-hover); }
+
+    /* ── SECTIONS ─────────────────────────────────── */
+
+    section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
     }
 
-    /* Language Selector */
-    .lang-selector { position: relative; }
-    .lang-btn {
-      display: flex; align-items: center; gap: 6px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px; padding: 6px 12px; color: var(--text-secondary);
-      cursor: pointer; font-size: 0.8rem; font-weight: 600;
-    }
-    .lang-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
-    .lang-menu {
-      display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
-      background: rgba(3,7,18,0.95); backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-      padding: 8px 0; min-width: 140px; z-index: 100;
-      list-style: none;
-    }
-    .lang-menu.open { display: block; }
-    .lang-menu li {
-      padding: 8px 16px; cursor: pointer; font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-    .lang-menu li:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+    /* ── HERO ─────────────────────────────────────── */
 
-    /* ============================================================
-       HERO
-    ============================================================ */
-    #hero {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      padding: 120px 0 80px;
-      overflow: hidden;
-    }
-
-    .hero-inner {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 64px;
-      align-items: center;
+    .hero {
+      padding-top: 160px;
+      padding-bottom: 120px;
+      text-align: center;
     }
 
     .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(240, 180, 41, 0.1);
-      border: 1px solid rgba(240, 180, 41, 0.25);
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 0.8rem;
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 980px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
       font-weight: 500;
-      color: var(--accent-gold);
+    }
+
+    .hero-badge strong { color: var(--green); font-weight: 600; }
+
+    .hero h1 {
+      font-size: clamp(48px, 8vw, 96px);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.0;
       margin-bottom: 24px;
     }
-    .hero-badge-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent-gold);
-      animation: pulse-dot 2s infinite;
-    }
 
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.5; transform: scale(0.7); }
-    }
-
-    .hero-title {
-      font-size: clamp(2.5rem, 6vw, 4rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      margin-bottom: 12px;
-    }
-
-    .hero-title-gradient {
-      background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-amber) 40%, #fef3c7 100%);
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 50%, #ff6b9d 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
-    .hero-tagline {
-      font-size: clamp(1.1rem, 2.5vw, 1.35rem);
-      color: var(--text-primary);
-      margin-bottom: 12px;
-      font-weight: 600;
-      line-height: 1.4;
-    }
-
-    .hero-desc {
-      font-size: 1rem;
+    .hero-sub {
+      font-size: clamp(18px, 2.5vw, 24px);
       color: var(--text-secondary);
-      margin-bottom: 36px;
-      font-weight: 300;
-      line-height: 1.6;
-      max-width: 480px;
+      max-width: 640px;
+      margin: 0 auto 48px;
+      line-height: 1.5;
+      font-weight: 400;
     }
 
     .hero-actions {
       display: flex;
-      flex-wrap: wrap;
       gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
       align-items: center;
-      margin-bottom: 40px;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 980px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
     }
 
     .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--accent-gold);
-      color: #000;
-      text-decoration: none;
-      padding: 13px 24px;
-      border-radius: var(--radius-sm);
-      font-weight: 700;
-      font-size: 0.95rem;
-      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      background: var(--accent);
+      color: #fff;
     }
-    .btn-primary:hover {
-      background: var(--accent-glow);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(240,180,41,0.3);
-    }
+
+    .btn-primary:hover { background: var(--accent-hover); transform: scale(1.02); }
 
     .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
       background: transparent;
-      color: var(--text-primary);
-      text-decoration: none;
-      padding: 12px 22px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-card);
-      font-weight: 500;
-      font-size: 0.95rem;
-      transition: border-color 0.2s, background 0.2s, transform 0.15s;
-    }
-    .btn-secondary:hover {
-      border-color: rgba(148,163,184,0.3);
-      background: rgba(255,255,255,0.04);
-      transform: translateY(-2px);
+      color: var(--accent);
+      border: 1px solid rgba(41,151,255,0.3);
     }
 
-    .hero-install {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-sm);
-      padding: 12px 16px;
-      max-width: fit-content;
-    }
+    .btn-secondary:hover { border-color: var(--accent); background: rgba(41,151,255,0.08); }
 
-    .install-prefix {
-      color: var(--accent-cyan);
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      font-weight: 500;
-      user-select: none;
-    }
+    /* ── STAT BANNER ──────────────────────────────── */
 
-    .install-cmd {
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      color: var(--text-primary);
-      user-select: all;
-    }
-
-    .copy-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-muted);
-      padding: 4px;
-      border-radius: 4px;
-      transition: color 0.2s, background 0.2s;
-      display: flex;
-      align-items: center;
-    }
-    .copy-btn:hover {
-      color: var(--text-primary);
-      background: rgba(255,255,255,0.08);
-    }
-    .copy-btn svg { width: 16px; height: 16px; }
-
-    /* ============================================================
-       SOLAR SYSTEM ANIMATION
-    ============================================================ */
-    .solar-system {
-      position: relative;
-      width: 420px;
-      height: 420px;
+    .stats-banner {
+      padding: 80px 24px;
+      max-width: 1200px;
       margin: 0 auto;
     }
 
-    .sun {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #fff7cd, var(--accent-gold) 45%, #b45309 80%);
-      box-shadow:
-        0 0 20px rgba(240,180,41,0.8),
-        0 0 50px rgba(240,180,41,0.4),
-        0 0 90px rgba(240,180,41,0.15);
-      animation: sun-pulse 4s ease-in-out infinite;
-      z-index: 10;
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-radius: 20px;
+      overflow: hidden;
     }
 
-    @keyframes sun-pulse {
-      0%, 100% { box-shadow: 0 0 20px rgba(240,180,41,0.8), 0 0 50px rgba(240,180,41,0.4), 0 0 90px rgba(240,180,41,0.15); }
-      50%       { box-shadow: 0 0 30px rgba(240,180,41,1),   0 0 70px rgba(240,180,41,0.5), 0 0 120px rgba(240,180,41,0.2); }
-    }
-
-    .orbit {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      border: 1px solid rgba(148,163,184,0.12);
-    }
-
-    .orbit-1 { width: 100px; height: 100px; }
-    .orbit-2 { width: 158px; height: 158px; }
-    .orbit-3 { width: 220px; height: 220px; }
-    .orbit-4 { width: 286px; height: 286px; }
-    .orbit-5 { width: 360px; height: 360px; border-style: dashed; border-color: rgba(148,163,184,0.07); }
-
-    .planet-orbit {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform-origin: 0 0;
-      border-radius: 50%;
-    }
-
-    .planet {
-      position: absolute;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .planet-orbit-1 {
-      width: 100px; height: 100px;
-      margin: -50px 0 0 -50px;
-      animation: orbit-rotate 6s linear infinite;
-    }
-    .planet-orbit-1 .planet {
-      width: 10px; height: 10px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #fca5a5, var(--accent-rose));
-      box-shadow: 0 0 8px rgba(244,63,94,0.7);
-    }
-
-    .planet-orbit-2a {
-      width: 158px; height: 158px;
-      margin: -79px 0 0 -79px;
-      animation: orbit-rotate 11s linear infinite;
-    }
-    .planet-orbit-2a .planet {
-      width: 12px; height: 12px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #93c5fd, var(--accent-blue));
-      box-shadow: 0 0 10px rgba(59,130,246,0.7);
-    }
-    .planet-orbit-2b {
-      width: 158px; height: 158px;
-      margin: -79px 0 0 -79px;
-      animation: orbit-rotate 11s linear infinite reverse;
-      animation-delay: -5.5s;
-    }
-    .planet-orbit-2b .planet {
-      width: 8px; height: 8px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #c4b5fd, var(--accent-violet));
-      box-shadow: 0 0 8px rgba(139,92,246,0.6);
-    }
-
-    .planet-orbit-3 {
-      width: 220px; height: 220px;
-      margin: -110px 0 0 -110px;
-      animation: orbit-rotate 18s linear infinite;
-    }
-    .planet-orbit-3 .planet {
-      width: 14px; height: 14px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #a5f3fc, var(--accent-cyan));
-      box-shadow: 0 0 12px rgba(6,182,212,0.7);
-    }
-
-    .planet-orbit-4a {
-      width: 286px; height: 286px;
-      margin: -143px 0 0 -143px;
-      animation: orbit-rotate 28s linear infinite;
-    }
-    .planet-orbit-4a .planet {
-      width: 9px; height: 9px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #6ee7b7, var(--accent-emerald));
-      box-shadow: 0 0 8px rgba(16,185,129,0.6);
-    }
-    .planet-orbit-4b {
-      width: 286px; height: 286px;
-      margin: -143px 0 0 -143px;
-      animation: orbit-rotate 28s linear infinite;
-      animation-delay: -10s;
-    }
-    .planet-orbit-4b .planet {
-      width: 7px; height: 7px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #d9f99d, #84cc16);
-      box-shadow: 0 0 7px rgba(132,204,22,0.5);
-    }
-    .planet-orbit-4c {
-      width: 286px; height: 286px;
-      margin: -143px 0 0 -143px;
-      animation: orbit-rotate 28s linear infinite;
-      animation-delay: -18s;
-    }
-    .planet-orbit-4c .planet {
-      width: 6px; height: 6px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #fde68a, var(--accent-amber));
-      box-shadow: 0 0 6px rgba(245,158,11,0.5);
-    }
-
-    .planet-orbit-5 {
-      width: 360px; height: 360px;
-      margin: -180px 0 0 -180px;
-      animation: orbit-rotate 50s linear infinite;
-    }
-    .planet-orbit-5 .planet {
-      width: 7px; height: 7px;
-      top: 0; left: 50%;
-      background: radial-gradient(circle at 35% 35%, #a5b4fc, var(--accent-indigo));
-      box-shadow: 0 0 8px rgba(99,102,241,0.5);
-      opacity: 0.7;
-    }
-
-    @keyframes orbit-rotate {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
-
-    .zone-label {
-      position: absolute;
-      font-size: 0.6rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      pointer-events: none;
-      white-space: nowrap;
-    }
-
-    /* ============================================================
-       FEATURES
-    ============================================================ */
-    #features {
-      padding: 100px 0;
-    }
-
-    .features-header {
+    .stat-item {
+      background: var(--bg-elevated);
+      padding: 48px 32px;
       text-align: center;
+    }
+
+    .stat-number {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 8px;
+    }
+
+    .stat-number.blue { color: var(--accent); }
+    .stat-number.green { color: var(--green); }
+    .stat-number.orange { color: var(--orange); }
+    .stat-number.purple { color: var(--purple); }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* ── PROBLEM ──────────────────────────────────── */
+
+    .problem {
+      padding: 120px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-eyebrow {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+
+    .section-desc {
+      font-size: 18px;
+      color: var(--text-secondary);
+      max-width: 600px;
+      line-height: 1.6;
       margin-bottom: 64px;
     }
-    .features-header .section-label { justify-content: center; }
-    .features-header .section-sub { margin: 0 auto; text-align: center; }
 
-    .features-grid {
+    /* ── COMPARISON TABLE ─────────────────────────── */
+
+    .comparison {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 80px;
     }
 
-    .feature-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-lg);
-      padding: 32px 28px;
-      transition: border-color 0.3s, background 0.3s, transform 0.2s, box-shadow 0.3s;
+    .compare-card {
+      border-radius: 20px;
+      padding: 48px 40px;
       position: relative;
       overflow: hidden;
     }
 
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--card-accent, rgba(240,180,41,0.4)), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
+    .compare-card.without {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
     }
 
-    .feature-card:hover {
-      border-color: rgba(148,163,184,0.2);
-      background: var(--bg-card-hover);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-card);
+    .compare-card.with {
+      background: linear-gradient(135deg, rgba(41,151,255,0.08) 0%, rgba(191,90,242,0.06) 100%);
+      border: 1px solid rgba(41,151,255,0.2);
     }
-    .feature-card:hover::before { opacity: 1; }
 
-    .feature-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: var(--radius-sm);
+    .compare-label {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 24px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      font-size: 1.4rem;
+      gap: 8px;
     }
 
-    .feature-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-      color: var(--text-primary);
+    .compare-card.without .compare-label { color: var(--red); }
+    .compare-card.with .compare-label { color: var(--green); }
+
+    .compare-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
     }
 
-    .feature-desc {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      line-height: 1.65;
+    .compare-card.without .compare-dot { background: var(--red); }
+    .compare-card.with .compare-dot { background: var(--green); }
+
+    .compare-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
 
-    /* ============================================================
-       HOW IT WORKS
-    ============================================================ */
-    #how-it-works {
-      padding: 100px 0;
-      background: linear-gradient(180deg, transparent 0%, rgba(6,13,31,0.6) 50%, transparent 100%);
-    }
-
-    /* Pain Point Section */
-    .pain-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      margin-top: 48px;
-    }
-    .pain-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-md);
-      padding: 32px 24px;
-      text-align: center;
-    }
-    .pain-icon { font-size: 2.5rem; margin-bottom: 16px; }
-    .pain-card h3 { margin-bottom: 20px; font-size: 1.1rem; }
-    .pain-chat { text-align: left; margin-top: 16px; }
-    .chat-bubble {
-      padding: 10px 14px;
-      border-radius: 12px;
-      margin-bottom: 8px;
-      font-size: 0.85rem;
+    .compare-list li {
+      font-size: 15px;
       line-height: 1.5;
-    }
-    .chat-bubble.user {
-      background: var(--accent-blue);
-      color: white;
-      border-bottom-right-radius: 4px;
-      margin-left: 20px;
-    }
-    .chat-bubble.ai {
-      background: var(--bg-surface);
       color: var(--text-secondary);
-      border-bottom-left-radius: 4px;
-      margin-right: 20px;
+      padding-left: 24px;
+      position: relative;
     }
-    .chat-label {
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      font-style: italic;
-      margin-top: 8px;
+
+    .compare-card.without .compare-list li::before {
+      content: '\00d7';
+      position: absolute;
+      left: 0;
+      color: var(--red);
+      font-weight: 700;
+      font-size: 18px;
     }
-    .pain-solution {
-      text-align: center;
-      margin-top: 48px;
-      font-size: 1.2rem;
-      color: var(--accent-gold);
+
+    .compare-card.with .compare-list li::before {
+      content: '\2713';
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .compare-card.with .compare-list li { color: var(--text); }
+
+    /* ── BENCHMARK ────────────────────────────────── */
+
+    .benchmark {
+      padding: 120px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .bench-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--bg-card);
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin-top: 64px;
+    }
+
+    .bench-table th {
+      padding: 20px 32px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-tertiary);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elevated);
+    }
+
+    .bench-table th:not(:first-child) { text-align: center; }
+
+    .bench-table td {
+      padding: 20px 32px;
+      font-size: 15px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .bench-table td:not(:first-child) { text-align: center; font-family: var(--mono); font-size: 14px; }
+
+    .bench-table tr:last-child td { border-bottom: none; }
+
+    .bench-table .highlight {
+      color: var(--green);
       font-weight: 600;
     }
 
-    /* How It Works — new 3-step layout */
-    .how-steps-new {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 32px;
-      margin-top: 48px;
-    }
-    .how-step-card {
-      text-align: center;
-      padding: 32px 24px;
-    }
-    .how-step-num {
-      width: 48px; height: 48px;
-      border-radius: 50%;
-      background: var(--accent-gold);
-      color: var(--bg-void);
-      font-weight: 700;
-      font-size: 1.2rem;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 24px;
-    }
-    .how-step-visual {
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    .how-step-card h3 { margin-bottom: 12px; }
-    .how-step-card p { color: var(--text-secondary); font-size: 0.95rem; }
+    .bench-table .dim { color: var(--text-tertiary); }
 
-    /* Before/After Demo */
-    .how-demo {
+    .bench-table .metric-name { color: var(--text); font-weight: 500; }
+
+    /* ── BAR CHART ────────────────────────────────── */
+
+    .bar-section {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 32px;
-      margin-top: 56px;
-      max-width: 800px;
-      margin-left: auto;
-      margin-right: auto;
+      gap: 48px;
+      margin-top: 64px;
     }
-    .how-demo-before, .how-demo-after {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-md);
-      padding: 24px;
+
+    .bar-group h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
     }
-    .how-demo-before { opacity: 0.6; }
-    .how-demo-after {
-      border-color: var(--accent-gold);
-      box-shadow: 0 0 20px rgba(240,180,41,0.1);
+
+    .bar-group p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
     }
-    .demo-label {
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .bar-label {
+      font-size: 12px;
       font-weight: 600;
-      margin-bottom: 16px;
-      font-size: 0.9rem;
-    }
-    .how-demo-before .demo-label { color: var(--text-muted); }
-    .how-demo-after .demo-label { color: var(--accent-gold); }
-
-    /* ============================================================
-       QUICK START
-    ============================================================ */
-    #quickstart {
-      padding: 100px 0;
-      background: linear-gradient(180deg, transparent 0%, rgba(6,13,31,0.5) 50%, transparent 100%);
+      width: 80px;
+      flex-shrink: 0;
+      text-align: right;
+      color: var(--text-secondary);
     }
 
-    .quickstart-inner {
+    .bar-track {
+      flex: 1;
+      height: 32px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--mono);
+      transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .bar-fill.stm { background: linear-gradient(90deg, var(--accent), var(--purple)); color: #fff; }
+    .bar-fill.no-mem { background: var(--bg-card-hover); color: var(--text-tertiary); border: 1px solid var(--border); }
+
+    /* ── WHY SECTION ──────────────────────────────── */
+
+    .why {
+      padding: 120px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .why-grid {
       display: grid;
-      grid-template-columns: 1fr 1.5fr;
-      gap: 64px;
-      align-items: start;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      margin-top: 64px;
     }
 
-    .quickstart-left h2 { margin-bottom: 16px; }
-    .quickstart-left .section-sub { margin-bottom: 32px; }
+    .why-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      transition: border-color 0.3s;
+    }
 
-    .quickstart-feature {
+    .why-card:hover { border-color: rgba(41,151,255,0.3); }
+
+    .why-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .why-card:nth-child(1) .why-icon { background: rgba(41,151,255,0.12); }
+    .why-card:nth-child(2) .why-icon { background: rgba(48,209,88,0.12); }
+    .why-card:nth-child(3) .why-icon { background: rgba(191,90,242,0.12); }
+    .why-card:nth-child(4) .why-icon { background: rgba(255,159,10,0.12); }
+
+    .why-card h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.01em;
+    }
+
+    .why-card p {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ── REASONING CALLOUT ────────────────────────── */
+
+    .reasoning-callout {
+      margin-top: 64px;
+      background: linear-gradient(135deg, rgba(41,151,255,0.06), rgba(191,90,242,0.04));
+      border: 1px solid rgba(41,151,255,0.15);
+      border-radius: 20px;
+      padding: 48px;
+    }
+
+    .reasoning-callout h3 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .reasoning-callout .sub {
+      color: var(--text-secondary);
+      font-size: 16px;
+      margin-bottom: 32px;
+    }
+
+    .reasoning-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .reasoning-item {
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      margin-bottom: 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.3);
     }
-    .quickstart-feature-icon {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: rgba(240,180,41,0.15);
-      border: 1px solid rgba(240,180,41,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .quickstart-feature-icon svg { width: 12px; height: 12px; color: var(--accent-gold); }
-    .quickstart-feature p {
-      font-size: 0.875rem;
+
+    .reasoning-item .q {
+      font-size: 14px;
       color: var(--text-secondary);
     }
 
-    /* ============================================================
-       PRICING
-    ============================================================ */
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      max-width: 900px;
-      margin: 48px auto 0;
-    }
-    .pricing-card {
-      background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 32px 24px;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .pricing-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(255,255,255,0.12);
-    }
-    .pricing-popular {
-      border-color: var(--accent-gold);
-      box-shadow: 0 0 40px rgba(240,180,41,0.1);
-    }
-    .pricing-badge {
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--accent-gold);
-      color: #000;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 4px 16px;
-      border-radius: 20px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-    }
-    .pricing-tier {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-    .pricing-price {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: var(--text-primary);
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-    .pricing-price span {
-      font-size: 1rem;
-      font-weight: 400;
-      color: var(--text-muted);
-    }
-    .pricing-desc {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 24px;
-    }
-    .pricing-features {
-      list-style: none;
-      padding: 0;
-      margin: 0 0 24px;
-      flex: 1;
-    }
-    .pricing-features li {
-      font-size: 0.85rem;
-      padding: 6px 0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .pricing-features li.incl { color: var(--text-secondary); }
-    .pricing-features li.excl { color: var(--text-muted); opacity: 0.45; }
-    .pricing-features li.incl::before {
-      content: "";
-      width: 16px; height: 16px;
-      flex-shrink: 0;
-      background: var(--accent-gold);
-      -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/contain no-repeat;
-      mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/contain no-repeat;
-    }
-    .pricing-features li.excl::before {
-      content: "\2014";
-      width: 16px;
-      text-align: center;
-      flex-shrink: 0;
-      font-size: 0.75rem;
-    }
-    .pricing-cta {
-      display: block;
-      text-align: center;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      text-decoration: none;
-      border: 1px solid rgba(255,255,255,0.15);
-      color: var(--text-primary);
-      transition: background 0.2s;
-      margin-top: auto;
-    }
-    .pricing-cta:hover { background: rgba(255,255,255,0.05); }
-    .pricing-cta-gold {
-      background: var(--accent-gold);
-      color: #000;
-      border-color: var(--accent-gold);
-    }
-    .pricing-cta-gold:hover { background: var(--accent-glow); }
-
-    @media (max-width: 900px) {
-      .pricing-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 600px) {
-      .pricing-grid { grid-template-columns: 1fr; max-width: 360px; margin-left: auto; margin-right: auto; }
+    .reasoning-item .a {
+      font-size: 14px;
+      color: var(--green);
+      font-weight: 500;
     }
 
-    /* ============================================================
-       USE CASES
-    ============================================================ */
-    #use-cases { padding: 100px 0; }
+    /* ── HOW IT WORKS ─────────────────────────────── */
 
-    .use-cases-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-      margin-top: 48px;
-    }
-    .use-case-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-md);
-      padding: 28px 24px;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .use-case-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(255,255,255,0.15);
-    }
-    .use-case-icon {
-      width: 44px; height: 44px;
-      border-radius: var(--radius-sm);
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 16px;
-    }
-    .use-case-icon svg { width: 22px; height: 22px; }
-    .use-case-card h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 8px;
-    }
-    .use-case-card p {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
-    @media (max-width: 900px) {
-      .use-cases-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 480px) {
-      .use-cases-grid { grid-template-columns: 1fr; }
-    }
-
-    /* ============================================================
-       SETUP WIZARD
-    ============================================================ */
-    .ai-selector {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin: 32px auto;
-      max-width: 700px;
-    }
-    .ai-card {
-      background: var(--bg-card);
-      border: 2px solid var(--border-card);
-      border-radius: var(--radius-md);
-      padding: 20px 16px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .ai-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
-    .ai-card.selected { border-color: var(--accent-gold); box-shadow: var(--shadow-glow); }
-    .ai-card-icon {
-      width: 40px; height: 40px;
-      margin: 0 auto 12px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .ai-card-icon svg { width: 32px; height: 32px; }
-    .ai-card-label { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
-
-    .os-selector {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      margin: 16px 0 32px;
-    }
-    .os-pill {
-      padding: 8px 20px;
-      border-radius: 20px;
-      border: 1px solid var(--border-card);
-      background: transparent;
-      color: var(--text-secondary);
-      font-family: var(--font-sans);
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .os-pill:hover { border-color: rgba(255,255,255,0.2); }
-    .os-pill.selected {
-      background: var(--accent-gold);
-      color: #000;
-      border-color: var(--accent-gold);
-      font-weight: 600;
-    }
-
-    .wizard-panel {
-      max-width: 640px;
+    .how {
+      padding: 120px 24px;
+      max-width: 1200px;
       margin: 0 auto;
     }
-    .wizard-section {
-      margin-bottom: 32px;
-    }
-    .wizard-section-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 16px;
+
+    .orbit-diagram {
+      margin-top: 64px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 64px;
       text-align: center;
+      position: relative;
+      overflow: hidden;
     }
-    .wizard-instructions {
-      display: none;
-      margin-top: 24px;
+
+    .orbit-rings {
+      position: relative;
+      width: 400px;
+      height: 400px;
+      margin: 0 auto;
     }
-    .wizard-instructions.visible { display: block; }
-    .wizard-step-card {
-      display: flex;
-      gap: 16px;
-      padding: 20px;
-      margin-bottom: 12px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-    }
-    .wizard-step-num {
-      width: 28px; height: 28px;
+
+    .orbit-ring {
+      position: absolute;
       border-radius: 50%;
-      background: var(--accent-gold);
-      color: #000;
-      font-weight: 700;
-      font-size: 0.85rem;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      border: 1px solid var(--border);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
     }
-    .wizard-step-content { flex: 1; }
-    .wizard-step-content p {
-      font-size: 0.9rem;
-      color: var(--text-primary);
+
+    .orbit-ring:nth-child(1) { width: 80px; height: 80px; border-color: rgba(41,151,255,0.4); }
+    .orbit-ring:nth-child(2) { width: 160px; height: 160px; border-color: rgba(41,151,255,0.25); }
+    .orbit-ring:nth-child(3) { width: 260px; height: 260px; }
+    .orbit-ring:nth-child(4) { width: 360px; height: 360px; border-color: rgba(255,255,255,0.04); }
+
+    .orbit-sun {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffd60a, #ff9f0a);
+      box-shadow: 0 0 40px rgba(255,214,10,0.4), 0 0 80px rgba(255,159,10,0.2);
+    }
+
+    .orbit-planet {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .orbit-planet.core {
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(41,151,255,0.6);
+      animation: orbit-core 8s linear infinite;
+    }
+
+    .orbit-planet.near {
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(48,209,88,0.4);
+      animation: orbit-near 14s linear infinite;
+    }
+
+    .orbit-planet.active {
+      background: var(--purple);
+      box-shadow: 0 0 8px rgba(191,90,242,0.3);
+      animation: orbit-active 22s linear infinite;
+    }
+
+    .orbit-planet.fading {
+      background: var(--text-tertiary);
+      animation: orbit-fading 35s linear infinite;
+    }
+
+    @keyframes orbit-core {
+      from { transform: rotate(0deg) translateX(40px) rotate(0deg); }
+      to   { transform: rotate(360deg) translateX(40px) rotate(-360deg); }
+    }
+    @keyframes orbit-near {
+      from { transform: rotate(90deg) translateX(80px) rotate(-90deg); }
+      to   { transform: rotate(450deg) translateX(80px) rotate(-450deg); }
+    }
+    @keyframes orbit-active {
+      from { transform: rotate(200deg) translateX(130px) rotate(-200deg); }
+      to   { transform: rotate(560deg) translateX(130px) rotate(-560deg); }
+    }
+    @keyframes orbit-fading {
+      from { transform: rotate(45deg) translateX(180px) rotate(-45deg); }
+      to   { transform: rotate(405deg) translateX(180px) rotate(-405deg); }
+    }
+
+    .orbit-labels {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 48px;
+    }
+
+    .orbit-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .orbit-label-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ── INSTALL ──────────────────────────────────── */
+
+    .install {
+      padding: 120px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .install-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+      margin-top: 64px;
+    }
+
+    .install-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+    }
+
+    .step-num {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 16px;
+      font-family: var(--mono);
+    }
+
+    .install-step h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .code-block {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+
+    .code-block pre {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .code-block .comment { color: var(--text-tertiary); }
+    .code-block .string { color: var(--green); }
+    .code-block .key { color: var(--accent); }
+    .code-block .cmd { color: var(--text); }
+
+    /* ── FEATURES ─────────────────────────────────── */
+
+    .features {
+      padding: 120px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 64px;
+    }
+
+    .feature-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: border-color 0.3s;
+    }
+
+    .feature-item:hover { border-color: rgba(255,255,255,0.15); }
+
+    .feature-item h4 {
+      font-size: 16px;
+      font-weight: 700;
       margin-bottom: 8px;
+    }
+
+    .feature-item p {
+      font-size: 14px;
+      color: var(--text-secondary);
       line-height: 1.5;
     }
 
-    .copy-box {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--bg-void);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-sm);
-      padding: 10px 14px;
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--accent-glow);
-      overflow-x: auto;
-      margin-top: 8px;
-    }
-    .copy-box code { flex: 1; white-space: pre; }
-    .copy-box .copy-btn {
-      flex-shrink: 0;
-      padding: 4px;
-    }
+    /* ── FOOTER ───────────────────────────────────── */
 
-    .wizard-download-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 20px;
-      background: var(--accent-gold);
-      color: #000;
-      font-weight: 600;
-      font-size: 0.85rem;
-      border-radius: var(--radius-sm);
-      text-decoration: none;
-      transition: background 0.2s;
-      margin-top: 8px;
-    }
-    .wizard-download-btn:hover { background: var(--accent-glow); }
-    .wizard-download-btn svg { width: 16px; height: 16px; }
-
-    .wizard-advanced {
-      text-align: center;
-      margin-top: 32px;
-    }
-    .wizard-advanced a {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      text-decoration: none;
-    }
-    .wizard-advanced a:hover { color: var(--text-secondary); }
-
-    @media (max-width: 768px) {
-      .ai-selector { grid-template-columns: repeat(2, 1fr); }
-      .ext-features-grid { grid-template-columns: repeat(2, 1fr); }
-      .ext-demo { grid-template-columns: 1fr; }
-      .ext-ai-logos { gap: 32px; }
-    }
-    @media (max-width: 480px) {
-      .ai-selector { grid-template-columns: 1fr; }
-      .ext-features-grid { grid-template-columns: 1fr; }
-    }
-
-    /* ============================================================
-       FOOTER
-    ============================================================ */
     footer {
-      padding: 60px 0 40px;
-      border-top: 1px solid var(--border-subtle);
+      border-top: 1px solid var(--border);
+      padding: 48px 24px;
+      margin-top: 80px;
     }
 
     .footer-inner {
-      display: grid;
-      grid-template-columns: 1.5fr 1fr 1fr;
-      gap: 48px;
-      margin-bottom: 48px;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .footer-brand h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-    .footer-brand p {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      line-height: 1.65;
-      max-width: 260px;
-    }
-
-    .footer-col h4 {
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-secondary);
-      margin-bottom: 16px;
+    .footer-inner p {
+      font-size: 13px;
+      color: var(--text-tertiary);
     }
 
     .footer-links {
-      list-style: none;
       display: flex;
-      flex-direction: column;
-      gap: 10px;
+      gap: 24px;
+      list-style: none;
     }
 
     .footer-links a {
-      font-size: 0.875rem;
-      color: var(--text-muted);
+      font-size: 13px;
+      color: var(--text-secondary);
       text-decoration: none;
-      transition: color 0.2s;
-    }
-    .footer-links a:hover { color: var(--text-primary); }
-
-    .footer-bottom {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-top: 24px;
-      border-top: 1px solid var(--border-subtle);
     }
 
-    .footer-bottom p {
-      font-size: 0.8rem;
-      color: var(--text-muted);
+    .footer-links a:hover { color: var(--text); }
+
+    /* ── RESPONSIVE ───────────────────────────────── */
+
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .comparison { grid-template-columns: 1fr; }
+      .bar-section { grid-template-columns: 1fr; }
+      .why-grid { grid-template-columns: 1fr; }
+      .reasoning-grid { grid-template-columns: 1fr; }
+      .install-steps { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .orbit-rings { width: 280px; height: 280px; }
+      .orbit-ring:nth-child(1) { width: 56px; height: 56px; }
+      .orbit-ring:nth-child(2) { width: 112px; height: 112px; }
+      .orbit-ring:nth-child(3) { width: 182px; height: 182px; }
+      .orbit-ring:nth-child(4) { width: 252px; height: 252px; }
+      @keyframes orbit-core {
+        from { transform: rotate(0deg) translateX(28px) rotate(0deg); }
+        to   { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+      }
+      @keyframes orbit-near {
+        from { transform: rotate(90deg) translateX(56px) rotate(-90deg); }
+        to   { transform: rotate(450deg) translateX(56px) rotate(-450deg); }
+      }
+      @keyframes orbit-active {
+        from { transform: rotate(200deg) translateX(91px) rotate(-200deg); }
+        to   { transform: rotate(560deg) translateX(91px) rotate(-560deg); }
+      }
+      @keyframes orbit-fading {
+        from { transform: rotate(45deg) translateX(126px) rotate(-45deg); }
+        to   { transform: rotate(405deg) translateX(126px) rotate(-405deg); }
+      }
+      .hero { padding-top: 120px; padding-bottom: 80px; }
+      .compare-card { padding: 32px 24px; }
+      .nav-links { display: none; }
+      .orbit-labels { flex-wrap: wrap; gap: 16px; }
+      .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
     }
 
-    .footer-badges {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+    /* ── ANIMATIONS ───────────────────────────────── */
 
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border-card);
-      border-radius: 999px;
-      padding: 4px 12px;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-    }
-    .badge-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-    }
-
-    /* ============================================================
-       TOAST
-    ============================================================ */
-    .toast {
-      position: fixed;
-      bottom: 32px;
-      right: 32px;
-      background: rgba(12,26,53,0.95);
-      border: 1px solid var(--accent-gold);
-      border-radius: var(--radius-sm);
-      padding: 12px 20px;
-      font-size: 0.85rem;
-      color: var(--accent-gold);
-      backdrop-filter: blur(12px);
-      transform: translateY(20px);
+    .fade-in {
       opacity: 0;
-      transition: transform 0.3s, opacity 0.3s;
-      pointer-events: none;
-      z-index: 999;
+      transform: translateY(30px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
     }
-    .toast.show {
-      transform: translateY(0);
+
+    .fade-in.visible {
       opacity: 1;
-    }
-
-    /* ============================================================
-       RESPONSIVE
-    ============================================================ */
-    @media (max-width: 900px) {
-      .hero-inner        { grid-template-columns: 1fr; gap: 48px; }
-      .solar-system      { width: 300px; height: 300px; }
-      .orbit-5           { display: none; }
-      .planet-orbit-5    { display: none; }
-      .orbit-4           { width: 240px; height: 240px; }
-      .planet-orbit-4a,.planet-orbit-4b,.planet-orbit-4c { width:240px;height:240px;margin:-120px 0 0 -120px; }
-      .orbit-3           { width: 180px; height: 180px; }
-      .planet-orbit-3    { width:180px;height:180px;margin:-90px 0 0 -90px; }
-      .orbit-2           { width: 120px; height: 120px; }
-      .planet-orbit-2a,.planet-orbit-2b { width:120px;height:120px;margin:-60px 0 0 -60px; }
-      .orbit-1           { width: 78px; height: 78px; }
-      .planet-orbit-1    { width:78px;height:78px;margin:-39px 0 0 -39px; }
-
-      .features-grid         { grid-template-columns: 1fr; }
-      .pain-grid             { grid-template-columns: 1fr; }
-      .how-steps-new         { grid-template-columns: 1fr; }
-      .how-demo              { grid-template-columns: 1fr; }
-      .footer-inner          { grid-template-columns: 1fr 1fr; }
-
-      .nav-links             { display: none; }
-      .nav-hamburger         { display: flex; }
-    }
-
-    @media (max-width: 600px) {
-      .features-grid     { grid-template-columns: 1fr; }
-      .footer-inner      { grid-template-columns: 1fr; }
-      .footer-bottom     { flex-direction: column; gap: 16px; text-align: center; }
-      .hero-actions      { flex-direction: column; align-items: flex-start; }
-      .ecosystem-grid    { grid-template-columns: 1fr; max-width: 360px; margin-left: auto; margin-right: auto; }
-    }
-
-    /* ============================================================
-       CHROME EXTENSION
-    ============================================================ */
-    #chrome-extension {
-      background: linear-gradient(180deg, transparent 0%, rgba(244,63,94,0.03) 50%, transparent 100%);
-    }
-
-    .ext-ai-logos {
-      display: flex;
-      justify-content: center;
-      gap: 48px;
-      margin: 40px 0 48px;
-    }
-
-    .ext-ai-logo {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .ext-ai-logo svg {
-      width: 48px;
-      height: 48px;
-      opacity: 0.7;
-      transition: opacity 0.3s;
-    }
-
-    .ext-ai-logo:hover svg { opacity: 1; }
-
-    .ext-ai-logo span {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .ext-features-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      margin-bottom: 48px;
-    }
-
-    .ext-feat-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-lg);
-      padding: 28px 24px;
-      transition: border-color 0.3s, transform 0.2s, box-shadow 0.3s;
-    }
-
-    .ext-feat-card:hover {
-      border-color: rgba(148,163,184,0.2);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-card);
-    }
-
-    .ext-feat-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 16px;
-    }
-
-    .ext-feat-card h3 {
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: var(--text-primary);
-    }
-
-    .ext-feat-card p {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
-
-    .ext-demo {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .ext-demo-before,
-    .ext-demo-after {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-md);
-      padding: 24px;
-    }
-
-    .ext-demo-after {
-      border-color: rgba(240,180,41,0.2);
-      background: rgba(240,180,41,0.02);
-    }
-
-    .ai-card-featured {
-      border-color: rgba(244,63,94,0.3) !important;
-      background: rgba(244,63,94,0.05) !important;
-    }
-
-    .ai-card-featured:hover {
-      border-color: rgba(244,63,94,0.5) !important;
-      background: rgba(244,63,94,0.08) !important;
-    }
-
-    .ai-card-badge {
-      font-size: 0.6rem;
-      color: var(--accent-rose);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-top: 4px;
-    }
-
-    /* ============================================================
-       ECOSYSTEM
-    ============================================================ */
-    #ecosystem { padding: 100px 0; }
-
-    .ecosystem-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      max-width: 1100px;
-      margin: 48px auto 0;
-    }
-
-    .product-card {
-      background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 32px 24px;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .product-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(255,255,255,0.12);
-    }
-    .product-card.product-featured {
-      border-color: rgba(240,180,41,0.3);
-      box-shadow: 0 0 40px rgba(240,180,41,0.08);
-    }
-
-    .product-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    .product-icon svg {
-      width: 28px;
-      height: 28px;
-    }
-
-    .product-name {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin-bottom: 4px;
-    }
-
-    .product-tagline {
-      font-size: 0.85rem;
-      color: var(--accent-gold);
-      font-weight: 500;
-      margin-bottom: 12px;
-    }
-
-    .product-desc {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      line-height: 1.65;
-      margin-bottom: 16px;
-      flex: 1;
-    }
-
-    .product-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 20px;
-    }
-    .product-tag {
-      font-size: 0.7rem;
-      font-weight: 500;
-      padding: 3px 10px;
-      border-radius: 20px;
-      background: rgba(240,180,41,0.08);
-      color: var(--accent-gold);
-      border: 1px solid rgba(240,180,41,0.15);
-    }
-
-    .product-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: auto;
-    }
-
-    .product-cta-primary {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      text-decoration: none;
-      background: var(--accent-gold);
-      color: #000;
-      border: none;
-      transition: background 0.2s;
-    }
-    .product-cta-primary:hover { background: var(--accent-glow); }
-    .product-cta-primary svg { width: 16px; height: 16px; }
-
-    .install-cmd {
-      display: block;
-      background: rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-      word-break: break-all;
-      user-select: all;
-      text-align: left;
-    }
-    .copy-btn {
-      margin-top: 6px;
-      padding: 4px 12px;
-      font-size: 0.75rem;
-      border-radius: 6px;
-      cursor: pointer;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--text-secondary);
-      transition: background 0.2s;
-    }
-    .copy-btn:hover { background: rgba(255,255,255,0.15); }
-    .install-toggle {
-      display: block;
-      margin-top: 8px;
-      font-size: 0.75rem;
-      opacity: 0.6;
-      color: var(--text-secondary);
-      text-decoration: none;
-      cursor: pointer;
-    }
-    .install-toggle:hover { opacity: 1; }
-
-    .product-cta-secondary {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      text-decoration: none;
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--text-secondary);
-      transition: background 0.2s, color 0.2s;
-    }
-    .product-cta-secondary:hover {
-      background: rgba(255,255,255,0.05);
-      color: var(--text-primary);
-    }
-    .product-cta-secondary svg { width: 14px; height: 14px; }
-
-    .product-card.product-community {
-      border-style: dashed;
-      border-color: rgba(255,255,255,0.08);
-      background: rgba(15,32,68,0.5);
-    }
-    .product-card.product-community:hover {
-      border-color: rgba(240,180,41,0.2);
+      transform: translateY(0);
     }
   </style>
 </head>
 <body>
 
-  <!-- ============================================================
-       NAVIGATION
-  ============================================================ -->
-  <nav id="nav">
-    <div class="container">
-      <div class="nav-inner">
-        <a href="#hero" class="nav-logo">
-          <div class="nav-logo-icon"></div>
-          Stellar Memory
-        </a>
-        <ul class="nav-links">
-          <li><a href="#pain-point" data-i18n="nav.why">Why?</a></li>
-          <li><a href="#use-cases" data-i18n="nav.usecases">Use Cases</a></li>
-          <li><a href="#chrome-extension" data-i18n="nav.extension">Extension</a></li>
-          <li><a href="#how-it-works" data-i18n="nav.howitworks">How It Works</a></li>
-          <li><a href="#get-started" data-i18n="nav.getstarted">Get Started</a></li>
-          <li><a href="https://starter-kit-marketplace.vercel.app" target="_blank" rel="noopener" data-i18n="nav.marketplace">Starter Kits</a></li>
-          <li><a href="https://github.com/sangjun0000/stellar-memory" target="_blank" rel="noopener" class="nav-cta">GitHub</a></li>
-          <li class="lang-selector">
-            <button class="lang-btn" onclick="toggleLangMenu()">
-              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-              <span id="current-lang">EN</span>
-            </button>
-            <ul class="lang-menu" id="lang-menu">
-              <li onclick="setLang('en')">English</li>
-              <li onclick="setLang('ko')">한국어</li>
-              <li onclick="setLang('zh')">中文</li>
-              <li onclick="setLang('es')">Español</li>
-              <li onclick="setLang('ja')">日本語</li>
-            </ul>
-          </li>
-        </ul>
-        <button class="nav-hamburger" aria-label="Menu" onclick="toggleMobileMenu()">
-          <span></span><span></span><span></span>
-        </button>
-      </div>
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">Stellar <span>Memory</span></a>
+    <ul class="nav-links">
+      <li><a href="#benchmark">Benchmark</a></li>
+      <li><a href="#how">How It Works</a></li>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="https://github.com/sangjun0000/stellar-memory" class="nav-cta">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">Open Source MCP Server &middot; <strong>MIT Licensed</strong></div>
+  <h1>
+    Your AI forgets<br>
+    <span class="gradient">everything.</span>
+  </h1>
+  <p class="hero-sub">
+    Every session starts from zero. Your AI re-reads files, re-asks questions,
+    and contradicts its own decisions. Stellar Memory gives it persistent memory
+    that survives across sessions.
+  </p>
+  <div class="hero-actions">
+    <a href="#install" class="btn btn-primary">Get Started</a>
+    <a href="#benchmark" class="btn btn-secondary">See the Benchmark</a>
+  </div>
+</section>
+
+<!-- STATS BANNER -->
+<div class="stats-banner fade-in">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-number blue">91%</div>
+      <div class="stat-label">Fewer tokens to restore context</div>
     </div>
-  </nav>
-
-  <!-- ============================================================
-       HERO
-  ============================================================ -->
-  <section id="hero">
-    <div class="container">
-      <div class="hero-inner">
-        <!-- Left: text -->
-        <div class="hero-text">
-          <div class="hero-badge">
-            <span class="hero-badge-dot"></span>
-            <span data-i18n="hero.badge">100% Free &amp; Open Source</span>
-          </div>
-          <h1 class="hero-title">
-            <span class="hero-title-gradient" data-i18n="hero.title">Stellar Memory</span>
-          </h1>
-          <p class="hero-tagline" data-i18n="hero.subtitle">AI remembers you</p>
-          <p class="hero-desc" data-i18n="hero.desc">Give any AI the ability to remember. Install our Chrome Extension for ChatGPT, Claude &amp; Gemini — or connect via MCP for developer tools. Free forever.</p>
-          <div class="hero-actions">
-            <a href="https://github.com/sangjun0000/stellar-memory/releases/download/chrome-ext-v1.0.0/stellar-chrome-v1.0.0.zip" target="_blank" rel="noopener" class="btn-primary">
-              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span data-i18n="hero.cta.ext">Get Chrome Extension</span>
-            </a>
-            <a href="#get-started" class="btn-secondary">
-              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-              <span data-i18n="hero.cta.dev">Developer SDK</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- Right: solar system -->
-        <div class="hero-right">
-          <div class="solar-system">
-            <div class="orbit orbit-5"></div>
-            <div class="orbit orbit-4"></div>
-            <div class="orbit orbit-3"></div>
-            <div class="orbit orbit-2"></div>
-            <div class="orbit orbit-1"></div>
-            <div class="sun"></div>
-            <div class="planet-orbit planet-orbit-1"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-2a"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-2b"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-3"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-4a"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-4b"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-4c"><div class="planet"></div></div>
-            <div class="planet-orbit planet-orbit-5"><div class="planet"></div></div>
-          </div>
-          <div style="text-align:center; margin-top: 20px; display:flex; flex-wrap:wrap; justify-content:center; gap:12px;">
-            <span style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-rose);display:inline-block;"></span>Core
-            </span>
-            <span style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-blue);display:inline-block;"></span>Inner
-            </span>
-            <span style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-cyan);display:inline-block;"></span>Outer
-            </span>
-            <span style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-emerald);display:inline-block;"></span>Belt
-            </span>
-            <span style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-indigo);display:inline-block;"></span>Cloud
-            </span>
-          </div>
-        </div>
-      </div>
+    <div class="stat-item">
+      <div class="stat-number green">100%</div>
+      <div class="stat-label">Decision + reasoning recall</div>
     </div>
-  </section>
-
-  <!-- ============================================================
-       PAIN POINT (Why you need this)
-  ============================================================ -->
-  <section id="pain-point" style="padding:100px 0;">
-    <div class="container">
-      <div style="text-align:center; margin-bottom:16px;">
-        <div class="section-label" data-i18n="pain.label">The Problem</div>
-        <h2 class="section-title" data-i18n="pain.title">Tired of repeating yourself to AI?</h2>
-        <p class="section-sub" style="margin:0 auto;" data-i18n="pain.subtitle">Every new conversation starts from zero. Your AI has no idea who you are.</p>
-      </div>
-
-      <div class="pain-grid">
-        <div class="pain-card">
-          <div class="pain-icon">&#x1F504;</div>
-          <h3 data-i18n="pain.repeat.title">Explaining from scratch, every time</h3>
-          <div class="pain-chat">
-            <div class="chat-bubble user" data-i18n="pain.repeat.before">"I'm a frontend dev, I use React, I prefer TypeScript..."</div>
-            <div class="chat-bubble ai" data-i18n="pain.repeat.ai">"Got it! How can I help you?"</div>
-            <div class="chat-label" data-i18n="pain.repeat.label">...next conversation, same thing again</div>
-          </div>
-        </div>
-
-        <div class="pain-card">
-          <div class="pain-icon">&#x1F4A8;</div>
-          <h3 data-i18n="pain.forget.title">New chat = blank slate</h3>
-          <div class="pain-chat">
-            <div class="chat-bubble user" data-i18n="pain.forget.before">"Remember the project structure we discussed?"</div>
-            <div class="chat-bubble ai" data-i18n="pain.forget.ai">"I'm sorry, I can't access previous conversations."</div>
-          </div>
-        </div>
-
-        <div class="pain-card">
-          <div class="pain-icon">&#x1F937;</div>
-          <h3 data-i18n="pain.context.title">AI that doesn't know you</h3>
-          <div class="pain-chat">
-            <div class="chat-bubble user" data-i18n="pain.context.before">"Review my code"</div>
-            <div class="chat-bubble ai" data-i18n="pain.context.ai">"What language and framework are you using?"</div>
-            <div class="chat-label" data-i18n="pain.context.label">...I've told you a hundred times</div>
-          </div>
-        </div>
-      </div>
-
-      <p class="pain-solution" data-i18n="pain.solution">With Stellar Memory, your AI remembers all of this.</p>
+    <div class="stat-item">
+      <div class="stat-number orange">314</div>
+      <div class="stat-label">Tokens for full context (vs 3,627)</div>
     </div>
-  </section>
+    <div class="stat-item">
+      <div class="stat-number purple">95%</div>
+      <div class="stat-label">Code consistency after 5 sessions</div>
+    </div>
+  </div>
+</div>
 
-  <!-- ============================================================
-       USE CASES (4 persona cards)
-  ============================================================ -->
-  <section id="use-cases">
-    <div class="container">
-      <div style="text-align:center; margin-bottom:16px;">
-        <div class="section-label" data-i18n="uc.label">Who Is This For?</div>
-        <h2 class="section-title" data-i18n="uc.title">AI memory for everyone</h2>
-        <p class="section-sub" style="margin:0 auto;" data-i18n="uc.subtitle">Not just for developers — anyone who uses AI can benefit from persistent memory.</p>
+<!-- PROBLEM -->
+<section class="problem fade-in" id="problem">
+  <div class="section-eyebrow">The Problem</div>
+  <h2 class="section-title">Code tells you what.<br>Not why.</h2>
+  <p class="section-desc">
+    After 5 sessions, an AI without memory produces code that contradicts
+    70% of your original design decisions. It doesn't remember why you chose
+    bcrypt over argon2, or cursor pagination over offset.
+  </p>
+
+  <div class="comparison">
+    <div class="compare-card without">
+      <div class="compare-label"><span class="compare-dot"></span> Without Stellar Memory</div>
+      <ul class="compare-list">
+        <li>Re-reads all files every session (3,627+ tokens)</li>
+        <li>Forgets WHY decisions were made</li>
+        <li>Asks the same questions repeatedly</li>
+        <li>Switches from nanoid to UUID mid-project</li>
+        <li>Introduces offset pagination where cursor was used</li>
+        <li>Creates new error handling instead of using AppError</li>
+        <li>30% code consistency by session 5</li>
+      </ul>
+    </div>
+    <div class="compare-card with">
+      <div class="compare-label"><span class="compare-dot"></span> With Stellar Memory</div>
+      <ul class="compare-list">
+        <li>Restores full context in 314 tokens</li>
+        <li>Remembers every decision AND the reasoning</li>
+        <li>Zero redundant questions across sessions</li>
+        <li>Consistently uses nanoid(21) everywhere</li>
+        <li>Follows cursor pagination pattern automatically</li>
+        <li>Knows AppError exists and uses it correctly</li>
+        <li>95% code consistency after 5 sessions</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- BENCHMARK -->
+<section class="benchmark fade-in" id="benchmark">
+  <div class="section-eyebrow">Benchmark</div>
+  <h2 class="section-title">Measured, not promised.</h2>
+  <p class="section-desc">
+    We built a 538-line Express API with 27 deliberate design decisions,
+    then measured context recall across sessions.
+  </p>
+
+  <table class="bench-table">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Stellar Memory</th>
+        <th>Read Files</th>
+        <th>No Memory</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="metric-name">Context Restoration Tokens</td>
+        <td class="highlight">314</td>
+        <td class="dim">3,627</td>
+        <td class="dim">0</td>
+      </tr>
+      <tr>
+        <td class="metric-name">Decision Recall (WHAT)</td>
+        <td class="highlight">100%</td>
+        <td>89%</td>
+        <td class="dim">0%</td>
+      </tr>
+      <tr>
+        <td class="metric-name">Reasoning Recall (WHY)</td>
+        <td class="highlight">100%</td>
+        <td class="dim">0%</td>
+        <td class="dim">0%</td>
+      </tr>
+      <tr>
+        <td class="metric-name">Code Consistency (Session 2)</td>
+        <td class="highlight">100%</td>
+        <td>70%</td>
+        <td class="dim">30%</td>
+      </tr>
+      <tr>
+        <td class="metric-name">Code Consistency (Session 5)</td>
+        <td class="highlight">95%</td>
+        <td class="dim">30%</td>
+        <td class="dim">10%</td>
+      </tr>
+      <tr>
+        <td class="metric-name">Scales with Project Size?</td>
+        <td class="highlight">Fixed budget</td>
+        <td class="dim">Linear growth</td>
+        <td class="dim">N/A</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="bar-section">
+    <div class="bar-group">
+      <h3>Token Cost</h3>
+      <p>Tokens needed to restore full project context</p>
+      <div class="bar-row">
+        <span class="bar-label">STM</span>
+        <div class="bar-track">
+          <div class="bar-fill stm" style="width: 8.7%">314</div>
+        </div>
       </div>
-      <div class="use-cases-grid">
-        <!-- Student -->
-        <div class="use-case-card">
-          <div class="use-case-icon" style="background:rgba(99,102,241,0.1);">
-            <svg fill="none" stroke="var(--accent-indigo)" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></svg>
-          </div>
-          <h3 data-i18n="uc.student.title">Students &amp; Learners</h3>
-          <p data-i18n="uc.student.desc">Your AI tutor remembers what you studied, where you struggled, and adapts to your learning pace.</p>
-        </div>
-        <!-- Writer -->
-        <div class="use-case-card">
-          <div class="use-case-icon" style="background:rgba(244,63,94,0.1);">
-            <svg fill="none" stroke="var(--accent-rose)" stroke-width="2" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3 0z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-          </div>
-          <h3 data-i18n="uc.writer.title">Writers &amp; Creators</h3>
-          <p data-i18n="uc.writer.desc">Your AI assistant knows your writing style, your characters, your world — across every session.</p>
-        </div>
-        <!-- Business -->
-        <div class="use-case-card">
-          <div class="use-case-icon" style="background:rgba(16,185,129,0.1);">
-            <svg fill="none" stroke="var(--accent-emerald)" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="12.01"/></svg>
-          </div>
-          <h3 data-i18n="uc.business.title">Business Professionals</h3>
-          <p data-i18n="uc.business.desc">Your AI remembers your clients, projects, and meeting notes — like a personal assistant that never forgets.</p>
-        </div>
-        <!-- Developer -->
-        <div class="use-case-card">
-          <div class="use-case-icon" style="background:rgba(6,182,212,0.1);">
-            <svg fill="none" stroke="var(--accent-cyan)" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          </div>
-          <h3 data-i18n="uc.dev.title">Developers</h3>
-          <p data-i18n="uc.dev.desc">Add persistent memory to any LLM in 3 lines of code. MCP, REST API, and Python SDK included.</p>
+      <div class="bar-row">
+        <span class="bar-label">Read Files</span>
+        <div class="bar-track">
+          <div class="bar-fill no-mem" style="width: 100%">3,627</div>
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- ============================================================
-       HOW IT WORKS (3 steps — persuasion-focused)
-  ============================================================ -->
-  <section id="how-it-works" style="padding:100px 0;">
-    <div class="container">
-      <div style="text-align:center; margin-bottom:16px;">
-        <div class="section-label" data-i18n="how.label">How It Works</div>
-        <h2 class="section-title" data-i18n="how.title">A memory plugin for your existing AI</h2>
-        <p class="section-sub" style="margin:0 auto;" data-i18n="how.subtitle">No need to switch AI tools. Just connect Stellar Memory to the one you already use.</p>
-      </div>
-
-      <div class="how-steps-new">
-        <div class="how-step-card">
-          <div class="how-step-num">1</div>
-          <div class="how-step-visual">
-            <svg width="64" height="64" fill="none" stroke="var(--accent-blue)" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 10h2m2 0h2" stroke="var(--accent-gold)" stroke-width="2"/></svg>
-          </div>
-          <h3 data-i18n="how.s1.title">Connect to your AI</h3>
-          <p data-i18n="how.s1.desc">Claude, ChatGPT, Cursor, or any AI tool — connect Stellar Memory in 30 seconds. One command, done.</p>
-        </div>
-
-        <div class="how-step-card">
-          <div class="how-step-num">2</div>
-          <div class="how-step-visual">
-            <svg width="64" height="64" fill="none" stroke="var(--accent-gold)" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4" stroke-dasharray="2 2"/></svg>
-          </div>
-          <h3 data-i18n="how.s2.title">It remembers automatically</h3>
-          <p data-i18n="how.s2.desc">You don't need to say "remember this." Your AI decides what's important and stores it on its own.</p>
-        </div>
-
-        <div class="how-step-card">
-          <div class="how-step-num">3</div>
-          <div class="how-step-visual">
-            <svg width="64" height="64" fill="none" stroke="var(--accent-emerald)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><polyline points="9 11 12 14 16 9" stroke-width="2"/></svg>
-          </div>
-          <h3 data-i18n="how.s3.title">Next conversation, it knows you</h3>
-          <p data-i18n="how.s3.desc">Start a new chat and your AI already knows your name, preferences, and project context. No more repeating yourself.</p>
+    <div class="bar-group">
+      <h3>Code Consistency Over Time</h3>
+      <p>Pattern adherence across 5 consecutive sessions</p>
+      <div class="bar-row">
+        <span class="bar-label">STM</span>
+        <div class="bar-track">
+          <div class="bar-fill stm" style="width: 95%">95%</div>
         </div>
       </div>
-
-      <div class="how-demo">
-        <div class="how-demo-before">
-          <div class="demo-label" data-i18n="how.before.label">Without Stellar Memory</div>
-          <div class="chat-bubble user" data-i18n="how.before.user1">"I'm a React developer using TypeScript..."</div>
-          <div class="chat-bubble ai" data-i18n="how.before.ai1">"Got it! How can I help?"</div>
-          <div class="chat-label">--- new chat ---</div>
-          <div class="chat-bubble user" data-i18n="how.before.user2">"I'm a React developer using TypeScript..."</div>
-        </div>
-        <div class="how-demo-after">
-          <div class="demo-label" data-i18n="how.after.label">With Stellar Memory</div>
-          <div class="chat-bubble user" data-i18n="how.after.user1">"Review this component"</div>
-          <div class="chat-bubble ai" data-i18n="how.after.ai1">"Since you prefer functional components with TypeScript, I'll review it with that in mind."</div>
+      <div class="bar-row">
+        <span class="bar-label">No Memory</span>
+        <div class="bar-track">
+          <div class="bar-fill no-mem" style="width: 10%">10%</div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ============================================================
-       CHROME EXTENSION
-  ============================================================ -->
-  <section id="chrome-extension" style="padding:100px 0;">
-    <div class="container">
-      <div style="text-align:center; margin-bottom:16px;">
-        <div class="section-label" data-i18n="ext.label">Chrome Extension</div>
-        <h2 class="section-title" data-i18n="ext.title">Install once, every AI remembers you</h2>
-        <p class="section-sub" style="margin:0 auto;" data-i18n="ext.subtitle">No coding required. Just install and chat — works with ChatGPT, Claude, and Gemini.</p>
+<!-- WHY / REASONING -->
+<section class="why fade-in">
+  <div class="section-eyebrow">Why Stellar Memory</div>
+  <h2 class="section-title">The memory your<br>AI deserves.</h2>
+  <p class="section-desc">
+    Not just a key-value store. An intelligent memory system modeled after
+    how human cognition actually works.
+  </p>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-icon">&#9790;</div>
+      <h3>Orbital Importance</h3>
+      <p>Important memories orbit close to the Sun for instant recall.
+         Stale knowledge drifts outward through natural decay.
+         The half-life is 72 hours by default.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">&#9881;</div>
+      <h3>Hybrid Search</h3>
+      <p>FTS5 keyword search + vector KNN search merged via
+         Reciprocal Rank Fusion. Finds both exact matches and
+         semantic similarities.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">&#9733;</div>
+      <h3>100% Local</h3>
+      <p>Everything runs on your machine. SQLite database, local
+         embeddings (all-MiniLM-L6-v2), no API keys, no cloud,
+         no data leaving your device.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">&#9889;</div>
+      <h3>Fixed Token Budget</h3>
+      <p>Context stays under 800 tokens regardless of project size.
+         A 10,000-line codebase costs the same as a 100-line one
+         to restore context.</p>
+    </div>
+  </div>
+
+  <div class="reasoning-callout">
+    <h3>The Reasoning Gap</h3>
+    <p class="sub">10 decisions where code shows WHAT but only Stellar Memory knows WHY.</p>
+    <div class="reasoning-grid">
+      <div class="reasoning-item">
+        <div><div class="q">Why better-sqlite3 over node:sqlite?</div><div class="a">"Broader Node.js version compatibility"</div></div>
       </div>
-
-      <div class="ext-ai-logos">
-        <div class="ext-ai-logo">
-          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="var(--accent-emerald)" stroke-width="1.5" fill="rgba(16,185,129,0.1)"/><path d="M8 12h8M12 8v8" stroke="var(--accent-emerald)" stroke-width="1.5"/></svg>
-          <span>ChatGPT</span>
-        </div>
-        <div class="ext-ai-logo">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M16.98 3.41L12 6.77 7.02 3.41 2 7.26v9.48l10 5.85 10-5.85V7.26l-5.02-3.85z" stroke="var(--accent-gold)" stroke-width="1.5" fill="rgba(240,180,41,0.1)"/></svg>
-          <span>Claude</span>
-        </div>
-        <div class="ext-ai-logo">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" stroke="var(--accent-blue)" stroke-width="1.5" fill="rgba(59,130,246,0.1)"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="var(--accent-blue)" stroke-width="1.5"/></svg>
-          <span>Gemini</span>
-        </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why nanoid over UUID?</div><div class="a">"URL-safe, no collision, no autoincrement"</div></div>
       </div>
-
-      <div class="ext-features-grid">
-        <div class="ext-feat-card">
-          <div class="ext-feat-icon" style="background:rgba(16,185,129,0.1);">
-            <svg width="22" height="22" fill="none" stroke="var(--accent-emerald)" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </div>
-          <h3 data-i18n="ext.f1.title">Auto-Capture</h3>
-          <p data-i18n="ext.f1.desc">Your conversations are automatically saved as you chat. No buttons to click, nothing to remember.</p>
-        </div>
-        <div class="ext-feat-card">
-          <div class="ext-feat-icon" style="background:rgba(240,180,41,0.1);">
-            <svg width="22" height="22" fill="none" stroke="var(--accent-gold)" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          </div>
-          <h3 data-i18n="ext.f2.title">Auto-Inject</h3>
-          <p data-i18n="ext.f2.desc">When you start a new chat, relevant memories are automatically included. Your AI already knows the context.</p>
-        </div>
-        <div class="ext-feat-card">
-          <div class="ext-feat-icon" style="background:rgba(59,130,246,0.1);">
-            <svg width="22" height="22" fill="none" stroke="var(--accent-blue)" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-          </div>
-          <h3 data-i18n="ext.f3.title">Cross-Platform Memory</h3>
-          <p data-i18n="ext.f3.desc">Tell ChatGPT you love coffee — Claude remembers it too. Your memory follows you across every AI.</p>
-        </div>
-        <div class="ext-feat-card">
-          <div class="ext-feat-icon" style="background:rgba(139,92,246,0.1);">
-            <svg width="22" height="22" fill="none" stroke="var(--accent-violet)" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <h3 data-i18n="ext.f4.title">Privacy-First</h3>
-          <p data-i18n="ext.f4.desc">All data stays on your computer. Nothing is sent to external servers. Your memories are yours alone.</p>
-        </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why cursor pagination over offset?</div><div class="a">"Consistent results, no offset drift"</div></div>
       </div>
-
-      <div class="ext-demo">
-        <div class="ext-demo-before">
-          <div class="demo-label" data-i18n="ext.before.label">Without Extension</div>
-          <div class="chat-bubble user" data-i18n="ext.before.user">"What's my favorite drink?"</div>
-          <div class="chat-bubble ai" data-i18n="ext.before.ai">"I'm sorry, I don't have any information about your preferences."</div>
-        </div>
-        <div class="ext-demo-after">
-          <div class="demo-label" data-i18n="ext.after.label">With Extension</div>
-          <div class="chat-bubble user" data-i18n="ext.after.user">"What's my favorite drink?"</div>
-          <div class="chat-bubble ai" data-i18n="ext.after.ai">"You mentioned you love coffee — especially iced americano!"</div>
-        </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why bcrypt cost 12?</div><div class="a">"Security best practice for 2024+"</div></div>
       </div>
-
-      <div style="text-align:center; margin-top:48px;">
-        <a href="https://github.com/sangjun0000/stellar-memory/releases/download/chrome-ext-v1.0.0/stellar-chrome-v1.0.0.zip" target="_blank" rel="noopener" class="btn-primary" style="font-size:1.05rem; padding:14px 32px;">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span data-i18n="ext.cta">Get Chrome Extension</span>
-        </a>
-        <p style="margin-top:12px; color:var(--text-muted); font-size:0.85rem;" data-i18n="ext.cta.sub">Free &amp; open source — works on any Chromium browser</p>
+      <div class="reasoning-item">
+        <div><div class="q">Why Zod over Joi?</div><div class="a">"Type-safe, better error messages"</div></div>
+      </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why soft delete?</div><div class="a">"Data recovery and audit trail"</div></div>
+      </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why register returns tokens?</div><div class="a">"Better UX, one fewer API call"</div></div>
+      </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why 1mb body limit?</div><div class="a">"Support larger post content"</div></div>
+      </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why ISO datetime strings?</div><div class="a">"Human-readable, sqlite compatible"</div></div>
+      </div>
+      <div class="reasoning-item">
+        <div><div class="q">Why GET endpoints are public?</div><div class="a">"Read-friendly API design"</div></div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ============================================================
-       FEATURES (3 cards)
-  ============================================================ -->
-  <section id="features">
-    <div class="container">
-      <div class="features-header">
-        <div class="section-label">Capabilities</div>
-        <h2 class="section-title" data-i18n="features.title">Everything a memory system needs</h2>
-        <p class="section-sub" data-i18n="features.subtitle">
-          Designed from first principles to mirror the way human memory actually works — layered, emotional, and self-organizing.
-        </p>
-      </div>
+<!-- HOW IT WORKS -->
+<section class="how fade-in" id="how">
+  <div class="section-eyebrow">How It Works</div>
+  <h2 class="section-title">Celestial mechanics<br>for AI cognition.</h2>
+  <p class="section-desc">
+    Memories orbit a central Sun. Important ones stay close for instant recall.
+    Forgotten ones drift to the Oort Cloud. Access pulls them back.
+  </p>
 
-      <div class="features-grid">
-        <!-- Card 1: 5-Zone Orbit System -->
-        <div class="feature-card" style="--card-accent: rgba(240,180,41,0.5);">
-          <div class="feature-icon" style="background: rgba(240,180,41,0.1);">
-            <svg width="24" height="24" fill="none" stroke="var(--accent-gold)" stroke-width="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-              <line x1="1" y1="12" x2="3" y2="12"/>
-              <line x1="21" y1="12" x2="23" y2="12"/>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-            </svg>
-          </div>
-          <h3 class="feature-title" data-i18n="feat.zones.title">5-Zone Orbit System</h3>
-          <p class="feature-desc" data-i18n="feat.zones.desc">
-            Memories organized across five concentric zones — Core, Inner, Outer, Belt, and Cloud — each with distinct retention behavior, priority, and access speed.
-          </p>
-        </div>
+  <div class="orbit-diagram">
+    <div class="orbit-rings">
+      <div class="orbit-ring"></div>
+      <div class="orbit-ring"></div>
+      <div class="orbit-ring"></div>
+      <div class="orbit-ring"></div>
+      <div class="orbit-sun"></div>
+      <div class="orbit-planet core"></div>
+      <div class="orbit-planet core" style="animation-delay: -3s;"></div>
+      <div class="orbit-planet near"></div>
+      <div class="orbit-planet near" style="animation-delay: -5s;"></div>
+      <div class="orbit-planet active"></div>
+      <div class="orbit-planet fading"></div>
+    </div>
+    <div class="orbit-labels">
+      <div class="orbit-label"><span class="orbit-label-dot" style="background:var(--accent)"></span> Core (instant recall)</div>
+      <div class="orbit-label"><span class="orbit-label-dot" style="background:var(--green)"></span> Near (recently used)</div>
+      <div class="orbit-label"><span class="orbit-label-dot" style="background:var(--purple)"></span> Active (in-context)</div>
+      <div class="orbit-label"><span class="orbit-label-dot" style="background:var(--text-tertiary)"></span> Fading (drifting away)</div>
+    </div>
+  </div>
+</section>
 
-        <!-- Card 2: Self-Learning -->
-        <div class="feature-card" style="--card-accent: rgba(16,185,129,0.4);">
-          <div class="feature-icon" style="background: rgba(16,185,129,0.1);">
-            <svg width="24" height="24" fill="none" stroke="var(--accent-emerald)" stroke-width="2" viewBox="0 0 24 24">
-              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-              <polyline points="17 6 23 6 23 12"/>
-            </svg>
-          </div>
-          <h3 class="feature-title" data-i18n="feat.learn.title">Self-Learning</h3>
-          <p class="feature-desc" data-i18n="feat.learn.desc">
-            Continuously refines its own memory organization based on usage patterns. Frequently accessed memories migrate inward; rarely used ones drift to outer zones.
-          </p>
-        </div>
+<!-- INSTALL -->
+<section class="install fade-in" id="install">
+  <div class="section-eyebrow">Get Started</div>
+  <h2 class="section-title">Three steps.<br>Two minutes.</h2>
 
-        <!-- Card 3: Multimodal Memory -->
-        <div class="feature-card" style="--card-accent: rgba(6,182,212,0.4);">
-          <div class="feature-icon" style="background: rgba(6,182,212,0.1);">
-            <svg width="24" height="24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </div>
-          <h3 class="feature-title" data-i18n="feat.multi.title">Multimodal Memory</h3>
-          <p class="feature-desc" data-i18n="feat.multi.desc">
-            Store and recall text, code, structured data, and conversation history — all within a unified memory graph.
-          </p>
-        </div>
+  <div class="install-steps">
+    <div class="install-step">
+      <div class="step-num">01</div>
+      <h3>Clone & Build</h3>
+      <div class="code-block">
+<pre><span class="cmd">git clone</span> <span class="string">https://github.com/sangjun0000/stellar-memory.git</span>
+<span class="cmd">cd</span> stellar-memory
+<span class="cmd">npm install</span>
+<span class="cmd">npm run build</span></pre>
       </div>
     </div>
-  </section>
-
-  <!-- ============================================================
-       ECOSYSTEM (Built with Stellar Memory)
-  ============================================================ -->
-  <section id="ecosystem">
-    <div class="container">
-      <div style="text-align:center; margin-bottom:16px;">
-        <div class="section-label" data-i18n="eco.label">Ecosystem</div>
-        <h2 class="section-title" data-i18n="eco.title">Built with Stellar Memory</h2>
-        <p class="section-sub" style="margin:0 auto;" data-i18n="eco.subtitle">Open-source projects powered by intelligent AI memory</p>
-      </div>
-
-      <div class="ecosystem-grid">
-        <!-- Homunculus -->
-        <div class="product-card product-featured">
-          <div class="product-icon" style="background:rgba(240,180,41,0.1);">
-            <svg fill="none" stroke="var(--accent-gold)" stroke-width="1.5" viewBox="0 0 24 24">
-              <path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.7-3.2 6H8.2C6.3 13.7 5 11.5 5 9a7 7 0 0 1 7-7z"/>
-              <path d="M9 22v-4h6v4"/>
-              <path d="M10 18h4"/>
-              <circle cx="9.5" cy="8.5" r="1" fill="var(--accent-gold)"/>
-              <circle cx="14.5" cy="8.5" r="1" fill="var(--accent-gold)"/>
-            </svg>
-          </div>
-          <h3 class="product-name">Homunculus</h3>
-          <p class="product-tagline" data-i18n="eco.hom.tagline">Autonomous AI Agent with Interactive TUI</p>
-          <p class="product-desc" data-i18n="eco.hom.desc">A self-aware AI agent with a fullscreen interactive interface. Thinks, remembers, and acts — powered by Stellar Memory's 5-zone brain.</p>
-          <div class="product-tags">
-            <span class="product-tag">AI Agent</span>
-            <span class="product-tag">Autonomous</span>
-            <span class="product-tag">Local-First</span>
-            <span class="product-tag">Interactive TUI</span>
-            <span class="product-tag">Python</span>
-          </div>
-          <div class="product-actions" id="hom-install">
-            <!-- Windows: .bat download -->
-            <a href="downloads/Homunculus-Setup.bat" download class="product-cta-primary install-win">
-              <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span data-i18n="eco.hom.install.win">Install for Windows</span>
-            </a>
-            <!-- Mac/Linux: curl one-liner -->
-            <div class="install-unix" style="display:none">
-              <code class="install-cmd" id="hom-curl">curl -fsSL https://stellar-memory.com/downloads/Homunculus-Setup.sh | bash</code>
-              <button onclick="copyHomCmd()" class="copy-btn" data-i18n-copy="eco.hom.install.copy">Copy</button>
-            </div>
-            <!-- Toggle -->
-            <a href="javascript:void(0)" class="install-toggle" onclick="toggleHomInstallOS()" data-i18n="eco.hom.install.toggle">Other OS?</a>
-            <!-- GitHub -->
-            <a href="https://github.com/sangjun0000/homunculus" target="_blank" rel="noopener" class="product-cta-secondary">
-              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-              <span data-i18n="eco.hom.github">View on GitHub</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- Chrome Extension Card -->
-        <div class="product-card product-featured">
-          <div class="product-icon" style="background:rgba(244,63,94,0.1);">
-            <svg fill="none" stroke="var(--accent-rose)" stroke-width="1.5" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" rx="4"/>
-              <path d="M8 12h8M12 8v8" stroke-width="2"/>
-            </svg>
-          </div>
-          <h3 class="product-name">Chrome Extension</h3>
-          <p class="product-tagline" data-i18n="eco.ext.tagline">AI Memory for ChatGPT, Claude &amp; Gemini</p>
-          <p class="product-desc" data-i18n="eco.ext.desc">Install once and every AI remembers you. Automatically captures conversations and injects relevant memories.</p>
-          <div class="product-tags">
-            <span class="product-tag">Chrome Extension</span>
-            <span class="product-tag">ChatGPT</span>
-            <span class="product-tag">Claude</span>
-            <span class="product-tag">Gemini</span>
-            <span class="product-tag">TypeScript</span>
-          </div>
-          <div class="product-actions">
-            <a href="https://github.com/sangjun0000/stellar-memory/releases/download/chrome-ext-v1.0.0/stellar-chrome-v1.0.0.zip" target="_blank" rel="noopener" class="product-cta-primary" data-i18n="eco.ext.install">
-              <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Install Extension
-            </a>
-            <a href="https://github.com/sangjun0000/stellar-memory/tree/main/stellar-chrome" target="_blank" rel="noopener" class="product-cta-secondary">
-              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-              <span data-i18n="eco.ext.github">View Source</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- Your Project? (Community Card) -->
-        <div class="product-card product-community">
-          <div class="product-icon" style="background:rgba(99,102,241,0.1);">
-            <svg fill="none" stroke="var(--accent-indigo)" stroke-width="1.5" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-          </div>
-          <h3 class="product-name" data-i18n="eco.community.title">Your Project?</h3>
-          <p class="product-tagline" data-i18n="eco.community.tagline">Join the Ecosystem</p>
-          <p class="product-desc" data-i18n="eco.community.desc">Build something amazing with Stellar Memory and showcase it here. We welcome all open-source projects.</p>
-          <div class="product-tags">
-            <span class="product-tag" style="background:rgba(99,102,241,0.08);color:var(--accent-indigo);border-color:rgba(99,102,241,0.15);">Open Source</span>
-          </div>
-          <div class="product-actions">
-            <a href="https://github.com/sangjun0000/stellar-memory/issues/new?title=Ecosystem+Submission&labels=ecosystem" target="_blank" rel="noopener" class="product-cta-secondary" style="border-color:rgba(99,102,241,0.25);color:var(--accent-indigo);">
-              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-              <span data-i18n="eco.community.cta">Submit Your Project</span>
-            </a>
-          </div>
-        </div>
+    <div class="install-step">
+      <div class="step-num">02</div>
+      <h3>Add to Claude Code</h3>
+      <div class="code-block">
+<pre><span class="comment">// .claude/settings.json</span>
+{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"stellar-memory"</span>: {
+      <span class="key">"command"</span>: <span class="string">"node"</span>,
+      <span class="key">"args"</span>: [<span class="string">"/path/to/dist/index.js"</span>]
+    }
+  }
+}</pre>
       </div>
     </div>
-  </section>
-
-  <!-- ============================================================
-       GET STARTED (Setup Wizard)
-  ============================================================ -->
-  <section id="get-started">
-    <div class="container">
-      <div style="text-align:center;">
-        <div class="section-label" data-i18n="setup.label">Get Started</div>
-        <h2 class="section-title" data-i18n="setup.title">Set up in 3 easy steps</h2>
-        <p class="section-sub" style="margin:0 auto;" data-i18n="setup.subtitle">Choose your AI tool, and we'll guide you through the rest. No coding required.</p>
-      </div>
-
-      <div class="wizard-panel">
-        <!-- Step 1: AI Tool Selector -->
-        <div class="wizard-section">
-          <div class="wizard-section-title" data-i18n="setup.step1">Which AI do you use?</div>
-          <div class="ai-selector">
-            <div class="ai-card ai-card-featured" data-ai="extension" onclick="selectAI('extension')">
-              <div class="ai-card-icon">
-                <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" stroke="var(--accent-rose)" stroke-width="1.5" fill="rgba(244,63,94,0.1)"/><path d="M8 12h8M12 8v8" stroke="var(--accent-rose)" stroke-width="2"/></svg>
-              </div>
-              <div class="ai-card-label" data-i18n="setup.ai.extension">Chrome Extension</div>
-              <div class="ai-card-badge" data-i18n="setup.ai.ext.badge">Easiest</div>
-            </div>
-            <div class="ai-card" data-ai="claude" onclick="selectAI('claude')">
-              <div class="ai-card-icon">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M16.98 3.41L12 6.77 7.02 3.41 2 7.26v9.48l10 5.85 10-5.85V7.26l-5.02-3.85z" stroke="var(--accent-gold)" stroke-width="1.5" fill="rgba(240,180,41,0.1)"/></svg>
-              </div>
-              <div class="ai-card-label" data-i18n="setup.ai.claude">Claude Desktop</div>
-            </div>
-            <div class="ai-card" data-ai="cursor" onclick="selectAI('cursor')">
-              <div class="ai-card-icon">
-                <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" stroke="var(--accent-blue)" stroke-width="1.5" fill="rgba(59,130,246,0.1)"/><path d="M8 12l3 3 5-6" stroke="var(--accent-blue)" stroke-width="2"/></svg>
-              </div>
-              <div class="ai-card-label" data-i18n="setup.ai.cursor">Cursor</div>
-            </div>
-            <div class="ai-card" data-ai="chatgpt" onclick="selectAI('chatgpt')">
-              <div class="ai-card-icon">
-                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="var(--accent-emerald)" stroke-width="1.5" fill="rgba(16,185,129,0.1)"/><path d="M8 12h8M12 8v8" stroke="var(--accent-emerald)" stroke-width="1.5"/></svg>
-              </div>
-              <div class="ai-card-label" data-i18n="setup.ai.chatgpt">ChatGPT</div>
-            </div>
-            <div class="ai-card" data-ai="other" onclick="selectAI('other')">
-              <div class="ai-card-icon">
-                <svg viewBox="0 0 24 24" fill="none"><polyline points="4 17 10 11 4 5" stroke="var(--accent-violet)" stroke-width="1.5" fill="rgba(139,92,246,0.1)"/><line x1="12" y1="19" x2="20" y2="19" stroke="var(--accent-violet)" stroke-width="1.5"/></svg>
-              </div>
-              <div class="ai-card-label" data-i18n="setup.ai.other">Other / Developer</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 2: OS Selector (hidden until AI selected) -->
-        <div class="wizard-section" id="wizard-step2" style="display:none;">
-          <div class="wizard-section-title"><span data-i18n="setup.step2">Your system</span> <span style="color:var(--accent-gold);font-weight:400;">(<span data-i18n="setup.step2.auto">auto-detected</span>)</span></div>
-          <div class="os-selector">
-            <button class="os-pill" data-os="windows" onclick="selectOS('windows')">Windows</button>
-            <button class="os-pill" data-os="macos" onclick="selectOS('macos')">macOS</button>
-            <button class="os-pill" data-os="linux" onclick="selectOS('linux')">Linux</button>
-          </div>
-        </div>
-
-        <!-- Step 3: Instructions (hidden until AI selected) -->
-        <div class="wizard-section" id="wizard-step3" style="display:none;">
-          <div class="wizard-section-title" data-i18n="setup.step3">Follow these steps</div>
-          <div class="wizard-instructions visible" id="wizard-instructions"></div>
-        </div>
-
-        <!-- Advanced link -->
-        <div class="wizard-advanced" id="wizard-advanced" style="display:none;">
-          <a href="https://github.com/sangjun0000/stellar-memory" target="_blank" rel="noopener" data-i18n="setup.advanced">Advanced: View on GitHub &rarr;</a>
-        </div>
-      </div>
+    <div class="install-step">
+      <div class="step-num">03</div>
+      <h3>Start Coding</h3>
+      <p style="color: var(--text-secondary); font-size: 15px; line-height: 1.6; margin-top: 16px;">
+        That's it. Stellar Memory automatically remembers decisions,
+        recalls context at session start, and commits state before exit.
+        Your AI now has persistent memory.
+      </p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ============================================================
-       FOOTER (2 columns)
-  ============================================================ -->
-  <footer>
-    <div class="container">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <div class="nav-logo-icon" style="width:28px;height:28px;"></div>
-            <h3>Stellar Memory</h3>
-          </div>
-          <p data-i18n="footer.desc">An intelligent AI memory system inspired by celestial structures.</p>
-        </div>
+<!-- FEATURES -->
+<section class="features fade-in" id="features">
+  <div class="section-eyebrow">Features</div>
+  <h2 class="section-title">Everything you need.</h2>
 
-        <div class="footer-col">
-          <h4>Project</h4>
-          <ul class="footer-links">
-            <li><a href="https://github.com/sangjun0000/stellar-memory" target="_blank" rel="noopener">GitHub Repository</a></li>
-            <li><a href="https://pypi.org/project/stellar-memory/" target="_blank" rel="noopener">PyPI Package</a></li>
-            <li><a href="#chrome-extension">Chrome Extension</a></li>
-            <li><a href="https://github.com/sangjun0000/stellar-memory/releases" target="_blank" rel="noopener">Releases</a></li>
-            <li><a href="https://github.com/sangjun0000/stellar-memory/issues" target="_blank" rel="noopener">Issue Tracker</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
-          <h4>Docs</h4>
-          <ul class="footer-links">
-            <li><a href="https://stellar-memory.com/docs/getting-started/" target="_blank" rel="noopener">Getting Started</a></li>
-            <li><a href="https://stellar-memory.com/docs/api-reference/" target="_blank" rel="noopener">API Reference</a></li>
-            <li><a href="https://github.com/sangjun0000/stellar-memory/tree/main/examples" target="_blank" rel="noopener">Examples</a></li>
-            <li><a href="https://github.com/sangjun0000/stellar-memory/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        <p>Built with care by <a href="https://github.com/sangjun0000" target="_blank" rel="noopener" style="color:var(--accent-gold);text-decoration:none;">sangjun0000</a>. MIT Licensed. Open source forever.</p>
-        <div class="footer-badges">
-          <span class="badge"><span class="badge-dot" style="background:var(--accent-emerald);"></span>v3.0.0 Stable</span>
-          <span class="badge"><span class="badge-dot" style="background:var(--accent-gold);"></span>MIT License</span>
-          <span class="badge"><span class="badge-dot" style="background:var(--accent-blue);"></span>Python 3.9+</span>
-          <span class="badge"><span class="badge-dot" style="background:var(--accent-rose);"></span>Chrome Extension</span>
-        </div>
-      </div>
+  <div class="features-grid">
+    <div class="feature-item">
+      <h4>16 MCP Tools</h4>
+      <p>recall, remember, commit, forget, orbit, scan, constellation, galaxy, analytics, and more.</p>
     </div>
-  </footer>
+    <div class="feature-item">
+      <h4>3D Dashboard</h4>
+      <p>React + Three.js solar system visualization. See your memories orbiting in real-time.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Multi-Project</h4>
+      <p>Isolated memory galaxies per project with universal cross-project memories.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Knowledge Graph</h4>
+      <p>Constellation of typed relationships between memories. Explore connections.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Conflict Detection</h4>
+      <p>Automatic detection when new memories contradict existing ones.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Local Embeddings</h4>
+      <p>all-MiniLM-L6-v2 runs in-process. No API calls, no data leaves your machine.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Corona Cache</h4>
+      <p>In-memory tier of 200 core memories for sub-millisecond keyword lookup.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Background Daemon</h4>
+      <p>Scheduled orbit recalculation, decay, and consolidation. Runs silently.</p>
+    </div>
+    <div class="feature-item">
+      <h4>Electron Desktop App</h4>
+      <p>Standalone Windows app with built-in API server and web dashboard.</p>
+    </div>
+  </div>
+</section>
 
-  <!-- Toast notification -->
-  <div class="toast" id="toast">Copied to clipboard!</div>
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <p>Stellar Memory &middot; MIT License &middot; Built by <a href="https://github.com/sangjun0000" style="color:var(--text-secondary);">sangjun0000</a></p>
+    <ul class="footer-links">
+      <li><a href="https://github.com/sangjun0000/stellar-memory">GitHub</a></li>
+      <li><a href="https://github.com/sangjun0000/stellar-memory/issues">Issues</a></li>
+      <li><a href="https://github.com/sangjun0000/stellar-memory/blob/main/LICENSE">License</a></li>
+    </ul>
+  </div>
+</footer>
 
-  <!-- ============================================================
-       JAVASCRIPT
-  ============================================================ -->
-  <script>
-    // ── i18n Translations ────────────────────────────────────────
-    const T = {
-      en: {
-        "hero.badge": "100% Free & Open Source",
-        "hero.title": "Stellar Memory",
-        "hero.subtitle": "AI remembers you",
-        "hero.desc": "Give any AI the ability to remember. Install our Chrome Extension for ChatGPT, Claude & Gemini — or connect via MCP for developer tools. Free forever.",
-        "hero.cta.start": "How does it work?",
-        "hero.cta.who": "Get Started Free",
-        "nav.why": "Why?",
-        "nav.usecases": "Use Cases",
-        "nav.howitworks": "How It Works",
-        "nav.getstarted": "Get Started",
-        "nav.marketplace": "Starter Kits",
-        "uc.label": "Who Is This For?",
-        "uc.title": "AI memory for everyone",
-        "uc.subtitle": "Not just for developers — anyone who uses AI can benefit from persistent memory.",
-        "uc.student.title": "Students & Learners",
-        "uc.student.desc": "Your AI tutor remembers what you studied, where you struggled, and adapts to your learning pace.",
-        "uc.writer.title": "Writers & Creators",
-        "uc.writer.desc": "Your AI assistant knows your writing style, your characters, your world — across every session.",
-        "uc.business.title": "Business Professionals",
-        "uc.business.desc": "Your AI remembers your clients, projects, and meeting notes — like a personal assistant that never forgets.",
-        "uc.dev.title": "Developers",
-        "uc.dev.desc": "Add persistent memory to any LLM in 3 lines of code. MCP, REST API, and Python SDK included.",
-        "features.title": "Everything a memory system needs",
-        "features.subtitle": "Designed from first principles to mirror the way human memory actually works — layered, emotional, and self-organizing.",
-        "feat.zones.title": "5-Zone Orbit System",
-        "feat.zones.desc": "Memories organized across five concentric zones — Core, Inner, Outer, Belt, and Cloud — each with distinct retention behavior, priority, and access speed.",
-        "feat.learn.title": "Self-Learning",
-        "feat.learn.desc": "Continuously refines its own memory organization based on usage patterns. Frequently accessed memories migrate inward; rarely used ones drift to outer zones.",
-        "feat.multi.title": "Multimodal Memory",
-        "feat.multi.desc": "Store and recall text, code, structured data, and conversation history — all within a unified memory graph.",
-        "pain.label": "The Problem",
-        "pain.title": "Tired of repeating yourself to AI?",
-        "pain.subtitle": "Every new conversation starts from zero. Your AI has no idea who you are.",
-        "pain.repeat.title": "Explaining from scratch, every time",
-        "pain.repeat.before": "\"I'm a frontend dev, I use React, I prefer TypeScript...\"",
-        "pain.repeat.ai": "\"Got it! How can I help you?\"",
-        "pain.repeat.label": "...next conversation, same thing again",
-        "pain.forget.title": "New chat = blank slate",
-        "pain.forget.before": "\"Remember the project structure we discussed?\"",
-        "pain.forget.ai": "\"I'm sorry, I can't access previous conversations.\"",
-        "pain.context.title": "AI that doesn't know you",
-        "pain.context.before": "\"Review my code\"",
-        "pain.context.ai": "\"What language and framework are you using?\"",
-        "pain.context.label": "...I've told you a hundred times",
-        "pain.solution": "With Stellar Memory, your AI remembers all of this.",
-        "how.label": "How It Works",
-        "how.title": "A memory plugin for your existing AI",
-        "how.subtitle": "No need to switch AI tools. Just connect Stellar Memory to the one you already use.",
-        "how.s1.title": "Connect to your AI",
-        "how.s1.desc": "Claude, ChatGPT, Cursor, or any AI tool \u2014 connect Stellar Memory in 30 seconds. One command, done.",
-        "how.s2.title": "It remembers automatically",
-        "how.s2.desc": "You don't need to say \"remember this.\" Your AI decides what's important and stores it on its own.",
-        "how.s3.title": "Next conversation, it knows you",
-        "how.s3.desc": "Start a new chat and your AI already knows your name, preferences, and project context. No more repeating yourself.",
-        "how.before.label": "Without Stellar Memory",
-        "how.before.user1": "\"I'm a React developer using TypeScript...\"",
-        "how.before.ai1": "\"Got it! How can I help?\"",
-        "how.before.user2": "\"I'm a React developer using TypeScript...\"",
-        "how.after.label": "With Stellar Memory",
-        "how.after.user1": "\"Review this component\"",
-        "how.after.ai1": "\"Since you prefer functional components with TypeScript, I'll review it with that in mind.\"",
-        "setup.label": "Get Started",
-        "setup.title": "Set up in 3 easy steps",
-        "setup.subtitle": "Choose your AI tool, and we'll guide you through the rest. No coding required.",
-        "setup.step1": "Which AI do you use?",
-        "setup.step2": "Your system",
-        "setup.step2.auto": "auto-detected",
-        "setup.step3": "Follow these steps",
-        "setup.ai.claude": "Claude Desktop",
-        "setup.ai.cursor": "Cursor",
-        "setup.ai.chatgpt": "ChatGPT",
-        "setup.ai.other": "Other / Developer",
-        "setup.claude.win.s1": "Download the installer",
-        "setup.claude.win.s2": "Double-click the downloaded file to install",
-        "setup.claude.win.s3": "Restart Claude Desktop — done! Stellar Memory is now connected.",
-        "setup.claude.mac.s1": "Open Terminal and paste this command",
-        "setup.claude.mac.s2": "Restart Claude Desktop — done! Stellar Memory is now connected.",
-        "setup.cursor.s1": "Open Cursor Settings (Ctrl+Shift+J) → MCP section",
-        "setup.cursor.s2": "Click '+ Add Server' and paste this config",
-        "setup.cursor.s3": "Save and restart Cursor — done!",
-        "setup.chatgpt.s1": "Install the library",
-        "setup.chatgpt.s2": "Add this middleware to your code",
-        "setup.chatgpt.s3": "ChatGPT now has persistent memory across sessions.",
-        "setup.other.s1": "Install Stellar Memory",
-        "setup.other.s2": "Start the MCP server",
-        "setup.other.s3": "Connect your AI tool to http://localhost:5464",
-        "setup.advanced": "Advanced: View on GitHub",
-        "nav.ecosystem": "Ecosystem",
-        "eco.label": "Ecosystem",
-        "eco.title": "Built with Stellar Memory",
-        "eco.subtitle": "Open-source projects powered by intelligent AI memory",
-        "eco.hom.tagline": "Autonomous AI Agent with Interactive TUI",
-        "eco.hom.desc": "A self-aware AI agent with a fullscreen interactive interface. Thinks, remembers, and acts — powered by Stellar Memory's 5-zone brain.",
-        "eco.hom.install.win": "Install for Windows",
-        "eco.hom.install.toggle": "Other OS?",
-        "eco.hom.github": "View on GitHub",
-        "eco.community.title": "Your Project?",
-        "eco.community.tagline": "Join the Ecosystem",
-        "eco.community.desc": "Build something amazing with Stellar Memory and showcase it here. We welcome all open-source projects.",
-        "eco.community.cta": "Submit Your Project",
-        "footer.desc": "An intelligent AI memory system inspired by celestial structures.",
-        "nav.extension": "Extension",
-        "ext.label": "Chrome Extension",
-        "ext.title": "Install once, every AI remembers you",
-        "ext.subtitle": "No coding required. Just install and chat — works with ChatGPT, Claude, and Gemini.",
-        "ext.f1.title": "Auto-Capture",
-        "ext.f1.desc": "Your conversations are automatically saved as you chat. No buttons to click, nothing to remember.",
-        "ext.f2.title": "Auto-Inject",
-        "ext.f2.desc": "When you start a new chat, relevant memories are automatically included. Your AI already knows the context.",
-        "ext.f3.title": "Cross-Platform Memory",
-        "ext.f3.desc": "Tell ChatGPT you love coffee — Claude remembers it too. Your memory follows you across every AI.",
-        "ext.f4.title": "Privacy-First",
-        "ext.f4.desc": "All data stays on your computer. Nothing is sent to external servers. Your memories are yours alone.",
-        "ext.before.label": "Without Extension",
-        "ext.before.user": "\"What's my favorite drink?\"",
-        "ext.before.ai": "\"I'm sorry, I don't have any information about your preferences.\"",
-        "ext.after.label": "With Extension",
-        "ext.after.user": "\"What's my favorite drink?\"",
-        "ext.after.ai": "\"You mentioned you love coffee — especially iced americano!\"",
-        "ext.cta": "Get Chrome Extension",
-        "ext.cta.sub": "Free & open source — works on any Chromium browser",
-        "hero.cta.ext": "Get Chrome Extension",
-        "hero.cta.dev": "Developer SDK",
-        "setup.ai.extension": "Chrome Extension",
-        "setup.ai.ext.badge": "Easiest",
-        "setup.ext.s1": "Install from Chrome Web Store",
-        "setup.ext.s2": "Visit any AI site (ChatGPT, Claude, or Gemini)",
-        "setup.ext.s3": "Start chatting — Stellar Memory handles the rest!",
-        "eco.ext.tagline": "AI Memory for ChatGPT, Claude & Gemini",
-        "eco.ext.desc": "Install once and every AI remembers you. Automatically captures conversations and injects relevant memories.",
-        "eco.ext.install": "Install Extension",
-        "eco.ext.github": "View Source"
-      },
-      ko: {
-        "hero.badge": "100% 무료 & 오픈소스",
-        "hero.title": "Stellar Memory",
-        "hero.subtitle": "AI가 당신을 기억합니다",
-        "hero.desc": "어떤 AI에든 기억 능력을 부여하세요. ChatGPT, Claude, Gemini용 크롬 확장 프로그램을 설치하거나, 개발자 도구용 MCP로 연결하세요. 영구 무료.",
-        "hero.cta.start": "어떻게 동작하나요?",
-        "hero.cta.who": "무료로 시작하기",
-        "nav.why": "왜 필요한가요?",
-        "nav.usecases": "활용 사례",
-        "nav.howitworks": "동작 방식",
-        "nav.getstarted": "시작하기",
-        "nav.marketplace": "스타터 킷",
-        "uc.label": "누구를 위한 건가요?",
-        "uc.title": "모두를 위한 AI 기억",
-        "uc.subtitle": "개발자만을 위한 것이 아닙니다 — AI를 사용하는 모든 사람이 영구 기억의 혜택을 받을 수 있습니다.",
-        "uc.student.title": "학생 & 학습자",
-        "uc.student.desc": "AI 튜터가 공부한 내용, 어려웠던 부분을 기억하고 학습 속도에 맞춰 도와줍니다.",
-        "uc.writer.title": "작가 & 크리에이터",
-        "uc.writer.desc": "AI 어시스턴트가 당신의 글쓰기 스타일, 캐릭터, 세계관을 모든 세션에서 기억합니다.",
-        "uc.business.title": "비즈니스 전문가",
-        "uc.business.desc": "AI가 고객, 프로젝트, 회의 노트를 기억합니다 — 절대 잊지 않는 개인 비서처럼.",
-        "uc.dev.title": "개발자",
-        "uc.dev.desc": "코드 3줄로 모든 LLM에 영구 기억을 추가하세요. MCP, REST API, Python SDK 포함.",
-        "features.title": "기억 시스템에 필요한 모든 것",
-        "features.subtitle": "인간의 기억 원리를 모방하여 설계 — 계층적이고, 감정적이며, 스스로 조직하는 시스템.",
-        "feat.zones.title": "5-Zone 궤도 시스템",
-        "feat.zones.desc": "기억이 5개 동심원 궤도에 배치 — Core, Inner, Outer, Belt, Cloud — 각각 다른 보존 기간, 우선순위, 접근 속도를 가집니다.",
-        "feat.learn.title": "자율 학습",
-        "feat.learn.desc": "사용 패턴을 분석하여 기억을 자동 재배치. 자주 접근하는 기억은 안쪽으로, 드물게 쓰이는 기억은 바깥으로 이동합니다.",
-        "feat.multi.title": "멀티모달 기억",
-        "feat.multi.desc": "텍스트, 코드, 구조화 데이터, 대화 기록을 저장하고 검색 — 통합된 기억 그래프 안에서 모두 관리됩니다.",
-        "pain.label": "문제점",
-        "pain.title": "AI에게 매번 같은 말을 반복하고 있지 않나요?",
-        "pain.subtitle": "새 대화를 시작할 때마다 AI는 당신이 누구인지 모릅니다.",
-        "pain.repeat.title": "매번 처음부터 설명",
-        "pain.repeat.before": "\"나는 프론트엔드 개발자이고, React를 쓰고, TypeScript를 선호해...\"",
-        "pain.repeat.ai": "\"알겠습니다! 어떤 도움이 필요하신가요?\"",
-        "pain.repeat.label": "...다음 대화에서 또 반복",
-        "pain.forget.title": "새 대화 = 백지 상태",
-        "pain.forget.before": "\"지난번에 말한 프로젝트 구조 기억나?\"",
-        "pain.forget.ai": "\"죄송합니다, 이전 대화 내용을 확인할 수 없습니다.\"",
-        "pain.context.title": "내가 누군지 모르는 AI",
-        "pain.context.before": "\"코드 리뷰 해줘\"",
-        "pain.context.ai": "\"어떤 언어와 프레임워크를 사용하시나요?\"",
-        "pain.context.label": "...이미 100번 말했는데",
-        "pain.solution": "Stellar Memory를 설치하면, AI가 이 모든 것을 기억합니다.",
-        "how.label": "동작 방식",
-        "how.title": "기존 AI에 기억력을 추가하는 플러그인",
-        "how.subtitle": "AI를 바꿀 필요 없습니다. 지금 쓰는 AI에 연결만 하세요.",
-        "how.s1.title": "AI에 연결",
-        "how.s1.desc": "Claude, ChatGPT, Cursor 등 \u2014 당신이 이미 사용하는 AI에 Stellar Memory를 연결합니다. 30초면 됩니다.",
-        "how.s2.title": "대화하면 자동으로 기억",
-        "how.s2.desc": "\"기억해\"라고 말하지 않아도 됩니다. AI가 대화 중 중요한 정보를 스스로 판단해서 기억합니다.",
-        "how.s3.title": "다음 대화부터 달라집니다",
-        "how.s3.desc": "새 대화를 시작해도 AI가 당신을 이미 알고 있습니다. 이름, 취향, 프로젝트 맥락 \u2014 더 이상 반복할 필요 없습니다.",
-        "how.before.label": "Stellar Memory 없이",
-        "how.before.user1": "\"나는 React 개발자인데...\"",
-        "how.before.ai1": "\"알겠습니다! 어떤 도움이 필요하신가요?\"",
-        "how.before.user2": "\"나는 React 개발자인데...\"",
-        "how.after.label": "Stellar Memory 사용 시",
-        "how.after.user1": "\"이 컴포넌트 리뷰해줘\"",
-        "how.after.ai1": "\"React + TypeScript 프로젝트시죠. 함수형 컴포넌트 선호하시니까 그 기준으로 리뷰할게요.\"",
-        "setup.label": "시작하기",
-        "setup.title": "3단계로 간편 설정",
-        "setup.subtitle": "사용하는 AI 도구를 선택하면 나머지는 안내해 드립니다. 코딩이 필요 없습니다.",
-        "setup.step1": "어떤 AI를 사용하시나요?",
-        "setup.step2": "운영체제",
-        "setup.step2.auto": "자동 감지",
-        "setup.step3": "아래 단계를 따라하세요",
-        "setup.ai.claude": "Claude Desktop",
-        "setup.ai.cursor": "Cursor",
-        "setup.ai.chatgpt": "ChatGPT",
-        "setup.ai.other": "기타 / 개발자",
-        "setup.claude.win.s1": "설치 파일을 다운로드하세요",
-        "setup.claude.win.s2": "다운로드한 파일을 더블클릭하여 설치",
-        "setup.claude.win.s3": "Claude Desktop을 재시작하면 완료! Stellar Memory가 연결되었습니다.",
-        "setup.claude.mac.s1": "터미널을 열고 이 명령어를 붙여넣으세요",
-        "setup.claude.mac.s2": "Claude Desktop을 재시작하면 완료! Stellar Memory가 연결되었습니다.",
-        "setup.cursor.s1": "Cursor 설정 (Ctrl+Shift+J) → MCP 섹션을 여세요",
-        "setup.cursor.s2": "'+ 서버 추가'를 클릭하고 이 설정을 붙여넣으세요",
-        "setup.cursor.s3": "저장하고 Cursor를 재시작하면 완료!",
-        "setup.chatgpt.s1": "라이브러리를 설치하세요",
-        "setup.chatgpt.s2": "이 미들웨어를 코드에 추가하세요",
-        "setup.chatgpt.s3": "이제 ChatGPT가 세션 간 영구 기억을 가집니다.",
-        "setup.other.s1": "Stellar Memory를 설치하세요",
-        "setup.other.s2": "MCP 서버를 시작하세요",
-        "setup.other.s3": "AI 도구를 http://localhost:5464에 연결하세요",
-        "setup.advanced": "고급: GitHub에서 보기",
-        "nav.ecosystem": "생태계",
-        "eco.label": "생태계",
-        "eco.title": "Stellar Memory로 만든 프로젝트",
-        "eco.subtitle": "지능형 AI 기억을 활용한 오픈소스 프로젝트",
-        "eco.hom.tagline": "인터랙티브 TUI를 갖춘 자율형 AI 에이전트",
-        "eco.hom.desc": "풀스크린 인터랙티브 인터페이스를 갖춘 자율형 AI 에이전트. 스스로 생각하고, 기억하고, 행동합니다 — Stellar Memory의 5-Zone 두뇌로 구동.",
-        "eco.hom.install.win": "Windows 설치",
-        "eco.hom.install.toggle": "다른 OS?",
-        "eco.hom.github": "GitHub에서 보기",
-        "eco.community.title": "당신의 프로젝트?",
-        "eco.community.tagline": "생태계에 참여하세요",
-        "eco.community.desc": "Stellar Memory로 멋진 것을 만들고 여기에 소개하세요. 모든 오픈소스 프로젝트를 환영합니다.",
-        "eco.community.cta": "프로젝트 제출하기",
-        "footer.desc": "천체 구조에서 영감을 받은 지능형 AI 기억 시스템.",
-        "nav.extension": "확장 프로그램",
-        "ext.label": "크롬 확장 프로그램",
-        "ext.title": "한 번 설치하면, 모든 AI가 나를 기억합니다",
-        "ext.subtitle": "코딩이 필요 없습니다. 설치하고 대화하세요 — ChatGPT, Claude, Gemini에서 작동합니다.",
-        "ext.f1.title": "자동 캡처",
-        "ext.f1.desc": "대화하면 자동으로 저장됩니다. 버튼을 누를 필요도, 기억할 필요도 없습니다.",
-        "ext.f2.title": "자동 주입",
-        "ext.f2.desc": "새 대화를 시작하면 관련 기억이 자동으로 포함됩니다. AI가 이미 맥락을 알고 있습니다.",
-        "ext.f3.title": "크로스 플랫폼 기억",
-        "ext.f3.desc": "ChatGPT에 커피를 좋아한다고 말하면 — Claude도 기억합니다. 기억이 모든 AI를 따라다닙니다.",
-        "ext.f4.title": "프라이버시 우선",
-        "ext.f4.desc": "모든 데이터는 내 컴퓨터에 저장됩니다. 외부 서버로 전송되지 않습니다. 내 기억은 오직 나만의 것.",
-        "ext.before.label": "확장 프로그램 없이",
-        "ext.before.user": "\"내가 좋아하는 음료가 뭐야?\"",
-        "ext.before.ai": "\"죄송합니다, 선호도에 대한 정보가 없습니다.\"",
-        "ext.after.label": "확장 프로그램 사용 시",
-        "ext.after.user": "\"내가 좋아하는 음료가 뭐야?\"",
-        "ext.after.ai": "\"커피를 좋아하신다고 하셨죠 — 특히 아이스 아메리카노요!\"",
-        "ext.cta": "크롬 확장 프로그램 설치",
-        "ext.cta.sub": "무료 & 오픈소스 — 모든 크로미움 브라우저에서 작동",
-        "hero.cta.ext": "크롬 확장 프로그램 설치",
-        "hero.cta.dev": "개발자 SDK",
-        "setup.ai.extension": "크롬 확장 프로그램",
-        "setup.ai.ext.badge": "가장 쉬움",
-        "setup.ext.s1": "Chrome 웹 스토어에서 설치하세요",
-        "setup.ext.s2": "아무 AI 사이트를 방문하세요 (ChatGPT, Claude, 또는 Gemini)",
-        "setup.ext.s3": "대화를 시작하세요 — Stellar Memory가 나머지를 처리합니다!",
-        "eco.ext.tagline": "ChatGPT, Claude & Gemini를 위한 AI 기억",
-        "eco.ext.desc": "한 번 설치하면 모든 AI가 나를 기억합니다. 대화를 자동으로 캡처하고 관련 기억을 주입합니다.",
-        "eco.ext.install": "확장 프로그램 설치",
-        "eco.ext.github": "소스 보기"
-      },
-      zh: {
-        "hero.badge": "100% 免费 & 开源",
-        "hero.title": "Stellar Memory",
-        "hero.subtitle": "AI记住你",
-        "hero.desc": "赋予任何AI记忆能力。安装 Chrome 扩展，支持 ChatGPT、Claude 和 Gemini — 或通过 MCP 连接开发者工具。永久免费。",
-        "hero.cta.start": "如何运作？",
-        "hero.cta.who": "免费开始",
-        "nav.why": "为什么？",
-        "nav.usecases": "使用场景",
-        "nav.howitworks": "如何运作",
-        "nav.getstarted": "开始使用",
-        "nav.marketplace": "入门套件",
-        "uc.label": "适合谁？",
-        "uc.title": "人人可用的AI记忆",
-        "uc.subtitle": "不仅适用于开发者 — 任何使用AI的人都能从持久记忆中受益。",
-        "uc.student.title": "学生和学习者",
-        "uc.student.desc": "AI导师记住你学过什么、哪里遇到困难，并根据你的学习节奏进行调整。",
-        "uc.writer.title": "作家和创作者",
-        "uc.writer.desc": "AI助手了解你的写作风格、角色和世界观 — 贯穿每一次对话。",
-        "uc.business.title": "商务人士",
-        "uc.business.desc": "AI记住你的客户、项目和会议笔记 — 就像一个永不遗忘的私人助理。",
-        "uc.dev.title": "开发者",
-        "uc.dev.desc": "3行代码为任何LLM添加持久记忆。包含MCP、REST API和Python SDK。",
-        "features.title": "记忆系统所需的一切",
-        "features.subtitle": "从第一原理出发设计，模拟人类记忆的真实运作方式 — 分层、情感化、自组织。",
-        "feat.zones.title": "5区域轨道系统",
-        "feat.zones.desc": "记忆分布在五个同心区域 — Core、Inner、Outer、Belt和Cloud — 每个区域具有不同的保留行为、优先级和访问速度。",
-        "feat.learn.title": "自主学习",
-        "feat.learn.desc": "根据使用模式持续优化记忆组织。频繁访问的记忆向内迁移，很少使用的记忆漂移到外部区域。",
-        "feat.multi.title": "多模态记忆",
-        "feat.multi.desc": "存储和检索文本、代码、结构化数据和对话历史 — 全部在统一的记忆图中管理。",
-        "pain.label": "问题",
-        "pain.title": "还在每次都向AI重复同样的话吗？",
-        "pain.subtitle": "每次新对话都从零开始。AI完全不知道你是谁。",
-        "pain.repeat.title": "每次都从头解释",
-        "pain.repeat.before": "\"我是前端开发者，用React，偏好TypeScript...\"",
-        "pain.repeat.ai": "\"明白了！需要什么帮助？\"",
-        "pain.repeat.label": "...下次对话又要重复",
-        "pain.forget.title": "新对话 = 白纸一张",
-        "pain.forget.before": "\"还记得我们讨论的项目结构吗？\"",
-        "pain.forget.ai": "\"抱歉，我无法访问之前的对话。\"",
-        "pain.context.title": "不认识你的AI",
-        "pain.context.before": "\"帮我审查代码\"",
-        "pain.context.ai": "\"你使用什么语言和框架？\"",
-        "pain.context.label": "...已经说了一百遍了",
-        "pain.solution": "安装Stellar Memory后，AI会记住这一切。",
-        "how.label": "如何运作",
-        "how.title": "为现有AI添加记忆的插件",
-        "how.subtitle": "无需更换AI工具。只需连接到你已有的AI。",
-        "how.s1.title": "连接你的AI",
-        "how.s1.desc": "Claude、ChatGPT、Cursor等 \u2014 30秒连接Stellar Memory。一条命令搞定。",
-        "how.s2.title": "自动记忆",
-        "how.s2.desc": "不需要说\"记住这个\"。AI自动判断重要信息并存储。",
-        "how.s3.title": "下次对话就不一样了",
-        "how.s3.desc": "开始新对话时，AI已经知道你的名字、偏好和项目背景。无需再重复。",
-        "how.before.label": "没有Stellar Memory",
-        "how.after.label": "使用Stellar Memory",
-        "setup.label": "开始使用",
-        "setup.title": "3步轻松设置",
-        "setup.subtitle": "选择你的AI工具，我们将引导你完成其余步骤。无需编程。",
-        "setup.step1": "你使用哪个AI？",
-        "setup.step2": "你的系统",
-        "setup.step2.auto": "自动检测",
-        "setup.step3": "按照以下步骤操作",
-        "setup.ai.claude": "Claude Desktop",
-        "setup.ai.cursor": "Cursor",
-        "setup.ai.chatgpt": "ChatGPT",
-        "setup.ai.other": "其他 / 开发者",
-        "setup.claude.win.s1": "下载安装程序",
-        "setup.claude.win.s2": "双击下载的文件进行安装",
-        "setup.claude.win.s3": "重启Claude Desktop — 完成！Stellar Memory已连接。",
-        "setup.claude.mac.s1": "打开终端并粘贴此命令",
-        "setup.claude.mac.s2": "重启Claude Desktop — 完成！Stellar Memory已连接。",
-        "setup.cursor.s1": "打开Cursor设置 (Ctrl+Shift+J) → MCP部分",
-        "setup.cursor.s2": "点击'+ 添加服务器'并粘贴此配置",
-        "setup.cursor.s3": "保存并重启Cursor — 完成！",
-        "setup.chatgpt.s1": "安装库",
-        "setup.chatgpt.s2": "将此中间件添加到你的代码中",
-        "setup.chatgpt.s3": "ChatGPT现在拥有跨会话的持久记忆。",
-        "setup.other.s1": "安装Stellar Memory",
-        "setup.other.s2": "启动MCP服务器",
-        "setup.other.s3": "将你的AI工具连接到 http://localhost:5464",
-        "setup.advanced": "高级：在GitHub上查看",
-        "nav.ecosystem": "生态系统",
-        "eco.label": "生态系统",
-        "eco.title": "基于 Stellar Memory 构建",
-        "eco.subtitle": "由智能AI记忆驱动的开源项目",
-        "eco.hom.tagline": "带交互式TUI的自主AI代理",
-        "eco.hom.desc": "拥有全屏交互界面的自主AI代理。自主思考、记忆和行动——由Stellar Memory的5区域大脑驱动。",
-        "eco.hom.install.win": "Windows 安装",
-        "eco.hom.install.toggle": "其他系统?",
-        "eco.hom.github": "在GitHub上查看",
-        "eco.community.title": "你的项目?",
-        "eco.community.tagline": "加入生态系统",
-        "eco.community.desc": "用Stellar Memory构建精彩项目，并在此展示。我们欢迎所有开源项目。",
-        "eco.community.cta": "提交你的项目",
-        "footer.desc": "受天体结构启发的智能AI记忆系统。",
-        "nav.extension": "浏览器扩展",
-        "ext.label": "Chrome 扩展",
-        "ext.title": "安装一次，所有AI都记住你",
-        "ext.subtitle": "无需编程。安装后直接对话 — 支持 ChatGPT、Claude 和 Gemini。",
-        "ext.f1.title": "自动捕获",
-        "ext.f1.desc": "对话时自动保存。无需点击按钮，无需刻意记忆。",
-        "ext.f2.title": "自动注入",
-        "ext.f2.desc": "开始新对话时，相关记忆自动包含。AI已经了解上下文。",
-        "ext.f3.title": "跨平台记忆",
-        "ext.f3.desc": "告诉ChatGPT你喜欢咖啡 — Claude也会记住。你的记忆跟随你到每个AI。",
-        "ext.f4.title": "隐私优先",
-        "ext.f4.desc": "所有数据保存在你的电脑上。不会发送到外部服务器。你的记忆只属于你。",
-        "ext.before.label": "没有扩展",
-        "ext.before.user": "\"我最喜欢的饮料是什么？\"",
-        "ext.before.ai": "\"抱歉，我没有关于你偏好的信息。\"",
-        "ext.after.label": "使用扩展后",
-        "ext.after.user": "\"我最喜欢的饮料是什么？\"",
-        "ext.after.ai": "\"你说过你喜欢咖啡 — 特别是冰美式！\"",
-        "ext.cta": "获取 Chrome 扩展",
-        "ext.cta.sub": "免费开源 — 适用于所有 Chromium 浏览器",
-        "hero.cta.ext": "获取 Chrome 扩展",
-        "hero.cta.dev": "开发者 SDK",
-        "setup.ai.extension": "Chrome 扩展",
-        "setup.ai.ext.badge": "最简单",
-        "setup.ext.s1": "从 Chrome 网上应用店安装",
-        "setup.ext.s2": "访问任意AI网站（ChatGPT、Claude 或 Gemini）",
-        "setup.ext.s3": "开始对话 — Stellar Memory 处理其余一切！",
-        "eco.ext.tagline": "ChatGPT、Claude 和 Gemini 的 AI 记忆",
-        "eco.ext.desc": "安装一次，所有AI都记住你。自动捕获对话并注入相关记忆。",
-        "eco.ext.install": "安装扩展",
-        "eco.ext.github": "查看源码"
-      },
-      es: {
-        "hero.badge": "100% Gratis y Open Source",
-        "hero.title": "Stellar Memory",
-        "hero.subtitle": "La IA te recuerda",
-        "hero.desc": "Dale a cualquier IA la capacidad de recordar. Instala nuestra extensión de Chrome para ChatGPT, Claude y Gemini — o conecta via MCP para herramientas de desarrollo. Gratis para siempre.",
-        "hero.cta.start": "Como funciona?",
-        "hero.cta.who": "Empezar Gratis",
-        "nav.why": "Por que?",
-        "nav.usecases": "Casos de Uso",
-        "nav.howitworks": "Como Funciona",
-        "nav.getstarted": "Empezar",
-        "nav.marketplace": "Kits de Inicio",
-        "uc.label": "Para quién es?",
-        "uc.title": "Memoria AI para todos",
-        "uc.subtitle": "No solo para desarrolladores — cualquiera que use IA puede beneficiarse de la memoria persistente.",
-        "uc.student.title": "Estudiantes",
-        "uc.student.desc": "Tu tutor IA recuerda lo que estudiaste, dónde tuviste dificultades, y se adapta a tu ritmo de aprendizaje.",
-        "uc.writer.title": "Escritores y Creadores",
-        "uc.writer.desc": "Tu asistente IA conoce tu estilo de escritura, tus personajes, tu mundo — en cada sesión.",
-        "uc.business.title": "Profesionales",
-        "uc.business.desc": "Tu IA recuerda tus clientes, proyectos y notas de reuniones — como un asistente personal que nunca olvida.",
-        "uc.dev.title": "Desarrolladores",
-        "uc.dev.desc": "Agrega memoria persistente a cualquier LLM en 3 líneas de código. MCP, REST API y Python SDK incluidos.",
-        "features.title": "Todo lo que necesita un sistema de memoria",
-        "features.subtitle": "Diseñado desde los principios fundamentales para reflejar cómo funciona realmente la memoria humana — en capas, emocional y autoorganizada.",
-        "feat.zones.title": "Sistema Orbital de 5 Zonas",
-        "feat.zones.desc": "Memorias organizadas en cinco zonas concéntricas — Core, Inner, Outer, Belt y Cloud — cada una con distinto comportamiento de retención, prioridad y velocidad de acceso.",
-        "feat.learn.title": "Autoaprendizaje",
-        "feat.learn.desc": "Refina continuamente su organización de memoria según patrones de uso. Las memorias frecuentes migran hacia adentro; las poco usadas se alejan.",
-        "feat.multi.title": "Memoria Multimodal",
-        "feat.multi.desc": "Almacena y recupera texto, código, datos estructurados e historial de conversaciones — todo en un grafo de memoria unificado.",
-        "pain.label": "El Problema",
-        "pain.title": "Cansado de repetirte ante la IA?",
-        "pain.subtitle": "Cada nueva conversacion empieza de cero. Tu IA no sabe quien eres.",
-        "pain.repeat.title": "Explicar desde cero, cada vez",
-        "pain.repeat.before": "\"Soy desarrollador frontend, uso React, prefiero TypeScript...\"",
-        "pain.repeat.ai": "\"Entendido! Como puedo ayudarte?\"",
-        "pain.repeat.label": "...proxima conversacion, lo mismo otra vez",
-        "pain.forget.title": "Nuevo chat = hoja en blanco",
-        "pain.forget.before": "\"Recuerdas la estructura del proyecto?\"",
-        "pain.forget.ai": "\"Lo siento, no puedo acceder a conversaciones anteriores.\"",
-        "pain.context.title": "IA que no te conoce",
-        "pain.context.before": "\"Revisa mi codigo\"",
-        "pain.context.ai": "\"Que lenguaje y framework usas?\"",
-        "pain.context.label": "...te lo he dicho cien veces",
-        "pain.solution": "Con Stellar Memory, tu IA recuerda todo esto.",
-        "how.label": "Como Funciona",
-        "how.title": "Un plugin de memoria para tu IA actual",
-        "how.subtitle": "No necesitas cambiar de IA. Solo conecta Stellar Memory a la que ya usas.",
-        "how.s1.title": "Conecta tu IA",
-        "how.s1.desc": "Claude, ChatGPT, Cursor o cualquier herramienta \u2014 conecta Stellar Memory en 30 segundos.",
-        "how.s2.title": "Recuerda automaticamente",
-        "how.s2.desc": "No necesitas decir \"recuerda esto\". Tu IA decide que es importante y lo guarda sola.",
-        "how.s3.title": "La proxima conversacion sera diferente",
-        "how.s3.desc": "Inicia un nuevo chat y tu IA ya conoce tu nombre, preferencias y contexto. Sin repetir nada.",
-        "how.before.label": "Sin Stellar Memory",
-        "how.after.label": "Con Stellar Memory",
-        "setup.label": "Comenzar",
-        "setup.title": "Configura en 3 pasos fáciles",
-        "setup.subtitle": "Elige tu herramienta de IA y te guiaremos en el resto. Sin necesidad de programar.",
-        "setup.step1": "Qué IA usas?",
-        "setup.step2": "Tu sistema",
-        "setup.step2.auto": "auto-detectado",
-        "setup.step3": "Sigue estos pasos",
-        "setup.ai.claude": "Claude Desktop",
-        "setup.ai.cursor": "Cursor",
-        "setup.ai.chatgpt": "ChatGPT",
-        "setup.ai.other": "Otro / Desarrollador",
-        "setup.claude.win.s1": "Descarga el instalador",
-        "setup.claude.win.s2": "Haz doble clic en el archivo descargado para instalar",
-        "setup.claude.win.s3": "Reinicia Claude Desktop — listo! Stellar Memory está conectado.",
-        "setup.claude.mac.s1": "Abre Terminal y pega este comando",
-        "setup.claude.mac.s2": "Reinicia Claude Desktop — listo! Stellar Memory está conectado.",
-        "setup.cursor.s1": "Abre Configuración de Cursor (Ctrl+Shift+J) → sección MCP",
-        "setup.cursor.s2": "Haz clic en '+ Agregar Servidor' y pega esta configuración",
-        "setup.cursor.s3": "Guarda y reinicia Cursor — listo!",
-        "setup.chatgpt.s1": "Instala la biblioteca",
-        "setup.chatgpt.s2": "Agrega este middleware a tu código",
-        "setup.chatgpt.s3": "ChatGPT ahora tiene memoria persistente entre sesiones.",
-        "setup.other.s1": "Instala Stellar Memory",
-        "setup.other.s2": "Inicia el servidor MCP",
-        "setup.other.s3": "Conecta tu herramienta de IA a http://localhost:5464",
-        "setup.advanced": "Avanzado: Ver en GitHub",
-        "nav.ecosystem": "Ecosistema",
-        "eco.label": "Ecosistema",
-        "eco.title": "Construido con Stellar Memory",
-        "eco.subtitle": "Proyectos de codigo abierto impulsados por memoria AI inteligente",
-        "eco.hom.tagline": "Agente AI Autonomo con TUI Interactivo",
-        "eco.hom.desc": "Un agente AI con interfaz interactiva de pantalla completa. Piensa, recuerda y actua — impulsado por el cerebro de 5 zonas de Stellar Memory.",
-        "eco.hom.install.win": "Instalar en Windows",
-        "eco.hom.install.toggle": "¿Otro SO?",
-        "eco.hom.github": "Ver en GitHub",
-        "eco.community.title": "Tu Proyecto?",
-        "eco.community.tagline": "Unete al Ecosistema",
-        "eco.community.desc": "Construye algo increible con Stellar Memory y muestralo aqui. Damos la bienvenida a todos los proyectos de codigo abierto.",
-        "eco.community.cta": "Enviar tu Proyecto",
-        "footer.desc": "Un sistema de memoria AI inteligente inspirado en estructuras celestiales.",
-        "nav.extension": "Extensión",
-        "ext.label": "Extensión de Chrome",
-        "ext.title": "Instala una vez, toda IA te recuerda",
-        "ext.subtitle": "Sin programación. Solo instala y chatea — funciona con ChatGPT, Claude y Gemini.",
-        "ext.f1.title": "Captura Automática",
-        "ext.f1.desc": "Tus conversaciones se guardan automáticamente mientras chateas. Sin botones, sin complicaciones.",
-        "ext.f2.title": "Inyección Automática",
-        "ext.f2.desc": "Al iniciar un nuevo chat, los recuerdos relevantes se incluyen automáticamente. Tu IA ya conoce el contexto.",
-        "ext.f3.title": "Memoria Multiplataforma",
-        "ext.f3.desc": "Dile a ChatGPT que te encanta el café — Claude también lo recuerda. Tu memoria te sigue en cada IA.",
-        "ext.f4.title": "Privacidad Primero",
-        "ext.f4.desc": "Todos los datos permanecen en tu computadora. Nada se envía a servidores externos. Tus recuerdos son solo tuyos.",
-        "ext.before.label": "Sin Extensión",
-        "ext.before.user": "\"¿Cuál es mi bebida favorita?\"",
-        "ext.before.ai": "\"Lo siento, no tengo información sobre tus preferencias.\"",
-        "ext.after.label": "Con Extensión",
-        "ext.after.user": "\"¿Cuál es mi bebida favorita?\"",
-        "ext.after.ai": "\"¡Mencionaste que te encanta el café — especialmente el americano con hielo!\"",
-        "ext.cta": "Obtener Extensión de Chrome",
-        "ext.cta.sub": "Gratis y open source — funciona en cualquier navegador Chromium",
-        "hero.cta.ext": "Obtener Extensión de Chrome",
-        "hero.cta.dev": "SDK para Desarrolladores",
-        "setup.ai.extension": "Extensión de Chrome",
-        "setup.ai.ext.badge": "Más fácil",
-        "setup.ext.s1": "Instala desde Chrome Web Store",
-        "setup.ext.s2": "Visita cualquier sitio de IA (ChatGPT, Claude o Gemini)",
-        "setup.ext.s3": "Empieza a chatear — ¡Stellar Memory se encarga del resto!",
-        "eco.ext.tagline": "Memoria IA para ChatGPT, Claude y Gemini",
-        "eco.ext.desc": "Instala una vez y toda IA te recuerda. Captura conversaciones automáticamente e inyecta recuerdos relevantes.",
-        "eco.ext.install": "Instalar Extensión",
-        "eco.ext.github": "Ver Código"
-      },
-      ja: {
-        "hero.badge": "100% 無料 & オープンソース",
-        "hero.title": "Stellar Memory",
-        "hero.subtitle": "AIがあなたを覚えます",
-        "hero.desc": "あらゆるAIに記憶能力を。ChatGPT、Claude、Gemini用のChrome拡張機能をインストール、または開発者ツール用にMCPで接続。永久無料。",
-        "hero.cta.start": "無料で始める",
-        "hero.cta.who": "誰のため？",
-        "nav.why": "なぜ？",
-        "nav.usecases": "活用例",
-        "nav.howitworks": "仕組み",
-        "nav.getstarted": "はじめる",
-        "nav.marketplace": "スターターキット",
-        "uc.label": "誰のため？",
-        "uc.title": "みんなのためのAI記憶",
-        "uc.subtitle": "開発者だけのものではありません — AIを使う全ての人が永続メモリの恩恵を受けられます。",
-        "uc.student.title": "学生・学習者",
-        "uc.student.desc": "AIチューターがあなたの学習内容、苦手な箇所を覚え、学習ペースに合わせてサポートします。",
-        "uc.writer.title": "作家・クリエイター",
-        "uc.writer.desc": "AIアシスタントがあなたの文体、キャラクター、世界観を全セッションで記憶します。",
-        "uc.business.title": "ビジネスプロフェッショナル",
-        "uc.business.desc": "AIがクライアント、プロジェクト、会議メモを記憶 — 忘れない個人秘書のように。",
-        "uc.dev.title": "開発者",
-        "uc.dev.desc": "3行のコードで任意のLLMに永続メモリを追加。MCP、REST API、Python SDK付属。",
-        "features.title": "記憶システムに必要なすべて",
-        "features.subtitle": "第一原理から設計された、人間の記憶を模倣するシステム — 階層的で、感情的で、自己組織化する。",
-        "feat.zones.title": "5ゾーン軌道システム",
-        "feat.zones.desc": "5つの同心円ゾーンに記憶を配置 — Core、Inner、Outer、Belt、Cloud — それぞれ異なる保持期間、優先度、アクセス速度。",
-        "feat.learn.title": "自律学習",
-        "feat.learn.desc": "使用パターンに基づき記憶を自動再編成。頻繁にアクセスされる記憶は内側へ、使われない記憶は外側へ移動。",
-        "feat.multi.title": "マルチモーダル記憶",
-        "feat.multi.desc": "テキスト、コード、構造化データ、会話履歴を保存・検索 — 統合された記憶グラフで管理。",
-        "pain.label": "問題点",
-        "pain.title": "AIに毎回同じことを繰り返していませんか？",
-        "pain.subtitle": "新しい会話を始めるたびに、AIはあなたが誰か分かりません。",
-        "pain.repeat.title": "毎回ゼロから説明",
-        "pain.repeat.before": "\"フロントエンド開発者で、Reactを使い、TypeScriptが好みで...\"",
-        "pain.repeat.ai": "\"分かりました！何をお手伝いしましょう？\"",
-        "pain.repeat.label": "...次の会話でまた繰り返し",
-        "pain.forget.title": "新しいチャット = 白紙状態",
-        "pain.forget.before": "\"前に話したプロジェクト構造覚えてる？\"",
-        "pain.forget.ai": "\"申し訳ございません、以前の会話にアクセスできません。\"",
-        "pain.context.title": "あなたを知らないAI",
-        "pain.context.before": "\"コードレビューして\"",
-        "pain.context.ai": "\"どの言語とフレームワークをお使いですか？\"",
-        "pain.context.label": "...もう100回言ったのに",
-        "pain.solution": "Stellar Memoryを入れれば、AIがこれを全部覚えます。",
-        "how.label": "仕組み",
-        "how.title": "既存のAIに記憶力を追加するプラグイン",
-        "how.subtitle": "AIを変える必要はありません。今使っているAIに接続するだけ。",
-        "how.s1.title": "AIに接続",
-        "how.s1.desc": "Claude、ChatGPT、Cursorなど — 30秒でStellar Memoryを接続。コマンド1つで完了。",
-        "how.s2.title": "自動で記憶",
-        "how.s2.desc": "「覚えて」と言わなくても大丈夫。AIが重要な情報を自分で判断して記憶します。",
-        "how.s3.title": "次の会話から変わります",
-        "how.s3.desc": "新しいチャットを始めても、AIがあなたの名前、好み、プロジェクトの文脈を既に知っています。",
-        "how.before.label": "Stellar Memoryなし",
-        "how.after.label": "Stellar Memoryあり",
-        "setup.label": "始める",
-        "setup.title": "3つの簡単ステップで設定",
-        "setup.subtitle": "AIツールを選ぶだけ。あとはガイドします。プログラミング不要。",
-        "setup.step1": "どのAIを使っていますか？",
-        "setup.step2": "お使いのシステム",
-        "setup.step2.auto": "自動検出",
-        "setup.step3": "以下の手順に従ってください",
-        "setup.ai.claude": "Claude Desktop",
-        "setup.ai.cursor": "Cursor",
-        "setup.ai.chatgpt": "ChatGPT",
-        "setup.ai.other": "その他 / 開発者",
-        "setup.claude.win.s1": "インストーラーをダウンロード",
-        "setup.claude.win.s2": "ダウンロードしたファイルをダブルクリックしてインストール",
-        "setup.claude.win.s3": "Claude Desktopを再起動 — 完了！Stellar Memoryが接続されました。",
-        "setup.claude.mac.s1": "ターミナルを開いてこのコマンドを貼り付け",
-        "setup.claude.mac.s2": "Claude Desktopを再起動 — 完了！Stellar Memoryが接続されました。",
-        "setup.cursor.s1": "Cursor設定 (Ctrl+Shift+J) → MCPセクションを開く",
-        "setup.cursor.s2": "'+ サーバー追加'をクリックしてこの設定を貼り付け",
-        "setup.cursor.s3": "保存してCursorを再起動 — 完了！",
-        "setup.chatgpt.s1": "ライブラリをインストール",
-        "setup.chatgpt.s2": "このミドルウェアをコードに追加",
-        "setup.chatgpt.s3": "ChatGPTにセッション間の永続メモリが追加されました。",
-        "setup.other.s1": "Stellar Memoryをインストール",
-        "setup.other.s2": "MCPサーバーを起動",
-        "setup.other.s3": "AIツールをhttp://localhost:5464に接続",
-        "setup.advanced": "上級者向け：GitHubで見る",
-        "nav.ecosystem": "エコシステム",
-        "eco.label": "エコシステム",
-        "eco.title": "Stellar Memoryで構築",
-        "eco.subtitle": "インテリジェントなAI記憶を活用したオープンソースプロジェクト",
-        "eco.hom.tagline": "インタラクティブTUI搭載の自律型AIエージェント",
-        "eco.hom.desc": "フルスクリーンのインタラクティブインターフェースを持つ自律型AIエージェント。自ら考え、記憶し、行動 — Stellar Memoryの5ゾーン脳で駆動。",
-        "eco.hom.install.win": "Windows インストール",
-        "eco.hom.install.toggle": "他のOS?",
-        "eco.hom.github": "GitHubで見る",
-        "eco.community.title": "あなたのプロジェクト?",
-        "eco.community.tagline": "エコシステムに参加",
-        "eco.community.desc": "Stellar Memoryで素晴らしいものを作り、ここで紹介しましょう。すべてのオープンソースプロジェクトを歓迎します。",
-        "eco.community.cta": "プロジェクトを提出",
-        "footer.desc": "天体構造にインスパイアされた知的AI記憶システム。",
-        "nav.extension": "拡張機能",
-        "ext.label": "Chrome 拡張機能",
-        "ext.title": "一度インストールすれば、すべてのAIがあなたを覚えます",
-        "ext.subtitle": "プログラミング不要。インストールして会話するだけ — ChatGPT、Claude、Geminiで動作します。",
-        "ext.f1.title": "自動キャプチャ",
-        "ext.f1.desc": "会話中に自動保存されます。ボタンをクリックする必要も、覚える必要もありません。",
-        "ext.f2.title": "自動インジェクション",
-        "ext.f2.desc": "新しいチャットを始めると、関連する記憶が自動的に含まれます。AIはすでに文脈を理解しています。",
-        "ext.f3.title": "クロスプラットフォーム記憶",
-        "ext.f3.desc": "ChatGPTにコーヒーが好きだと言えば — Claudeも覚えています。記憶がすべてのAIについて回ります。",
-        "ext.f4.title": "プライバシーファースト",
-        "ext.f4.desc": "すべてのデータはあなたのパソコンに保存されます。外部サーバーには送信されません。記憶はあなただけのもの。",
-        "ext.before.label": "拡張機能なし",
-        "ext.before.user": "\"私の好きな飲み物は何？\"",
-        "ext.before.ai": "\"申し訳ありませんが、お好みに関する情報がありません。\"",
-        "ext.after.label": "拡張機能使用時",
-        "ext.after.user": "\"私の好きな飲み物は何？\"",
-        "ext.after.ai": "\"コーヒーがお好きだとおっしゃっていましたね — 特にアイスアメリカーノ！\"",
-        "ext.cta": "Chrome 拡張機能を入手",
-        "ext.cta.sub": "無料＆オープンソース — すべてのChromiumブラウザで動作",
-        "hero.cta.ext": "Chrome 拡張機能を入手",
-        "hero.cta.dev": "開発者 SDK",
-        "setup.ai.extension": "Chrome 拡張機能",
-        "setup.ai.ext.badge": "最も簡単",
-        "setup.ext.s1": "Chrome ウェブストアからインストール",
-        "setup.ext.s2": "AIサイトにアクセス（ChatGPT、Claude、またはGemini）",
-        "setup.ext.s3": "チャットを始めましょう — Stellar Memoryが残りを処理します！",
-        "eco.ext.tagline": "ChatGPT、Claude、Gemini用のAIメモリ",
-        "eco.ext.desc": "一度インストールすればすべてのAIがあなたを覚えます。会話を自動キャプチャし関連する記憶を注入します。",
-        "eco.ext.install": "拡張機能をインストール",
-        "eco.ext.github": "ソースを見る"
-      }
-    };
-
-    const LANG_LABELS = { en:'EN', ko:'KO', zh:'ZH', es:'ES', ja:'JA' };
-
-    function detectLang() {
-      var saved = localStorage.getItem('lang');
-      if (saved && T[saved]) return saved;
-      var browser = (navigator.language || 'en').slice(0, 2).toLowerCase();
-      return T[browser] ? browser : 'en';
-    }
-
-    function setLang(lang) {
-      if (!T[lang]) lang = 'en';
-      currentLang = lang;
-      document.querySelectorAll('[data-i18n]').forEach(function(el) {
-        var key = el.dataset.i18n;
-        if (T[lang][key]) el.textContent = T[lang][key];
-      });
-      document.getElementById('current-lang').textContent = LANG_LABELS[lang];
-      document.documentElement.lang = lang;
-      localStorage.setItem('lang', lang);
-      closeLangMenu();
-      if (selectedAI && selectedOS) renderInstructions();
-    }
-
-    function toggleLangMenu() {
-      document.getElementById('lang-menu').classList.toggle('open');
-    }
-
-    function closeLangMenu() {
-      document.getElementById('lang-menu').classList.remove('open');
-    }
-
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.lang-selector')) closeLangMenu();
-    });
-
-    // ── Nav scroll effect ──────────────────────────────────────
-    var nav = document.getElementById('nav');
-    window.addEventListener('scroll', function() {
-      nav.classList.toggle('scrolled', window.scrollY > 40);
-    }, { passive: true });
-
-    // ── Mobile menu ────────────────────────────────────────────
-    function toggleMobileMenu() {
-      var links = document.querySelector('.nav-links');
-      if (links.style.display === 'flex') {
-        links.style.display = '';
-      } else {
-        links.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:60px;left:0;right:0;background:rgba(3,7,18,0.97);backdrop-filter:blur(16px);padding:24px;gap:20px;border-bottom:1px solid rgba(148,163,184,0.08);z-index:99;';
-        links.querySelectorAll('a').forEach(function(a) {
-          a.addEventListener('click', function() { links.style.display = ''; }, { once: true });
-        });
-      }
-    }
-
-    // ── Checkout (Lemon Squeezy direct links) ──────────────────
-
-    // ── Copy install command ───────────────────────────────────
-    function copyInstall() {
-      var text = document.getElementById('install-text').textContent;
-      navigator.clipboard.writeText(text).then(function() { showToast('Copied to clipboard!'); });
-    }
-
-    function showToast(msg) {
-      var toast = document.getElementById('toast');
-      toast.textContent = msg;
-      toast.classList.add('show');
-      setTimeout(function() { toast.classList.remove('show'); }, 2200);
-    }
-
-    // ── Intersection observer for fade-in ─────────────────────
-    var observerStyle = document.createElement('style');
-    observerStyle.textContent = '.fade-up{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease;}.fade-up.visible{opacity:1;transform:translateY(0);}';
-    document.head.appendChild(observerStyle);
-
-    var fadeTargets = [].concat(
-      Array.from(document.querySelectorAll('.feature-card')),
-      Array.from(document.querySelectorAll('.use-case-card')),
-      Array.from(document.querySelectorAll('.ai-card')),
-      Array.from(document.querySelectorAll('.ext-feat-card'))
-    );
-
-    fadeTargets.forEach(function(el, i) {
-      el.classList.add('fade-up');
-      el.style.transitionDelay = (i % 6) * 0.07 + 's';
-    });
-
-    var observer = new IntersectionObserver(function(entries) {
-      entries.forEach(function(e) {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-          observer.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.12 });
-
-    fadeTargets.forEach(function(el) { observer.observe(el); });
-
-    // ── Smooth active nav link highlighting ────────────────────
-    var sections = document.querySelectorAll('section[id]');
-    var navAnchors = document.querySelectorAll('.nav-links a[href^="#"]');
-
-    window.addEventListener('scroll', function() {
-      var current = '';
-      sections.forEach(function(sec) {
-        if (window.scrollY >= sec.offsetTop - 120) current = sec.id;
-      });
-      navAnchors.forEach(function(a) {
-        a.style.color = a.getAttribute('href') === '#' + current
-          ? 'var(--text-primary)'
-          : '';
-      });
-    }, { passive: true });
-
-    // ── Setup Wizard ──────────────────────────────────────────
-    var selectedAI = null;
-    var selectedOS = null;
-    var currentLang = 'en';
-
-    function detectOS() {
-      var ua = navigator.userAgent.toLowerCase();
-      if (ua.indexOf('win') !== -1) return 'windows';
-      if (ua.indexOf('mac') !== -1) return 'macos';
-      return 'linux';
-    }
-
-    var WIZARD_INSTRUCTIONS = {
-      'claude-windows': [
-        { titleKey: 'setup.claude.win.s1', action: 'download', url: 'https://raw.githubusercontent.com/sangjun0000/stellar-memory/main/stellar-memory-setup.bat', filename: 'stellar-memory-setup.bat' },
-        { titleKey: 'setup.claude.win.s2', action: 'text' },
-        { titleKey: 'setup.claude.win.s3', action: 'text' }
-      ],
-      'claude-macos': [
-        { titleKey: 'setup.claude.mac.s1', action: 'copy', command: 'curl -sL https://raw.githubusercontent.com/sangjun0000/stellar-memory/main/stellar-memory-setup.sh | bash' },
-        { titleKey: 'setup.claude.mac.s2', action: 'text' }
-      ],
-      'claude-linux': [
-        { titleKey: 'setup.claude.mac.s1', action: 'copy', command: 'curl -sL https://raw.githubusercontent.com/sangjun0000/stellar-memory/main/stellar-memory-setup.sh | bash' },
-        { titleKey: 'setup.claude.mac.s2', action: 'text' }
-      ],
-      'cursor-windows': [
-        { titleKey: 'setup.cursor.s1', action: 'text' },
-        { titleKey: 'setup.cursor.s2', action: 'copy', command: '{\n  "mcpServers": {\n    "stellar-memory": {\n      "command": "uvx",\n      "args": ["stellar-memory"]\n    }\n  }\n}' },
-        { titleKey: 'setup.cursor.s3', action: 'text' }
-      ],
-      'cursor-macos': [
-        { titleKey: 'setup.cursor.s1', action: 'text' },
-        { titleKey: 'setup.cursor.s2', action: 'copy', command: '{\n  "mcpServers": {\n    "stellar-memory": {\n      "command": "uvx",\n      "args": ["stellar-memory"]\n    }\n  }\n}' },
-        { titleKey: 'setup.cursor.s3', action: 'text' }
-      ],
-      'cursor-linux': [
-        { titleKey: 'setup.cursor.s1', action: 'text' },
-        { titleKey: 'setup.cursor.s2', action: 'copy', command: '{\n  "mcpServers": {\n    "stellar-memory": {\n      "command": "uvx",\n      "args": ["stellar-memory"]\n    }\n  }\n}' },
-        { titleKey: 'setup.cursor.s3', action: 'text' }
-      ],
-      'chatgpt-windows': [
-        { titleKey: 'setup.chatgpt.s1', action: 'copy', command: 'pip install stellar-memory[mcp]' },
-        { titleKey: 'setup.chatgpt.s2', action: 'copy', command: 'from stellar_memory.middleware import ChatGPTMiddleware\nmiddleware = ChatGPTMiddleware()' },
-        { titleKey: 'setup.chatgpt.s3', action: 'text' }
-      ],
-      'chatgpt-macos': [
-        { titleKey: 'setup.chatgpt.s1', action: 'copy', command: 'pip install stellar-memory[mcp]' },
-        { titleKey: 'setup.chatgpt.s2', action: 'copy', command: 'from stellar_memory.middleware import ChatGPTMiddleware\nmiddleware = ChatGPTMiddleware()' },
-        { titleKey: 'setup.chatgpt.s3', action: 'text' }
-      ],
-      'chatgpt-linux': [
-        { titleKey: 'setup.chatgpt.s1', action: 'copy', command: 'pip install stellar-memory[mcp]' },
-        { titleKey: 'setup.chatgpt.s2', action: 'copy', command: 'from stellar_memory.middleware import ChatGPTMiddleware\nmiddleware = ChatGPTMiddleware()' },
-        { titleKey: 'setup.chatgpt.s3', action: 'text' }
-      ],
-      'other-windows': [
-        { titleKey: 'setup.other.s1', action: 'copy', command: 'pip install stellar-memory[mcp]' },
-        { titleKey: 'setup.other.s2', action: 'copy', command: 'stellar-memory serve' },
-        { titleKey: 'setup.other.s3', action: 'text' }
-      ],
-      'other-macos': [
-        { titleKey: 'setup.other.s1', action: 'copy', command: 'pip install stellar-memory[mcp]' },
-        { titleKey: 'setup.other.s2', action: 'copy', command: 'stellar-memory serve' },
-        { titleKey: 'setup.other.s3', action: 'text' }
-      ],
-      'other-linux': [
-        { titleKey: 'setup.other.s1', action: 'copy', command: 'pip install stellar-memory[mcp]' },
-        { titleKey: 'setup.other.s2', action: 'copy', command: 'stellar-memory serve' },
-        { titleKey: 'setup.other.s3', action: 'text' }
-      ],
-      'extension-windows': [
-        { titleKey: 'setup.ext.s1', action: 'link', url: 'https://github.com/sangjun0000/stellar-memory/releases/download/chrome-ext-v1.0.0/stellar-chrome-v1.0.0.zip', label: 'GitHub — stellar-chrome' },
-        { titleKey: 'setup.ext.s2', action: 'text' },
-        { titleKey: 'setup.ext.s3', action: 'text' }
-      ],
-      'extension-macos': [
-        { titleKey: 'setup.ext.s1', action: 'link', url: 'https://github.com/sangjun0000/stellar-memory/releases/download/chrome-ext-v1.0.0/stellar-chrome-v1.0.0.zip', label: 'GitHub — stellar-chrome' },
-        { titleKey: 'setup.ext.s2', action: 'text' },
-        { titleKey: 'setup.ext.s3', action: 'text' }
-      ],
-      'extension-linux': [
-        { titleKey: 'setup.ext.s1', action: 'link', url: 'https://github.com/sangjun0000/stellar-memory/releases/download/chrome-ext-v1.0.0/stellar-chrome-v1.0.0.zip', label: 'GitHub — stellar-chrome' },
-        { titleKey: 'setup.ext.s2', action: 'text' },
-        { titleKey: 'setup.ext.s3', action: 'text' }
-      ]
-    };
-
-    function selectAI(tool) {
-      selectedAI = tool;
-      document.querySelectorAll('.ai-card').forEach(function(c) { c.classList.remove('selected'); });
-      document.querySelector('[data-ai="' + tool + '"]').classList.add('selected');
-      document.getElementById('wizard-step2').style.display = 'block';
-      document.getElementById('wizard-step3').style.display = 'block';
-      document.getElementById('wizard-advanced').style.display = 'block';
-      if (!selectedOS) {
-        selectedOS = detectOS();
-        document.querySelectorAll('.os-pill').forEach(function(p) { p.classList.remove('selected'); });
-        var osPill = document.querySelector('[data-os="' + selectedOS + '"]');
-        if (osPill) osPill.classList.add('selected');
-      }
-      renderInstructions();
-    }
-
-    function selectOS(os) {
-      selectedOS = os;
-      document.querySelectorAll('.os-pill').forEach(function(p) { p.classList.remove('selected'); });
-      document.querySelector('[data-os="' + os + '"]').classList.add('selected');
-      renderInstructions();
-    }
-
-    function getI18nText(key) {
-      var lang = currentLang || 'en';
-      return (T[lang] && T[lang][key]) || (T.en && T.en[key]) || key;
-    }
-
-    function renderInstructions() {
-      if (!selectedAI || !selectedOS) return;
-      var key = selectedAI + '-' + selectedOS;
-      var steps = WIZARD_INSTRUCTIONS[key];
-      if (!steps) return;
-
-      var container = document.getElementById('wizard-instructions');
-      var html = '';
-      for (var i = 0; i < steps.length; i++) {
-        var step = steps[i];
-        var title = getI18nText(step.titleKey);
-        html += '<div class="wizard-step-card">';
-        html += '<div class="wizard-step-num">' + (i + 1) + '</div>';
-        html += '<div class="wizard-step-content">';
-        html += '<p>' + title + '</p>';
-        if (step.action === 'download') {
-          html += '<a href="' + step.url + '" class="wizard-download-btn" onclick="downloadFile(event, \'' + step.url + '\', \'' + step.filename + '\')">';
-          html += '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
-          html += step.filename + '</a>';
-        } else if (step.action === 'copy') {
-          var escapedCmd = step.command.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          html += '<div class="copy-box">';
-          html += '<code>' + escapedCmd + '</code>';
-          html += '<button class="copy-btn" onclick="copyWizardCmd(this)" title="Copy">';
-          html += '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-          html += '</button></div>';
-        } else if (step.action === 'link') {
-          html += '<a href="' + step.url + '" target="_blank" rel="noopener" class="wizard-download-btn">';
-          html += '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
-          html += step.label + '</a>';
-        }
-        html += '</div></div>';
-      }
-      container.innerHTML = html;
-    }
-
-    function downloadFile(e, url, filename) {
-      e.preventDefault();
-      fetch(url)
-        .then(function(res) { return res.blob(); })
-        .then(function(blob) {
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(a.href);
-        })
-        .catch(function() {
-          window.open(url, '_blank');
-        });
-    }
-
-    function copyWizardCmd(btn) {
-      var code = btn.parentElement.querySelector('code');
-      var text = code.textContent;
-      navigator.clipboard.writeText(text).then(function() {
-        showToast('Copied to clipboard!');
-      });
-    }
-
-    // ── Homunculus install OS toggle ────────────────────────────
-    function toggleHomInstallOS() {
-      var card = document.getElementById('hom-install');
-      if (!card) return;
-      var win = card.querySelector('.install-win');
-      var unix = card.querySelector('.install-unix');
-      if (win.style.display === 'none') {
-        win.style.display = '';
-        unix.style.display = 'none';
-      } else {
-        win.style.display = 'none';
-        unix.style.display = '';
-      }
-    }
-
-    function copyHomCmd() {
-      var cmd = document.getElementById('hom-curl').textContent.trim();
-      navigator.clipboard.writeText(cmd);
-      var btn = document.querySelector('#hom-install .copy-btn');
-      var orig = btn.textContent;
-      btn.textContent = 'Copied!';
-      setTimeout(function() { btn.textContent = orig; }, 1500);
-    }
-
-    // Initialize OS detection on load
-    selectedOS = detectOS();
-    document.addEventListener('DOMContentLoaded', function() {
-      var osPill = document.querySelector('[data-os="' + selectedOS + '"]');
-      if (osPill) osPill.classList.add('selected');
-
-      // Homunculus install: show Windows or Unix based on OS
-      var homCard = document.getElementById('hom-install');
-      if (homCard) {
-        var winBtn = homCard.querySelector('.install-win');
-        var unixDiv = homCard.querySelector('.install-unix');
-        if (selectedOS === 'windows') {
-          winBtn.style.display = '';
-          unixDiv.style.display = 'none';
-        } else {
-          winBtn.style.display = 'none';
-          unixDiv.style.display = '';
-        }
+<script>
+  // Intersection Observer for fade-in animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
       }
     });
+  }, { threshold: 0.1 });
 
-    // ── Auto-select Extension in wizard when hash is #get-started ──
-    if (window.location.hash === '#get-started') {
-      setTimeout(function() { selectAI('extension'); }, 300);
-    }
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
 
-    // ── Initialize language ────────────────────────────────────
-    currentLang = detectLang();
-    setLang(currentLang);
-  </script>
 </body>
 </html>

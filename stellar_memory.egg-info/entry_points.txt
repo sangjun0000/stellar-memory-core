@@ -1,2 +1,0 @@
-[console_scripts]
-stellar-memory = stellar_memory.cli:main

@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://stellar-memory.com/sitemap.xml
