@@ -155,7 +155,7 @@ export default function App() {
     // Don't overwrite an active search with the polling refresh
     if (activeSearchRef.current) return;
     try {
-      const res = await api.getMemories({ project: proj, zone: activeZone });
+      const res = await api.getMemories({ project: proj, zone: activeZone, summary_only: 'true' });
       setMemories(res.data);
       setLastUpdatedAt(Date.now());
     } catch {
@@ -178,7 +178,7 @@ export default function App() {
     activeSearchRef.current = null;
     try {
       const [memRes, sunRes, zoneRes] = await Promise.all([
-        api.getMemories({ project: proj }),
+        api.getMemories({ project: proj, summary_only: 'true' }),
         api.getSun(proj),
         api.getZoneStats(proj),
       ]);
@@ -341,7 +341,7 @@ export default function App() {
     setSearchResultCount(undefined);
     activeSearchRef.current = null;
     try {
-      const res = await api.getMemories({ project, zone });
+      const res = await api.getMemories({ project, zone, summary_only: 'true' });
       setMemories(res.data);
       setLastUpdatedAt(Date.now());
     } catch (e) {
@@ -442,7 +442,7 @@ export default function App() {
 
   // Filter out empty/contentless memories from the 3D view
   const visibleMemories = useMemo(
-    () => memories.filter((m) => m.content && m.content.trim().length > 0),
+    () => memories.filter((m) => (m.summary || m.content) && (m.summary || m.content || '').trim().length > 0),
     [memories],
   );
 

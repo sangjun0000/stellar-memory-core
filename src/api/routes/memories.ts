@@ -40,11 +40,21 @@ app.get('/', (c) => {
 
   if (summaryOnly) {
     const slim = memories.map((m) => ({
-      id:         m.id,
-      summary:    m.summary,
-      type:       m.type,
-      distance:   m.distance,
-      importance: m.importance,
+      id:           m.id,
+      project:      m.project,
+      content:      m.content?.slice(0, 120) ?? '',
+      summary:      m.summary,
+      type:         m.type,
+      tags:         m.tags,
+      distance:     m.distance,
+      importance:   m.importance,
+      velocity:     m.velocity,
+      impact:       m.impact,
+      access_count: m.access_count,
+      quality_score: m.quality_score,
+      is_universal: m.is_universal,
+      created_at:   m.created_at,
+      updated_at:   m.updated_at,
     }));
     return c.json({ ok: true, data: slim, total: slim.length });
   }

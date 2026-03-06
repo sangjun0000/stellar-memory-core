@@ -220,7 +220,7 @@ async function del<T>(path: string): Promise<T> {
 
 export const api = {
   // Memories
-  getMemories: (params?: { project?: string; zone?: OrbitZone; limit?: number }) =>
+  getMemories: (params?: { project?: string; zone?: OrbitZone; limit?: number; summary_only?: string }) =>
     get<{ data: Memory[]; total: number }>('/api/memories', params as Record<string, string | number | undefined>),
 
   getMemory: (id: string) =>
