@@ -23,7 +23,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: web/dist/favicon.ico
+  icon: build/icon.ico
 
 nsis:
   oneClick: false
@@ -32,3 +32,9 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Stellar Memory
+  artifactName: Stellar-Memory-Setup-${version}.${ext}
+
+publish:
+  provider: github
+  owner: sangjun0000
+  repo: stellar-memory-core
