@@ -19,6 +19,7 @@ import {
 } from '../storage/queries.js';
 import { getDatabase } from '../storage/database.js';
 import { createLogger } from '../utils/logger.js';
+import { getConfig } from '../utils/config.js';
 import { corona } from './corona.js';
 
 const log = createLogger('multiproject');
@@ -27,7 +28,7 @@ const log = createLogger('multiproject');
 // State
 // ---------------------------------------------------------------------------
 
-let currentProject: string = process.env['STELLAR_PROJECT'] ?? 'default';
+let currentProject: string = getConfig().defaultProject;
 
 // ---------------------------------------------------------------------------
 // Validation

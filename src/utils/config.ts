@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
+import { execSync } from 'node:child_process';
 import type { StellarConfig } from '../engine/types.js';
 
 function resolveDbPath(): string {
@@ -33,10 +34,28 @@ function parseInt_(value: string | undefined, fallback: number): number {
   return isNaN(parsed) ? fallback : parsed;
 }
 
+function detectProject(): string {
+  const env = process.env['STELLAR_PROJECT'];
+  if (env) return env;
+
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim();
+    if (gitRoot) return basename(gitRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 50);
+  } catch {
+    // not a git repo — fall through
+  }
+
+  const dirName = basename(process.cwd()).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 50);
+  return dirName || 'default';
+}
+
 export function loadConfig(): StellarConfig {
   return {
     dbPath: resolveDbPath(),
-    defaultProject: process.env['STELLAR_PROJECT'] ?? 'default',
+    defaultProject: detectProject(),
     sunTokenBudget: parseInt_(process.env['STELLAR_SUN_TOKEN_BUDGET'], 800),
     decayHalfLifeHours: parseFloat_(process.env['STELLAR_DECAY_HALF_LIFE'], 72),
     // Frequency saturation: number of accesses at which frequency score plateaus

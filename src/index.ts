@@ -3,6 +3,7 @@ import { createStellarServer } from './mcp/server.js';
 import { initDatabase } from './storage/database.js';
 import { getConfig } from './utils/config.js';
 import { autoCommitOnClose } from './engine/sun.js';
+import { switchProject } from './engine/multiproject.js';
 
 /**
  * Validate that the runtime environment meets Stellar Memory's requirements.
@@ -40,6 +41,12 @@ async function main(): Promise<void> {
 
   // Initialize SQLite database (creates schema on first run)
   initDatabase(config.dbPath);
+
+  // Auto-detect and switch to the project based on cwd/git repo
+  if (config.defaultProject !== 'default') {
+    switchProject(config.defaultProject);
+    console.error(`[stellar-memory] Auto-detected project: ${config.defaultProject}`);
+  }
 
   // Create MCP server with all tools and resources registered
   const server = createStellarServer();

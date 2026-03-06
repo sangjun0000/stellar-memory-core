@@ -6,6 +6,7 @@ import { setupTestDb, teardownTestDb } from './setup.js';
 import { StellarScanner } from '../src/scanner/index.js';
 import { isExcluded, buildSourceHash } from '../src/scanner/local/filesystem.js';
 import { getMemoriesByProject } from '../src/storage/queries.js';
+import { getCurrentProject } from '../src/engine/multiproject.js';
 
 // ---------------------------------------------------------------------------
 // isExcluded — unit tests (no I/O)
@@ -103,7 +104,7 @@ describe('StellarScanner integration', () => {
     expect(result.errorFiles).toBe(0);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
 
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories.length).toBe(2);
   });
 
@@ -114,7 +115,7 @@ describe('StellarScanner integration', () => {
     const result  = await scanner.scanPath(tmpDir, { includeGit: false });
 
     expect(result.createdMemories).toBeGreaterThanOrEqual(1);
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories.some((m) => m.source === 'scanner')).toBe(true);
     expect(memories.some((m) => m.source_path?.endsWith('utils.ts'))).toBe(true);
   });
@@ -140,7 +141,7 @@ describe('StellarScanner integration', () => {
 
     // Only src/index.ts should be scanned, not node_modules
     expect(result.createdMemories).toBe(1);
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories.every((m) => !m.source_path?.includes('node_modules'))).toBe(true);
   });
 
@@ -157,7 +158,7 @@ describe('StellarScanner integration', () => {
     expect(r2.skippedFiles).toBeGreaterThanOrEqual(1);
 
     // Still only one memory in DB
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories.length).toBe(1);
   });
 
@@ -167,7 +168,7 @@ describe('StellarScanner integration', () => {
     const scanner = new StellarScanner();
     await scanner.scanPath(tmpDir, { includeGit: false });
 
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories.length).toBe(1);
     // Compare normalised to handle Windows backslash vs forward slash
     const storedPath = (memories[0]?.source_path ?? '').replace(/\\/g, '/');
@@ -180,7 +181,7 @@ describe('StellarScanner integration', () => {
     const scanner = new StellarScanner();
     await scanner.scanPath(tmpDir, { includeGit: false });
 
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories[0]?.source_hash).toBeDefined();
     expect(memories[0]?.source_hash).toMatch(/^[0-9a-f]{16}$/);
   });
@@ -192,7 +193,7 @@ describe('StellarScanner integration', () => {
     const result  = await scanner.scanPath(tmpDir, { includeGit: false });
 
     expect(result.createdMemories).toBeGreaterThanOrEqual(1);
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories.some((m) => m.source_path?.endsWith('config.json'))).toBe(true);
   });
 
@@ -211,7 +212,7 @@ describe('StellarScanner integration', () => {
     const scanner = new StellarScanner();
     await scanner.scanPath(tmpDir, { includeGit: false });
 
-    const memories = getMemoriesByProject('default');
+    const memories = getMemoriesByProject(getCurrentProject());
     expect(memories[0]?.distance).toBeGreaterThanOrEqual(0.1);
     expect(memories[0]?.distance).toBeLessThanOrEqual(100);
     expect(memories[0]?.importance).toBeGreaterThanOrEqual(0);
