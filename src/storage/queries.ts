@@ -976,6 +976,14 @@ export function listProjects(): Array<{ project: string; count: number }> {
 // Quality queries
 // ---------------------------------------------------------------------------
 
+export function updateMemoryContent(id: string, content: string): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE memories SET content = ?, updated_at = ? WHERE id = ?
+  `).run(content, now, id);
+}
+
 export function updateQualityScore(memoryId: string, score: number): void {
   const db = getDatabase();
   const now = new Date().toISOString();

@@ -41,7 +41,7 @@ export interface ScheduleConfig {
   cleanupInterval: number;
   /** Quality scoring period (ms). Default: 4 hours */
   qualityScoringInterval: number;
-  /** Memory consolidation period (ms). Default: 6 hours */
+  /** Memory consolidation period (ms). Default: 1 hour */
   consolidationInterval: number;
   /** Procedural pattern detection period (ms). Default: 12 hours */
   proceduralDetectionInterval: number;
@@ -56,7 +56,7 @@ export const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
   localScanInterval:           30 * 60 * 1000,        // 30 min
   cleanupInterval:             24 * 60 * 60 * 1000,   // 24 hours
   qualityScoringInterval:      4  * 60 * 60 * 1000,   // 4 hours
-  consolidationInterval:       6  * 60 * 60 * 1000,   // 6 hours
+  consolidationInterval:       1  * 60 * 60 * 1000,   // 1 hour
   proceduralDetectionInterval: 12 * 60 * 60 * 1000,   // 12 hours
   oortCleanupAgeDays:          30,
 };

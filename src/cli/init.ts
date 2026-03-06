@@ -5,12 +5,16 @@
  * Usage:
  *   npx stellar-memory init          # Configure Claude Code + download model
  *   npx stellar-memory init --skip-model  # Skip embedding model download
+ *   npx stellar-memory init --global  # Register MCP globally (default)
+ *   npx stellar-memory init --project # Register MCP in .mcp.json (project-level)
  */
 
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
+import { createInterface } from 'node:readline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -58,34 +62,137 @@ function checkClaudeCLI(): boolean {
   }
 }
 
-function configureMCP(): boolean {
-  if (!checkClaudeCLI()) {
-    warn('Claude CLI not found — skipping MCP auto-configuration');
-    log('');
-    log('  To manually configure, add to your MCP settings:');
-    log(`  ${CYAN}claude mcp add stellar-memory -- npx -y stellar-memory${RESET}`);
-    log('');
-    return false;
+/** Prompt user for a yes/no or choice question. Returns trimmed input. */
+function prompt(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+const MCP_SERVER_CONFIG = {
+  command: 'npx',
+  args: ['-y', 'stellar-memory'],
+};
+
+/** Write MCP config to project-level .mcp.json in cwd. */
+function configureMCPProject(): boolean {
+  const mcpPath = join(process.cwd(), '.mcp.json');
+  let config: { mcpServers?: Record<string, unknown> } = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    } catch {
+      warn('.mcp.json exists but is unreadable — overwriting');
+    }
   }
 
-  log('');
-  log('Configuring Claude MCP server...');
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
 
+  if (config.mcpServers['stellar-memory']) {
+    success('MCP already registered in .mcp.json');
+    return true;
+  }
+
+  config.mcpServers['stellar-memory'] = MCP_SERVER_CONFIG;
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2));
+  success(`MCP registered in ${mcpPath}`);
+  log(`  ${CYAN}Scope:${RESET} project-level (only this directory)`);
+  return true;
+}
+
+/** Write MCP config to global ~/.claude/mcp_settings.json. */
+function configureMCPGlobal(): boolean {
+  const claudeDir = join(homedir(), '.claude');
+  const settingsPath = join(claudeDir, 'mcp_settings.json');
+
+  if (!existsSync(claudeDir)) {
+    mkdirSync(claudeDir, { recursive: true });
+  }
+
+  let config: { mcpServers?: Record<string, unknown> } = {};
+
+  if (existsSync(settingsPath)) {
+    try {
+      config = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+    } catch {
+      warn('mcp_settings.json exists but is unreadable — overwriting');
+    }
+  }
+
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
+
+  if (config.mcpServers['stellar-memory']) {
+    success('MCP already registered globally (~/.claude/mcp_settings.json)');
+    return true;
+  }
+
+  config.mcpServers['stellar-memory'] = MCP_SERVER_CONFIG;
+  writeFileSync(settingsPath, JSON.stringify(config, null, 2));
+  success('MCP registered globally (~/.claude/mcp_settings.json)');
+  log(`  ${CYAN}Scope:${RESET} all Claude Code projects`);
+  return true;
+}
+
+/** Try claude CLI first, then fall back to direct file editing. */
+function configureMCPViaCLI(scope: 'global' | 'project'): boolean {
+  const scopeFlag = scope === 'global' ? '--global' : '--project';
   const result = spawnSync('claude', [
-    'mcp', 'add', 'stellar-memory', '--', 'npx', '-y', 'stellar-memory'
+    'mcp', 'add', scopeFlag, 'stellar-memory', '--', 'npx', '-y', 'stellar-memory'
   ], {
     stdio: 'inherit',
     shell: true,
   });
+  return result.status === 0;
+}
 
-  if (result.status === 0) {
-    success('MCP server registered with Claude');
-    return true;
+async function configureMCP(args: string[]): Promise<boolean> {
+  log('');
+  log('Configuring Claude MCP server...');
+
+  // Determine scope from flags, or ask interactively
+  let scope: 'global' | 'project';
+
+  if (args.includes('--project')) {
+    scope = 'project';
+  } else if (args.includes('--global')) {
+    scope = 'global';
+  } else if (!process.stdin.isTTY) {
+    // Non-interactive (e.g. piped) — default to global
+    scope = 'global';
+    log(`  ${CYAN}Defaulting to global MCP registration (non-interactive mode)${RESET}`);
   } else {
-    warn('MCP auto-configuration failed');
-    log('  You can manually run:');
-    log(`  ${CYAN}claude mcp add stellar-memory -- npx -y stellar-memory${RESET}`);
-    return false;
+    log('');
+    log('  Where should Stellar Memory be registered?');
+    log(`  ${CYAN}[1]${RESET} Global — available in all Claude Code projects ${BOLD}(recommended)${RESET}`);
+    log(`  ${CYAN}[2]${RESET} Project — only this directory (.mcp.json)`);
+    log('');
+    const answer = await prompt('  Enter 1 or 2 [1]: ');
+    scope = answer === '2' ? 'project' : 'global';
+  }
+
+  // Try claude CLI if available (it handles edge cases better)
+  if (checkClaudeCLI()) {
+    if (configureMCPViaCLI(scope)) {
+      success(`MCP server registered with Claude (${scope})`);
+      return true;
+    }
+    warn('claude CLI registration failed — falling back to direct config edit');
+  }
+
+  // Direct file edit fallback
+  if (scope === 'project') {
+    return configureMCPProject();
+  } else {
+    return configureMCPGlobal();
   }
 }
 
@@ -164,7 +271,7 @@ async function main(): Promise<void> {
   }
 
   // 3. Configure MCP
-  configureMCP();
+  await configureMCP(args);
 
   // 4. Install Claude Code hooks (auto-restore + auto-observe + auto-commit)
   const { installHooks } = await import('./hooks/install.js');

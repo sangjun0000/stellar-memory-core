@@ -50,7 +50,7 @@ import { createLogger } from '../utils/logger.js';
 import { corona } from './corona.js';
 import { calculateQuality } from './quality.js';
 import { trackBgError } from '../mcp/tools/memory-tools.js';
-import { runConsolidation } from './consolidation.js';
+import { runConsolidation, findSimilarMemory, enrichMemory } from './consolidation.js';
 
 const log = createLogger('planet');
 
@@ -102,6 +102,30 @@ export function createMemory(data: {
       content_hash: contentHash,
     });
     return existing;
+  }
+
+  // Semantic deduplication: compare against existing memories using text
+  // similarity (Jaccard fallback, since the new memory has no embedding yet).
+  // A background async check with the real embedding runs after insertion.
+  const candidateText = data.content + ' ' + tags.join(' ');
+  const similar = findSimilarMemory(data.project, candidateText, null);
+  if (similar) {
+    if (similar.action === 'skip') {
+      log.debug('Near-exact duplicate detected — skipping insertion', {
+        existingId: similar.memory.id,
+        similarity: similar.similarity.toFixed(3),
+        project:    data.project,
+      });
+      return similar.memory;
+    }
+    if (similar.action === 'enrich') {
+      log.debug('Similar memory found — enriching existing instead of inserting', {
+        existingId: similar.memory.id,
+        similarity: similar.similarity.toFixed(3),
+        project:    data.project,
+      });
+      return enrichMemory(similar.memory, data.content);
+    }
   }
 
   // Compute initial importance using static scores.
@@ -183,16 +207,52 @@ export function createMemory(data: {
 
 /**
  * Schedule an async embedding generation for a memory.
+ * After the embedding is stored, runs a high-precision semantic dedup check:
+ * if a very similar existing memory is found (≥ SKIP_THRESHOLD), the newly
+ * inserted memory is soft-deleted and the existing one is returned.
  * Errors are swallowed so they never affect the calling code path.
  */
 function scheduleEmbedding(memoryId: string, text: string): void {
   generateEmbedding(text)
-    .then(embedding => {
+    .then(async embedding => {
       try {
         const db = getDatabase();
         insertEmbedding(db, memoryId, embedding);
       } catch {
         // DB may have been reset (tests) — ignore silently
+        return;
+      }
+
+      // Post-insertion semantic check with real embedding
+      try {
+        const { findSimilarMemory: check, enrichMemory: enrich } = await import('./consolidation.js');
+        const memory = (await import('../storage/queries.js')).getMemoryById(memoryId);
+        if (!memory || memory.deleted_at) return;
+
+        const similar = check(memory.project, text, embedding, memoryId);
+        if (!similar) return;
+
+        if (similar.action === 'skip') {
+          log.debug('Post-embedding duplicate detected — removing new memory', {
+            newId:      memoryId,
+            existingId: similar.memory.id,
+            similarity: similar.similarity.toFixed(3),
+          });
+          (await import('../storage/queries.js')).softDeleteMemory(memoryId);
+          corona.evict(memoryId);
+        } else if (similar.action === 'enrich') {
+          log.debug('Post-embedding similar memory — enriching existing', {
+            newId:      memoryId,
+            existingId: similar.memory.id,
+            similarity: similar.similarity.toFixed(3),
+          });
+          enrich(similar.memory, memory.content);
+          // Remove the redundant new memory
+          (await import('../storage/queries.js')).softDeleteMemory(memoryId);
+          corona.evict(memoryId);
+        }
+      } catch {
+        // Dedup is best-effort — don't block or fail
       }
     })
     .catch(() => {

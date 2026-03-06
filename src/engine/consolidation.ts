@@ -24,6 +24,7 @@ import {
   consolidateMemories,
   getConsolidationHistory,
   updateMemoryOrbit,
+  updateMemoryContent,
   insertOrbitLog,
 } from '../storage/queries.js';
 import { createMemory } from './planet.js';
@@ -42,6 +43,14 @@ const SIMILARITY_THRESHOLD = 0.80; // cosine similarity cutoff for grouping
 const DISTANCE_TOLERANCE   = 3.0;  // AU — memories must be within ±3 AU
 const OORT_DISTANCE        = 95.0; // source memories are pushed here post-merge
 const JACCARD_DEDUP_THRESHOLD = 0.70; // sentence deduplication cutoff
+
+// ---------------------------------------------------------------------------
+// Pre-save dedup thresholds
+// ---------------------------------------------------------------------------
+/** Above this similarity: treat new memory as near-duplicate → enrich existing. */
+export const ENRICH_THRESHOLD = 0.85;
+/** Above this similarity: treat new memory as exact duplicate → skip entirely. */
+export const SKIP_THRESHOLD   = 0.95;
 
 // Type priority for choosing the merged memory's type (higher = more important)
 const TYPE_PRIORITY: Record<MemoryType, number> = {
@@ -170,6 +179,102 @@ function textSimilarity(a: Memory, b: Memory): number {
   const tokensA = tokenizeToSet(a.content + ' ' + a.summary);
   const tokensB = tokenizeToSet(b.content + ' ' + b.summary);
   return jaccardSimilarity(tokensA, tokensB);
+}
+
+// ---------------------------------------------------------------------------
+// Pre-save duplicate detection
+// ---------------------------------------------------------------------------
+
+export interface SimilarMemoryResult {
+  memory: Memory;
+  similarity: number;
+  /** 'skip' if similarity ≥ SKIP_THRESHOLD, 'enrich' if ≥ ENRICH_THRESHOLD */
+  action: 'skip' | 'enrich';
+}
+
+/**
+ * Check whether a candidate text is too similar to any existing memory in the
+ * project. Returns the most similar memory and recommended action, or null if
+ * no similar memory is found.
+ *
+ * Uses stored embeddings when available (fast — no model inference needed).
+ * Falls back to Jaccard text similarity when embeddings are absent.
+ *
+ * This is designed to be called synchronously in createMemory() using the
+ * pre-fetched embedding cache from the corona, so it must not do async work.
+ */
+export function findSimilarMemory(
+  project: string,
+  candidateText: string,
+  candidateEmbedding: Float32Array | null,
+  excludeId?: string,
+): SimilarMemoryResult | null {
+  const existing = getMemoriesByProject(project).filter(
+    m => !m.consolidated_into && !m.deleted_at && m.id !== excludeId,
+  );
+
+  if (existing.length === 0) return null;
+
+  const candidateTokens = candidateEmbedding === null
+    ? tokenizeToSet(candidateText)
+    : null;
+
+  let bestMemory: Memory | null = null;
+  let bestSim = 0;
+
+  for (const m of existing) {
+    let sim: number;
+
+    if (candidateEmbedding !== null) {
+      const storedEmb = getStoredEmbedding(m.id);
+      if (storedEmb) {
+        sim = cosineSimilarity(candidateEmbedding, storedEmb);
+      } else {
+        // Fallback: text similarity
+        const mTokens = tokenizeToSet(m.content + ' ' + m.summary);
+        sim = jaccardSimilarity(candidateTokens!, mTokens);
+      }
+    } else {
+      const mTokens = tokenizeToSet(m.content + ' ' + m.summary);
+      sim = jaccardSimilarity(candidateTokens!, mTokens);
+    }
+
+    if (sim > bestSim) {
+      bestSim = sim;
+      bestMemory = m;
+    }
+  }
+
+  if (!bestMemory || bestSim < ENRICH_THRESHOLD) return null;
+
+  return {
+    memory: bestMemory,
+    similarity: bestSim,
+    action: bestSim >= SKIP_THRESHOLD ? 'skip' : 'enrich',
+  };
+}
+
+/**
+ * Enrich an existing memory by merging unique sentences from new content into it.
+ * Returns the updated memory.
+ */
+export function enrichMemory(existing: Memory, newContent: string): Memory {
+  const existingSentences = splitIntoSentences(existing.content);
+  const newSentences      = splitIntoSentences(newContent);
+  const combined          = deduplicateSentences([...existingSentences, ...newSentences]);
+  const mergedContent     = combined.join(' ');
+
+  // Only update if the merged content is actually richer
+  if (mergedContent === existing.content) return existing;
+
+  updateMemoryContent(existing.id, mergedContent);
+  log.debug('Enriched existing memory with new content', {
+    id:       existing.id,
+    before:   existing.content.length,
+    after:    mergedContent.length,
+  });
+
+  return { ...existing, content: mergedContent };
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,8 @@
  *   1. Instantiate McpServer.
  *   2. Register the stellar://sun resource.
  *   3. Register each tool, forwarding parsed args to the appropriate handler.
+ *   4. Inject sun context automatically on the first tool call of each session
+ *      so Claude restores context without needing CLAUDE.md protocol instructions.
  *
  * Business logic lives in mcp/tools/. This file contains no logic beyond wiring.
  */
@@ -31,6 +33,8 @@ import {
 } from './tools/memory-tools.js';
 import { handleScan } from './tools/ingestion-tools.js';
 import { handleDaemon } from './tools/daemon-tool.js';
+import { getSunContent } from '../engine/sun.js';
+import { getCurrentProject } from '../engine/multiproject.js';
 
 // ---------------------------------------------------------------------------
 // Server factory
@@ -39,6 +43,36 @@ import { handleDaemon } from './tools/daemon-tool.js';
 export function createStellarServer(): McpServer {
   const server = new McpServer({ name: 'stellar-memory', version: '0.4.0' });
 
+  // ── Session auto-context injection ────────────────────────────────────────
+  //
+  // Prepend sun context to the first tool response of this server instance.
+  //
+  // When a new MCP server process starts (= new Claude session), the first
+  // tool call the model makes will receive the sun context prepended to its
+  // normal response. This restores working context automatically without
+  // requiring any CLAUDE.md protocol instructions.
+  //
+  // The flag is per-server-instance so tests creating multiple servers are
+  // not affected by each other.
+  let sessionContextInjected = false;
+
+  type McpTextResponse = { content: [{ type: 'text'; text: string }] };
+
+  function withSessionContext(response: McpTextResponse): McpTextResponse {
+    if (sessionContextInjected) return response;
+    sessionContextInjected = true;
+
+    const project = getCurrentProject();
+    const sunContext = getSunContent(project);
+
+    // Only inject if there's meaningful content (not the "no memories yet" placeholder)
+    if (sunContext.includes('No memories committed yet')) return response;
+
+    const injected =
+      `[STELLAR MEMORY \u2014 SESSION CONTEXT RESTORED]\n${sunContext}\n\n---\n\n${response.content[0].text}`;
+    return { content: [{ type: 'text' as const, text: injected }] };
+  }
+
   // ── Resource: stellar://sun ───────────────────────────────────────────────
 
   server.resource(
@@ -46,9 +80,10 @@ export function createStellarServer(): McpServer {
     'stellar://sun',
     {
       description:
-        'Current working context (the Sun). Contains active project state, recent decisions, and next steps. ' +
-        'Read this at the start of every session to restore context.\n\n' +
-        '[AUTO-TRIGGER] Read this resource at the very beginning of every conversation before any other action.',
+        'Current working context (the Sun). Contains the active project state, recent decisions, ' +
+        'next steps, and the most important memories in the core orbital zone. ' +
+        'Reading this resource restores full session context instantly. ' +
+        'Read it at the start of every conversation to know what was being worked on.',
       mimeType: 'text/plain',
     },
     (uri) => handleSunResource(uri.href)
@@ -59,9 +94,8 @@ export function createStellarServer(): McpServer {
   server.tool(
     'status',
     'View the current state of your stellar memory system. Shows memories grouped by orbital zone ' +
-    '(core = actively working, forgotten = nearly forgotten), and optionally lists registered data sources. ' +
-    'Use this to get a snapshot of what the system knows.\n\n' +
-    '[AUTO-TRIGGER] Call at the start of every session alongside recall to restore full context.',
+    '(core = most important, forgotten = least relevant), and optionally lists registered data sources. ' +
+    'Call this at the start of a session to see the full memory landscape.',
     {
       zone: z.enum(['all', 'core', 'near', 'active', 'archive', 'fading', 'forgotten'])
         .optional()
@@ -73,16 +107,16 @@ export function createStellarServer(): McpServer {
         .optional()
         .describe('What to display: memories, data sources, or both. Default: "memories".'),
     },
-    (args) => handleStatus(args)
+    async (args) => withSessionContext(await handleStatus(args))
   );
 
   // ── Tool: commit ──────────────────────────────────────────────────────────
 
   server.tool(
     'commit',
-    'Save the current session state into the Sun (working context). Call this at the end of each session ' +
-    'or when switching tasks to preserve your progress.\n\n' +
-    '[AUTO-TRIGGER] Call automatically before a conversation ends. This is the most critical auto-trigger.',
+    'Save the current session state into the Sun (working context). ' +
+    'Preserves current work, decisions made, next steps, and active errors for the next session. ' +
+    'Call this before ending a conversation or switching tasks to ensure nothing is lost.',
     {
       current_work: z.string().min(1)
         .describe('A clear description of what you are currently working on.'),
@@ -103,8 +137,8 @@ export function createStellarServer(): McpServer {
   server.tool(
     'recall',
     'Search memories by content and pull relevant ones closer to the Sun. ' +
-    'Uses hybrid FTS5 + vector search for best results.\n\n' +
-    '[AUTO-TRIGGER] Call at session start with keywords from the user\'s first message.',
+    'Uses hybrid FTS5 + vector search for best results. ' +
+    'Call this when starting work on a specific topic to surface relevant past context.',
     {
       query: z.string().min(1)
         .describe('Search query to find relevant memories.'),
@@ -120,7 +154,7 @@ export function createStellarServer(): McpServer {
       at: z.string().optional()
         .describe('ISO date string. If provided, returns memories that were active at this point in time (temporal query) instead of normal recall.'),
     },
-    (args) => handleRecall(args)
+    async (args) => withSessionContext(await handleRecall(args))
   );
 
   // ── Tool: remember ────────────────────────────────────────────────────────
@@ -128,9 +162,10 @@ export function createStellarServer(): McpServer {
   server.tool(
     'remember',
     'Store a new memory in the stellar system. Memories are automatically placed in an orbital zone ' +
-    'based on their type and impact.\n\n' +
-    '[AUTO-TRIGGER] Call immediately when: (1) a design decision is made, (2) a bug is resolved, ' +
-    '(3) a feature milestone is reached, (4) important technical context is discovered.',
+    'based on their type and impact. ' +
+    'Store memories immediately when: a design decision is made, a bug is resolved, ' +
+    'a feature milestone is reached, or important technical context is discovered. ' +
+    'Do not wait — store memories as soon as the information becomes clear.',
     {
       content: z.string().min(1)
         .describe('The full content of the memory to store.'),
@@ -151,8 +186,8 @@ export function createStellarServer(): McpServer {
 
   server.tool(
     'orbit',
-    'Force a recalculation of all orbital positions for the project.\n\n' +
-    '[AUTO-TRIGGER] Call after storing 5+ memories in a single session.',
+    'Force a recalculation of all orbital positions for the project. ' +
+    'Call this after storing 5 or more memories in a single session to keep distances accurate.',
     {},
     () => handleOrbit({} as Record<string, never>)
   );
@@ -161,7 +196,9 @@ export function createStellarServer(): McpServer {
 
   server.tool(
     'forget',
-    'Push a memory into a distant orbit (soft forget) or permanently delete it.',
+    'Push a memory into a distant orbit (soft forget) or permanently delete it. ' +
+    'Use "push" to move a memory to the Oort cloud (it still exists but is deprioritized). ' +
+    'Use "delete" to permanently remove it.',
     {
       id: z.string().min(1)
         .describe('The ID of the memory to forget.'),
