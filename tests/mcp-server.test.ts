@@ -574,11 +574,13 @@ describe('orbital placement — impact drives initial distance', () => {
     expect(highImpact.distance).toBeLessThan(40.0);
   });
 
-  it('custom impact=0.0 places memory beyond 30 AU at creation', () => {
+  it('custom impact=0.0 places memory in Archive zone or further at creation', () => {
     const proj = defaultProject();
 
-    // With weights recency=0.30, frequency=0.20, impact=0.30, relevance=0.20:
-    //   impact=0.0 → total ≈ 0.30(recency) + 0.00 = 0.30 → importanceToDistance(0.30) ≈ 49 AU
+    // ACT-R formula: activation(fresh,0 accesses) × contentWeight(0.0) × qualityModifier
+    // contentWeight=0.0 → total=0 → distance=100 AU (Forgotten)
+    // planet.ts creation uses legacy weighted formula: recency×0.3 + freq×0.2 + impact×0.3 + rel×0.2
+    //   = 1.0×0.3 + 0 + 0 + 0 = 0.3 → importanceToDistance(0.3) = 27.5 AU (Archive zone)
     const trivial = createMemory({
       project: proj,
       content: 'Minor formatting note',
@@ -586,6 +588,6 @@ describe('orbital placement — impact drives initial distance', () => {
       impact: 0.0,
     });
 
-    expect(trivial.distance).toBeGreaterThan(30.0);
+    expect(trivial.distance).toBeGreaterThan(15.0);
   });
 });

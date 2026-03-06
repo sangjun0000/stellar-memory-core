@@ -1,18 +1,29 @@
 /**
- * gravity.ts — Relevance calculation (keyword + vector)
+ * gravity.ts — Relevance calculation (keyword + vector) and retrieval scoring
  *
  * Phase 1: keyword overlap between memory content and sun context.
  * Phase 2: cosine vector similarity + hybrid score combining both.
  *
- * Hybrid formula:  0.7 × vectorRelevance + 0.3 × keywordRelevance
+ * Hybrid formula (storage relevance):  0.7 × vectorRelevance + 0.3 × keywordRelevance
+ *
+ * Retrieval formula (search ranking):
+ *   retrieval_score = semanticW × semantic_similarity
+ *                   + keywordW  × keyword_overlap
+ *                   + proximityW × proximity_bonus
+ *   where proximity_bonus = 1.0 - (distance / 100)
  *
  * The keyword score is retained as a fast fallback when embeddings are not
  * available (e.g., during unit tests or before the model has loaded).
  */
 
-// Hybrid weighting constants
+// Hybrid weighting constants (storage relevance)
 const VECTOR_WEIGHT  = 0.7;
 const KEYWORD_WEIGHT = 0.3;
+
+// Default retrieval scoring weights
+const DEFAULT_RETRIEVAL_SEMANTIC_WEIGHT  = 0.55;
+const DEFAULT_RETRIEVAL_KEYWORD_WEIGHT   = 0.25;
+const DEFAULT_RETRIEVAL_PROXIMITY_WEIGHT = 0.20;
 
 /**
  * Tokenize text: split by whitespace, lowercase, strip punctuation, filter
@@ -138,4 +149,59 @@ export function hybridRelevance(
   if (!memoryEmbedding || !sunEmbedding) return kwScore;
 
   return Math.min(1.0, VECTOR_WEIGHT * vecScore + KEYWORD_WEIGHT * kwScore);
+}
+
+// ---------------------------------------------------------------------------
+// Retrieval score (search ranking)
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculate retrieval score for ranking search results.
+ *
+ * Separate from storage importance — this score is computed at query time
+ * and reflects how well a memory matches the user's current query, biased
+ * toward memories that are already close (high proximity bonus).
+ *
+ *   retrieval_score = semanticW  × semantic_similarity
+ *                   + keywordW   × keyword_overlap
+ *                   + proximityW × proximity_bonus
+ *
+ *   proximity_bonus = 1.0 - clamp(distance / 100, 0, 1)
+ *     → 1.0 for a memory at 0 AU (core), 0.0 at 100 AU (forgotten)
+ *
+ * Falls back to keyword + proximity when embeddings are absent.
+ *
+ * Weights default to 0.55 / 0.25 / 0.20 but can be overridden from config.
+ */
+export function retrievalScore(
+  memoryText: string,
+  queryText: string,
+  memoryDistance: number,
+  memoryEmbedding: Float32Array | null | undefined,
+  queryEmbedding:  Float32Array | null | undefined,
+  weights?: {
+    semantic:  number;
+    keyword:   number;
+    proximity: number;
+  },
+): number {
+  const w = weights ?? {
+    semantic:  DEFAULT_RETRIEVAL_SEMANTIC_WEIGHT,
+    keyword:   DEFAULT_RETRIEVAL_KEYWORD_WEIGHT,
+    proximity: DEFAULT_RETRIEVAL_PROXIMITY_WEIGHT,
+  };
+
+  const semantic  = vectorRelevance(memoryEmbedding, queryEmbedding);
+  const keyword   = keywordRelevance(memoryText, queryText);
+  const proximity = 1.0 - Math.min(1.0, Math.max(0.0, memoryDistance / 100));
+
+  // When no embeddings available, redistribute semantic weight to keyword
+  if (!memoryEmbedding || !queryEmbedding) {
+    const totalNonSemantic = w.keyword + w.proximity;
+    const kwNorm  = totalNonSemantic > 0 ? w.keyword   / totalNonSemantic : 0.5;
+    const prxNorm = totalNonSemantic > 0 ? w.proximity / totalNonSemantic : 0.5;
+    return Math.min(1.0, kwNorm * keyword + prxNorm * proximity);
+  }
+
+  return Math.min(1.0, w.semantic * semantic + w.keyword * keyword + w.proximity * proximity);
 }

@@ -42,7 +42,7 @@ import {
   recencyScore,
   frequencyScore,
 } from './orbit.js';
-import { keywordRelevance } from './gravity.js';
+import { keywordRelevance, retrievalScore } from './gravity.js';
 import { generateEmbedding } from './embedding.js';
 import { insertEmbedding, searchByVector, deleteEmbedding } from '../storage/vec.js';
 import { getDatabase, withTransaction } from '../storage/database.js';
@@ -475,9 +475,10 @@ export async function recallMemoriesAsync(
 
     // Vector KNN search (async embedding)
     let vecIds: string[] = [];
+    let queryEmbedding: Float32Array | null = null;
     try {
       const db = getDatabase();
-      const queryEmbedding = await generateEmbedding(query);
+      queryEmbedding = await generateEmbedding(query);
       const vecResults = searchByVector(db, queryEmbedding, fetchN);
       vecIds = vecResults.map(r => r.memoryId);
     } catch {
@@ -488,21 +489,47 @@ export async function recallMemoriesAsync(
     let merged = mergeRRF(ftsResults, vecIds, fetchN);
     merged = hydrateVectorOnlyResults(merged, ftsResults);
 
+    // Load memory embeddings for re-ranking with retrieval_score
+    const cfg = getConfig();
+    const retrievalWeights = {
+      semantic:  cfg.retrievalSemanticWeight,
+      keyword:   cfg.retrievalKeywordWeight,
+      proximity: cfg.retrievalProximityWeight,
+    };
+    let memEmbeddingMap: Map<string, Float32Array> | null = null;
+    if (queryEmbedding) {
+      try {
+        const db = getDatabase();
+        const rows = db.prepare(
+          `SELECT memory_id, embedding FROM memory_vec WHERE memory_id IN (${merged.map(() => '?').join(',')})`
+        ).all(...merged.map(m => m.id)) as Array<{ memory_id: string; embedding: Buffer }>;
+        memEmbeddingMap = new Map(rows.map(r => [
+          r.memory_id,
+          new Float32Array(r.embedding.buffer, r.embedding.byteOffset, r.embedding.byteLength / 4),
+        ]));
+      } catch {
+        // embeddings unavailable — fall back to keyword+proximity
+      }
+    }
+
     for (let i = 0; i < merged.length; i++) {
       const m = merged[i];
       if (seenIds.has(m.id)) continue;
       if (!m.content) continue; // skip unhydrated stubs
 
-      const zoneBoost = m.distance < 40
-        ? ZONE_BOOST.archive
-        : m.distance < 70
-          ? ZONE_BOOST.fading
-          : ZONE_BOOST.forgotten;
+      const memEmb = memEmbeddingMap?.get(m.id) ?? null;
+      const retScore = retrievalScore(
+        m.content + ' ' + m.tags.join(' '),
+        query,
+        m.distance,
+        memEmb,
+        queryEmbedding,
+        retrievalWeights,
+      );
 
-      const rankScore = 1 / (1 + i);
       scored.push({
         memory: m,
-        score: rankScore * zoneBoost * TIER_PRIORITY.tier3,
+        score: retScore * TIER_PRIORITY.tier3,
         tier: 'DEEP',
       });
       seenIds.add(m.id);

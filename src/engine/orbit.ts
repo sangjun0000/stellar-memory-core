@@ -1,11 +1,14 @@
 /**
  * orbit.ts — Core importance function and orbital mechanics
  *
- * Implements the celestial mechanics metaphor:
- *   - High importance  → small orbital distance (close to the sun)
- *   - Low importance   → large orbital distance (far from the sun, fading)
- *   - Access boost     → pulls a memory closer when it is recalled
- *   - Decay            → memories drift outward over time via recency score
+ * Implements an ACT-R-inspired activation model:
+ *   - Adaptive half-life grows with access count (stable memories decay slower)
+ *   - Activation = 0.6×recency + 0.4×frequency (replaces raw recency/frequency weights)
+ *   - storageImportance = activation × contentWeight × qualityModifier
+ *   - Segment-based distance mapping for sharper zone boundaries
+ *
+ * High importance  → small orbital distance (close to the sun)
+ * Low importance   → large orbital distance (far from the sun, fading)
  */
 
 import type { Memory, ImportanceComponents, OrbitChange, StellarConfig } from './types.js';
@@ -29,15 +32,16 @@ import type { MemoryType } from './types.js';
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate recency score using exponential decay.
+ * Calculate recency score using ACT-R adaptive half-life.
  *
- * Formula: 0.5 ^ (hoursSince / effectiveHalfLife)
+ * The effective half-life grows with access count so that frequently-accessed
+ * memories decay much more slowly (stable memories persist longer).
+ *
+ * effectiveHalflife = min(maxStabilityHours, baseHalfLife × stabilityGrowth^min(accessCount,15))
+ *
+ * Formula: 0.5 ^ (hoursSince / effectiveHalflife)
  *   - At t=0          → score = 1.0
  *   - At t=halfLife   → score = 0.5
- *   - At t=2×halfLife → score = 0.25
- *
- * Procedural memories use a slower decay rate (halfLife / 0.3 ≈ 240h for default 72h)
- * so hard-won knowledge persists longer.
  *
  * Returns a value in [0, 1].
  */
@@ -46,6 +50,9 @@ export function recencyScore(
   createdAt: string,
   halfLifeHours: number = 72,
   memoryType?: MemoryType,
+  accessCount: number = 0,
+  stabilityGrowth: number = 1.5,
+  maxStabilityHours: number = 8760,
 ): number {
   const referenceTime = lastAccessedAt ?? createdAt;
   // Append 'Z' only when there is no existing timezone designator so that
@@ -58,26 +65,32 @@ export function recencyScore(
   const now = new Date();
   const hoursSince = (now.getTime() - refMs) / (1000 * 60 * 60);
 
-  // Procedural memories decay ~3.3x slower than normal
-  const effectiveHalfLife = memoryType === 'procedural'
+  // Adaptive half-life: grows with access frequency, capped at maxStabilityHours
+  // Procedural memories use a slower base decay rate (~3.3× slower than normal)
+  const baseHalfLife = memoryType === 'procedural'
     ? halfLifeHours / getProceduralDecayMultiplier()
     : halfLifeHours;
 
-  return Math.pow(0.5, Math.max(0, hoursSince) / effectiveHalfLife);
+  const effectiveHalflife = Math.min(
+    maxStabilityHours,
+    baseHalfLife * Math.pow(stabilityGrowth, Math.min(accessCount, 15)),
+  );
+
+  return Math.pow(0.5, Math.max(0, hoursSince) / effectiveHalflife);
 }
 
 /**
- * Calculate frequency score using logarithmic saturation.
+ * Calculate frequency factor using logarithmic saturation.
  *
  * Formula: log(1 + count) / log(1 + saturationPoint)
  *   - Grows quickly for the first few accesses.
- *   - Plateaus as count approaches saturationPoint.
+ *   - Plateaus as count approaches saturationPoint (default 50).
  *
  * Returns a value in [0, 1].
  */
 export function frequencyScore(
   accessCount: number,
-  saturationPoint: number = 20,
+  saturationPoint: number = 50,
 ): number {
   if (saturationPoint <= 0) throw new Error('saturationPoint must be positive');
   return Math.min(1.0, Math.log(1 + accessCount) / Math.log(1 + saturationPoint));
@@ -88,25 +101,56 @@ export function frequencyScore(
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate overall importance from all four components.
+ * Calculate overall importance using ACT-R activation model.
  *
- * Weights are configured via StellarConfig and must sum to 1.0 for a
- * meaningful 0–1 total (they do in the defaults: 0.30+0.20+0.30+0.20=1.00).
+ * activation = activationRecencyWeight × recency + activationFrequencyWeight × frequencyFactor
+ * storageImportance = clamp(activation × contentWeight × qualityModifier, 0, 1)
+ *
+ * qualityModifier ∈ [0.7, 1.2]:  0.7 + 0.5 × qualityScore
+ * contentWeight: injected externally (defaults to memory.impact for backward compat)
+ *
+ * The legacy weights (recency/frequency/impact/relevance) are ignored in the
+ * new activation path but kept in the return value for callers that inspect them.
  */
 export function calculateImportance(
   memory: Memory,
   sunText: string,
   config: StellarConfig,
+  contentWeight?: number,
 ): ImportanceComponents {
-  const weights = config.weights;
-  const weightSum = weights.recency + weights.frequency + weights.impact + weights.relevance;
-  if (Math.abs(weightSum - 1.0) > 0.01) {
-    throw new Error(`Weights must sum to 1.0, got ${weightSum.toFixed(3)}`);
-  }
+  const stabilityGrowth   = config.stabilityGrowth   ?? 1.5;
+  const maxStabilityHours = config.maxStabilityHours ?? 8760;
+  const recencyWeight     = config.activationRecencyWeight   ?? 0.6;
+  const frequencyWeight   = config.activationFrequencyWeight ?? 0.4;
 
-  const rec  = recencyScore(memory.last_accessed_at, memory.created_at, config.decayHalfLifeHours, memory.type);
+  // Effective half-life exposed for callers
+  const baseHalfLife = memory.type === 'procedural'
+    ? config.decayHalfLifeHours / getProceduralDecayMultiplier()
+    : config.decayHalfLifeHours;
+  const effectiveHalflife = Math.min(
+    maxStabilityHours,
+    baseHalfLife * Math.pow(stabilityGrowth, Math.min(memory.access_count, 15)),
+  );
+
+  const rec  = recencyScore(
+    memory.last_accessed_at,
+    memory.created_at,
+    config.decayHalfLifeHours,
+    memory.type,
+    memory.access_count,
+    stabilityGrowth,
+    maxStabilityHours,
+  );
   const freq = frequencyScore(memory.access_count, config.frequencySaturationPoint);
-  const imp  = memory.impact;
+
+  // ACT-R activation
+  const activation = recencyWeight * rec + frequencyWeight * freq;
+
+  // contentWeight: externally injected (future content-weight agent), fallback to impact
+  const cw = contentWeight ?? memory.impact;
+
+  // qualityModifier ∈ [0.7, 1.2]
+  const qualityModifier = 0.7 + 0.5 * (memory.quality_score ?? 0.5);
 
   // Combine content + tags so tags act as relevance boosters.
   const memoryText = memory.content + ' ' + memory.tags.join(' ');
@@ -128,7 +172,6 @@ export function calculateImportance(
     if (memRow?.embedding) {
       const memEmbedding = new Float32Array(memRow.embedding.buffer, memRow.embedding.byteOffset, memRow.embedding.byteLength / 4);
 
-      // Look up the sun embedding via the most-recent sun memory, if available.
       const sunRow = db.prepare(
         `SELECT mv.embedding FROM memory_vec mv
          JOIN memories m ON m.id = mv.memory_id
@@ -148,42 +191,52 @@ export function calculateImportance(
     rel = keywordRelevance(memoryText, sunText);
   }
 
-  const total =
-    config.weights.recency   * rec  +
-    config.weights.frequency * freq +
-    config.weights.impact    * imp  +
-    config.weights.relevance * rel;
+  const total = Math.max(0, Math.min(1, activation * cw * qualityModifier));
 
   return {
-    recency:   rec,
-    frequency: freq,
-    impact:    imp,
-    relevance: rel,
-    total:     Math.min(1.0, Math.max(0.0, total)),
+    // Sub-components
+    recency:            rec,
+    frequencyFactor:    freq,
+    effectiveHalflife,
+    // Composite
+    activation,
+    contentWeight:      cw,
+    qualityModifier,
+    // Legacy aliases
+    frequency:          freq,
+    impact:             cw,
+    relevance:          rel,
+    total,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Distance mapping
+// Distance mapping — segment-based
 // ---------------------------------------------------------------------------
 
 /**
- * Convert importance (0–1) to orbital distance (0.1–100).
+ * Convert importance (0–1) to orbital distance (0.1–100 AU).
  *
- * Uses quadratic mapping so that:
- *   - importance = 1.0 → distance ≈ 0.1  (core / working memory)
- *   - importance = 0.0 → distance = 100  (Oort cloud / nearly forgotten)
+ * Uses segment-based linear interpolation aligned with ORBIT_ZONES boundaries,
+ * giving sharper zone transitions than the old quadratic formula.
  *
- * The quadratic curve creates a non-linear relationship: a memory must fall
- * significantly in importance before it drifts noticeably outward, which
- * mirrors how cognitive salience works in practice.
+ * Zone thresholds:
+ *   Core    [0.85, 1.0]  → [0.1,  1.0)
+ *   Near    [0.65, 0.85) → [1.0,  5.0)
+ *   Active  [0.40, 0.65) → [5.0,  15.0)
+ *   Archive [0.20, 0.40) → [15.0, 40.0)
+ *   Fading  [0.05, 0.20) → [40.0, 70.0)
+ *   Forgotten [0, 0.05)  → [70.0, 100.0]
  */
 export function importanceToDistance(importance: number): number {
-  const MIN_DISTANCE = 0.1;
-  const MAX_DISTANCE = 100.0;
-  const clamped    = Math.min(1.0, Math.max(0.0, importance));
-  const normalized = Math.pow(1 - clamped, 2);
-  return MIN_DISTANCE + normalized * (MAX_DISTANCE - MIN_DISTANCE);
+  const clamped = Math.min(1.0, Math.max(0.0, importance));
+
+  if (clamped >= 0.85) return 0.1  + (1.0  - clamped) / 0.15 * 0.9;
+  if (clamped >= 0.65) return 1.0  + (0.85 - clamped) / 0.20 * 4.0;
+  if (clamped >= 0.40) return 5.0  + (0.65 - clamped) / 0.25 * 10.0;
+  if (clamped >= 0.20) return 15.0 + (0.40 - clamped) / 0.20 * 25.0;
+  if (clamped >= 0.05) return 40.0 + (0.20 - clamped) / 0.15 * 30.0;
+  return 70.0 + (0.05 - clamped) / 0.05 * 30.0;
 }
 
 /**
@@ -192,19 +245,18 @@ export function importanceToDistance(importance: number): number {
  * Used when a user manually drags a memory to a new orbital position.
  */
 export function distanceToImportance(distance: number): number {
-  const MIN_DISTANCE = 0.1;
-  const MAX_DISTANCE = 100.0;
-  const clamped = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, distance));
-  const normalized = (clamped - MIN_DISTANCE) / (MAX_DISTANCE - MIN_DISTANCE);
-  return Math.max(0.0, Math.min(1.0, 1 - Math.sqrt(normalized)));
+  const clamped = Math.min(100.0, Math.max(0.1, distance));
+
+  if (clamped < 1.0)  return 1.0  - (clamped - 0.1)  / 0.9  * 0.15;
+  if (clamped < 5.0)  return 0.85 - (clamped - 1.0)  / 4.0  * 0.20;
+  if (clamped < 15.0) return 0.65 - (clamped - 5.0)  / 10.0 * 0.25;
+  if (clamped < 40.0) return 0.40 - (clamped - 15.0) / 25.0 * 0.20;
+  if (clamped < 70.0) return 0.20 - (clamped - 40.0) / 30.0 * 0.15;
+  return Math.max(0, 0.05 - (clamped - 70.0) / 30.0 * 0.05);
 }
 
 /**
  * Return the orbit zone label for a given distance.
- *
- * Iterates ORBIT_ZONES in definition order (core → forgotten) and returns the
- * first zone whose [min, max) range contains the distance. Falls back to
- * the 'forgotten' label for any distance at or beyond 70.
  */
 export function getOrbitZone(distance: number): string {
   for (const [, zone] of Object.entries(ORBIT_ZONES)) {
@@ -212,7 +264,6 @@ export function getOrbitZone(distance: number): string {
       return zone.label;
     }
   }
-  // Beyond all defined zones — treat as forgotten.
   return ORBIT_ZONES.forgotten.label;
 }
 
@@ -223,12 +274,8 @@ export function getOrbitZone(distance: number): string {
 /**
  * Apply access boost — pull a memory closer when it is recalled.
  *
- * The boost is proportional to the current distance so that:
- *   - Far-away memories (high distance) receive a large absolute pull.
- *   - Close memories (low distance) are nudged only slightly.
- *
+ * Proportional to current distance so far-away memories get a larger pull.
  * MIN_BOOST ensures even core memories get a small reward.
- * The floor of 0.1 prevents distance from going below the core minimum.
  */
 export function applyAccessBoost(currentDistance: number): number {
   const BOOST_FACTOR = 0.3;
@@ -243,13 +290,6 @@ export function applyAccessBoost(currentDistance: number): number {
 
 /**
  * Run a full orbit recalculation for all memories in a project.
- *
- * Called during stellar_commit and stellar_orbit. For each non-deleted memory:
- *   1. Compute new importance using current sun context.
- *   2. Map importance → distance.
- *   3. If the distance shifted by more than 0.01, persist the change and log it.
- *
- * Returns every OrbitChange that was actually written.
  */
 export function recalculateOrbits(project: string, config: StellarConfig): OrbitChange[] {
   const memories = getMemoriesByProject(project);
@@ -257,7 +297,6 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
     return [];
   }
 
-  // Build sun context text for relevance scoring.
   const sunState = getSunState(project);
   const sunText  = sunState
     ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
@@ -268,12 +307,10 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
   for (const memory of memories) {
     const components    = calculateImportance(memory, sunText, config);
     const newImportance = components.total;
-    // Apply quality-based orbit adjustment: low-quality memories drift further out
     const qualityScore  = memory.quality_score ?? 0.5;
-    const newDistance    = importanceToDistance(newImportance) * qualityOrbitAdjustment(qualityScore);
+    const newDistance   = importanceToDistance(newImportance) * qualityOrbitAdjustment(qualityScore);
     const velocity      = newDistance - memory.distance;
 
-    // Skip negligible drifts to avoid write churn.
     if (Math.abs(velocity) <= 0.01) {
       continue;
     }
@@ -293,11 +330,7 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
     changes.push(change);
   }
 
-  // Prune orbit log entries older than 90 days to prevent unbounded growth.
   cleanupOrbitLog(90);
-
-  // Refresh the corona cache after orbit recalculation so distance changes
-  // are reflected in the in-memory tier immediately.
   corona.warmup(project);
 
   return changes;

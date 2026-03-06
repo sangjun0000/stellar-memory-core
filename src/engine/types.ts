@@ -101,7 +101,15 @@ export interface OrbitChange {
 
 // Importance scoring components
 export interface ImportanceComponents {
+  // Sub-components
   recency: number;
+  frequencyFactor: number;
+  effectiveHalflife: number;
+  // Composite scores
+  activation: number;
+  contentWeight: number;
+  qualityModifier: number;
+  // Legacy aliases (kept for backward compatibility with callers)
   frequency: number;
   impact: number;
   relevance: number;
@@ -183,6 +191,15 @@ export interface StellarConfig {
   sunTokenBudget: number;
   decayHalfLifeHours: number;
   frequencySaturationPoint: number;
+  // ACT-R adaptive stability parameters
+  stabilityGrowth: number;       // exponent base for half-life growth per access (default 1.5)
+  maxStabilityHours: number;     // cap on effective half-life in hours (default 8760 = 1 year)
+  activationRecencyWeight: number;   // weight of recency in activation (default 0.6)
+  activationFrequencyWeight: number; // weight of frequency in activation (default 0.4)
+  // Retrieval scoring weights (used during recall, separate from storage importance)
+  retrievalSemanticWeight: number;   // weight of semantic similarity (default 0.55)
+  retrievalKeywordWeight: number;    // weight of keyword overlap (default 0.25)
+  retrievalProximityWeight: number;  // weight of orbital proximity bonus (default 0.20)
   weights: {
     recency: number;
     frequency: number;

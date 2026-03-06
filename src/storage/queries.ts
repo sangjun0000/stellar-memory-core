@@ -774,6 +774,15 @@ export function deleteEdge(id: string): void {
   db.prepare(`DELETE FROM constellation_edges WHERE id = ?`).run(id);
 }
 
+export function getEdgeCountForMemory(memoryId: string): number {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT COUNT(*) as count FROM constellation_edges
+    WHERE source_id = ? OR target_id = ?
+  `).get(memoryId, memoryId) as { count: number } | undefined;
+  return row?.count ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // Conflict queries
 // ---------------------------------------------------------------------------

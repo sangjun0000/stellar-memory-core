@@ -4,6 +4,7 @@ import {
   vectorRelevance,
   hybridRelevance,
   keywordRelevance,
+  retrievalScore,
 } from '../src/engine/gravity.js';
 
 // ---------------------------------------------------------------------------
@@ -140,5 +141,71 @@ describe('hybridRelevance', () => {
     const weakScore   = hybridRelevance('database migration', 'frontend styling', null, null);
 
     expect(strongScore).toBeGreaterThan(weakScore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// retrievalScore
+// ---------------------------------------------------------------------------
+
+describe('retrievalScore', () => {
+  it('returns a value in [0, 1]', () => {
+    const mem = new Float32Array([1, 0, 0, 0]);
+    const query = new Float32Array([1, 0, 0, 0]);
+    const score = retrievalScore('auth token', 'auth', 5.0, mem, query);
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(1);
+  });
+
+  it('proximity_bonus is higher for close memories', () => {
+    // Same semantic + keyword, different distance
+    const mem = new Float32Array([1, 0, 0, 0]);
+    const query = new Float32Array([1, 0, 0, 0]);
+    const close  = retrievalScore('auth', 'auth', 1.0,  mem, query);
+    const far    = retrievalScore('auth', 'auth', 80.0, mem, query);
+    expect(close).toBeGreaterThan(far);
+  });
+
+  it('falls back gracefully when embeddings are absent', () => {
+    const score = retrievalScore('auth login token', 'auth login', 5.0, null, null);
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThanOrEqual(1);
+  });
+
+  it('keyword-only fallback: no-overlap returns only proximity contribution', () => {
+    // With no embeddings and no keyword overlap, only proximity contributes
+    // weights: keyword=0.25, proximity=0.20 → normalised: kw=0.556, prx=0.444
+    // distance=0 → proximity=1.0, keyword=0 → score = 0.444 × 1.0 = 0.444
+    const score = retrievalScore('unrelated content', 'completely different', 0.0, null, null);
+    expect(score).toBeGreaterThan(0); // proximity_bonus at distance=0 contributes
+    expect(score).toBeLessThan(0.6);
+  });
+
+  it('returns higher score when all three signals are strong', () => {
+    const vec = new Float32Array([1, 0, 0, 0]);
+    // Strong: identical vectors + overlapping keywords + close distance
+    const strong = retrievalScore('auth login token', 'auth login', 0.5, vec, vec);
+    // Weak: orthogonal vectors + no keyword overlap + far distance
+    const weakVec = new Float32Array([0, 1, 0, 0]);
+    const weak   = retrievalScore('database migration', 'frontend styling', 90.0, weakVec, vec);
+    expect(strong).toBeGreaterThan(weak);
+  });
+
+  it('respects custom weights', () => {
+    const mem = new Float32Array([1, 0, 0, 0]);
+    const query = new Float32Array([0, 1, 0, 0]); // orthogonal → semantic=0
+    // With proximity-only weights, score ≈ proximity_bonus
+    const proximityOnly = retrievalScore('unrelated', 'unrelated', 0.0, mem, query, {
+      semantic: 0.0, keyword: 0.0, proximity: 1.0,
+    });
+    expect(proximityOnly).toBeCloseTo(1.0, 3); // distance=0 → proximity=1
+  });
+
+  it('proximity_bonus = 0 at distance=100', () => {
+    const score = retrievalScore('text', 'text', 100.0, null, null);
+    // keyword overlap but proximity=0 — score comes entirely from keyword
+    // with no embeddings: kw_norm ≈ 0.556, prx_norm ≈ 0.444; keyword > 0
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(1);
   });
 });

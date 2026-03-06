@@ -59,7 +59,16 @@ export function loadConfig(): StellarConfig {
     sunTokenBudget: parseInt_(process.env['STELLAR_SUN_TOKEN_BUDGET'], 800),
     decayHalfLifeHours: parseFloat_(process.env['STELLAR_DECAY_HALF_LIFE'], 72),
     // Frequency saturation: number of accesses at which frequency score plateaus
-    frequencySaturationPoint: parseInt_(process.env['STELLAR_FREQ_SAT_POINT'], 20),
+    frequencySaturationPoint: parseInt_(process.env['STELLAR_FREQ_SAT_POINT'], 50),
+    // ACT-R adaptive stability
+    stabilityGrowth:             parseFloat_(process.env['STELLAR_STABILITY_GROWTH'], 1.5),
+    maxStabilityHours:           parseFloat_(process.env['STELLAR_MAX_STABILITY'], 8760),
+    activationRecencyWeight:     parseFloat_(process.env['STELLAR_ACTIVATION_RECENCY_WEIGHT'], 0.6),
+    activationFrequencyWeight:   parseFloat_(process.env['STELLAR_ACTIVATION_FREQUENCY_WEIGHT'], 0.4),
+    // Retrieval scoring weights
+    retrievalSemanticWeight:     parseFloat_(process.env['STELLAR_RETRIEVAL_SEMANTIC_WEIGHT'], 0.55),
+    retrievalKeywordWeight:      parseFloat_(process.env['STELLAR_RETRIEVAL_KEYWORD_WEIGHT'], 0.25),
+    retrievalProximityWeight:    parseFloat_(process.env['STELLAR_RETRIEVAL_PROXIMITY_WEIGHT'], 0.20),
     weights: {
       recency:   parseFloat_(process.env['STELLAR_WEIGHT_RECENCY'],   0.30),
       frequency: parseFloat_(process.env['STELLAR_WEIGHT_FREQUENCY'], 0.20),
