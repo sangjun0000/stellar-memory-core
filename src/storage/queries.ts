@@ -13,6 +13,7 @@ import type {
   ObservationEntry,
 } from '../engine/types.js';
 import { ORBIT_ZONES } from '../engine/types.js';
+import { filterActiveMemories } from '../engine/validity.js';
 import type { DataSource } from '../scanner/types.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -111,10 +112,10 @@ interface RawSunStateRow {
 }
 
 // ---------------------------------------------------------------------------
-// Deserializers — parse JSON fields coming out of SQLite
+// Deserializers ??parse JSON fields coming out of SQLite
 // ---------------------------------------------------------------------------
 
-// Cast helpers — node:sqlite returns Record<string, SQLOutputValue> from .get()/.all().
+// Cast helpers ??node:sqlite returns Record<string, SQLOutputValue> from .get()/.all().
 // We cast through unknown because we know the schema guarantees the shape.
 function asRawMemory(row: unknown): RawMemoryRow {
   return row as RawMemoryRow;
@@ -243,6 +244,12 @@ export function insertMemory(memory: Partial<Memory>): Memory {
   const created_at = memory.created_at ?? now;
   const updated_at = memory.updated_at ?? now;
   const deleted_at = memory.deleted_at ?? null;
+  const valid_from = memory.valid_from ?? null;
+  const valid_until = memory.valid_until ?? null;
+  const superseded_by = memory.superseded_by ?? null;
+  const consolidated_into = memory.consolidated_into ?? null;
+  const quality_score = memory.quality_score ?? null;
+  const is_universal = memory.is_universal ? 1 : 0;
 
   db.prepare(`
     INSERT INTO memories (
@@ -250,14 +257,18 @@ export function insertMemory(memory: Partial<Memory>): Memory {
       distance, importance, velocity, impact,
       access_count, last_accessed_at, metadata,
       source, source_path, source_hash, content_hash,
-      created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      created_at, updated_at, deleted_at,
+      valid_from, valid_until, superseded_by,
+      consolidated_into, quality_score, is_universal
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, project, content, summary, type, tags,
     distance, importance, velocity, impact,
     access_count, last_accessed_at, metadata,
     source, source_path, source_hash, content_hash,
-    created_at, updated_at, deleted_at
+    created_at, updated_at, deleted_at,
+    valid_from, valid_until, superseded_by,
+    consolidated_into, quality_score, is_universal
   );
 
   // Return the fully resolved Memory object (no second DB hit needed)
@@ -269,6 +280,12 @@ export function insertMemory(memory: Partial<Memory>): Memory {
     access_count, last_accessed_at, metadata: memory.metadata ?? {},
     source, source_path, source_hash, content_hash,
     created_at, updated_at, deleted_at,
+    valid_from: valid_from ?? undefined,
+    valid_until: valid_until ?? undefined,
+    superseded_by: superseded_by ?? undefined,
+    consolidated_into: consolidated_into ?? undefined,
+    quality_score: quality_score ?? undefined,
+    is_universal: Boolean(is_universal),
   };
 }
 
@@ -290,7 +307,7 @@ export function getMemoryByIds(ids: string[]): Memory[] {
     WHERE id IN (${placeholders})
       AND deleted_at IS NULL
   `).all(...ids) as unknown[];
-  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+  return filterActiveMemories(rows.map((r) => deserializeMemory(asRawMemory(r))));
 }
 
 export function getMemoriesByProject(
@@ -303,7 +320,7 @@ export function getMemoriesByProject(
     : `SELECT * FROM memories WHERE project = ? AND deleted_at IS NULL ORDER BY distance ASC`;
 
   const rows = db.prepare(sql).all(project) as unknown[];
-  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+  return filterActiveMemories(rows.map((r) => deserializeMemory(asRawMemory(r))));
 }
 
 /**
@@ -322,7 +339,7 @@ export function getRecentMemories(project: string, hoursAgo: number = 3): Memory
     ORDER BY created_at DESC
   `).all(project, cutoff) as unknown[];
 
-  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+  return filterActiveMemories(rows.map((r) => deserializeMemory(asRawMemory(r))));
 }
 
 export function getMemoriesInZone(project: string, zone: OrbitZone): Memory[] {
@@ -338,7 +355,7 @@ export function getMemoriesInZone(project: string, zone: OrbitZone): Memory[] {
     ORDER BY distance ASC
   `).all(project, min, max) as unknown[];
 
-  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+  return filterActiveMemories(rows.map((r) => deserializeMemory(asRawMemory(r))));
 }
 
 export function updateMemoryOrbit(
@@ -415,12 +432,14 @@ export function searchMemories(
     WHERE memories_fts MATCH ?
       AND m.project = ?
       AND m.deleted_at IS NULL
+      AND m.superseded_by IS NULL
+      AND (m.valid_from IS NULL OR m.valid_from <= datetime('now'))
       AND (m.valid_until IS NULL OR m.valid_until > datetime('now'))
     ORDER BY rank
     LIMIT ?
   `).all(escapedQuery, project, limit) as unknown[];
 
-  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+  return filterActiveMemories(rows.map((r) => deserializeMemory(asRawMemory(r))));
 }
 
 // ---------------------------------------------------------------------------
@@ -444,6 +463,8 @@ export function searchMemoriesInRange(
     WHERE memories_fts MATCH ?
       AND m.project = ?
       AND m.deleted_at IS NULL
+      AND m.superseded_by IS NULL
+      AND (m.valid_from IS NULL OR m.valid_from <= datetime('now'))
       AND (m.valid_until IS NULL OR m.valid_until > datetime('now'))
       AND m.distance >= ?
       AND m.distance < ?
@@ -451,11 +472,11 @@ export function searchMemoriesInRange(
     LIMIT ?
   `).all(escapedQuery, project, minDistance, maxDistance, limit) as unknown[];
 
-  return rows.map((r) => deserializeMemory(asRawMemory(r)));
+  return filterActiveMemories(rows.map((r) => deserializeMemory(asRawMemory(r))));
 }
 
 // ---------------------------------------------------------------------------
-// Nearest memories (by orbital distance — closest to the "sun" first)
+// Nearest memories (by orbital distance ??closest to the "sun" first)
 // ---------------------------------------------------------------------------
 
 export function getNearestMemories(project: string, limit: number): Memory[] {
@@ -732,7 +753,7 @@ export function getConstellation(
 
 /**
  * Get all constellation neighbors for a batch of memory IDs.
- * Returns a map from memory ID → set of neighbor IDs.
+ * Returns a map from memory ID ??set of neighbor IDs.
  */
 export function getEdgesForBatch(
   memoryIds: string[],
@@ -1024,7 +1045,7 @@ export function getMemoriesByQuality(
 
 export function getTopTags(project: string, limit = 20): Array<{ tag: string; count: number }> {
   const db = getDatabase();
-  // Tags are stored as JSON arrays — we use the memories table and parse in JS
+  // Tags are stored as JSON arrays ??we use the memories table and parse in JS
   const rows = db.prepare(`
     SELECT tags FROM memories
     WHERE project = ? AND deleted_at IS NULL
@@ -1175,7 +1196,7 @@ export function getAnalytics(project: string): MemoryAnalytics {
     date: row.date,
     created: row.created,
     accessed: row.accessed,
-    forgotten: 0, // soft-delete count per day — simplified to 0 here
+    forgotten: 0, // soft-delete count per day ??simplified to 0 here
   }));
 
   return {
@@ -1191,3 +1212,4 @@ export function getAnalytics(project: string): MemoryAnalytics {
     activity_timeline,
   };
 }
+

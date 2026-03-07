@@ -1,5 +1,5 @@
 /**
- * sun.ts — Sun state management
+ * sun.ts ??Sun state management
  *
  * The "sun" is the gravitational centre of the memory system: it holds the
  * current working context (what the AI is doing right now).  Every memory
@@ -20,6 +20,7 @@ import {
 } from '../storage/queries.js';
 import { estimateTokens } from '../utils/tokenizer.js';
 import { getConfig } from '../utils/config.js';
+import { filterActiveMemories } from './validity.js';
 import { createMemory } from './planet.js';
 import { corona } from './corona.js';
 
@@ -39,8 +40,8 @@ export function getSunContent(project: string): string {
   }
 
   // Read from the corona in-memory cache instead of hitting the DB.
-  const coreMemories = corona.getCoreMemories();
-  const nearMemories = corona.getNearMemories();
+  const coreMemories = filterActiveMemories(corona.getCoreMemories());
+  const nearMemories = filterActiveMemories(corona.getNearMemories());
   return formatSunContent(sun, coreMemories, nearMemories);
 }
 
@@ -102,7 +103,7 @@ export function commitToSun(
   const formatted     = formatSunContent(updated, coreMemories, nearMemories);
   updated.token_count = estimateTokens(formatted);
 
-  // Warn in dev if we exceed the budget — the consumer (getSunContent) is
+  // Warn in dev if we exceed the budget ??the consumer (getSunContent) is
   // responsible for truncation, but we record the real count here.
   if (updated.token_count > config.sunTokenBudget) {
     process.stderr.write(
@@ -126,9 +127,9 @@ export function commitToSun(
  *
  * New priority order (Corona-aware):
  *   1. Header
- *   2. CORE IDENTITY — core zone memories (instant recall, ~40% budget)
+ *   2. CORE IDENTITY ??core zone memories (instant recall, ~40% budget)
  *   3. WORKING ON (current_work, ~10%)
- *   4. ACTIVE CONTEXT — near zone memories (~25%)
+ *   4. ACTIVE CONTEXT ??near zone memories (~25%)
  *   5. RECENT DECISIONS / NEXT STEPS / ACTIVE ISSUES (~25%)
  */
 export function formatSunContent(
@@ -138,6 +139,8 @@ export function formatSunContent(
 ): string {
   const config = getConfig();
   const budget = config.sunTokenBudget;
+  const activeCoreMemories = filterActiveMemories(coreMemories);
+  const activeNearMemories = filterActiveMemories(nearMemories);
 
   const MAX_CORE_DISPLAY = 5;
   const MAX_NEAR_DISPLAY = 5;
@@ -145,12 +148,12 @@ export function formatSunContent(
 
   /** Truncate summary to SUMMARY_LIMIT characters. */
   const truncSummary = (s: string): string =>
-    s.length > SUMMARY_LIMIT ? s.slice(0, SUMMARY_LIMIT).trimEnd() + '…' : s;
+    s.length > SUMMARY_LIMIT ? s.slice(0, SUMMARY_LIMIT).trimEnd() + '...' : s;
 
   // Build candidate sections in priority order.
   const sections: string[] = [];
 
-  // 1. Header — always included. Add [STALE] warning if last commit > 24h ago.
+  // 1. Header ??always included. Add [STALE] warning if last commit > 24h ago.
   let header = `[STELLAR MEMORY - project: ${sun.project}]`;
   if (sun.last_commit_at) {
     const lastCommitMs = new Date(
@@ -160,22 +163,22 @@ export function formatSunContent(
     ).getTime();
     const hoursSince = (Date.now() - lastCommitMs) / (1000 * 60 * 60);
     if (hoursSince > 24) {
-      header += ` [STALE — last commit ${Math.floor(hoursSince)}h ago. Run commit to refresh.]`;
+      header += ` [STALE ??last commit ${Math.floor(hoursSince)}h ago. Run commit to refresh.]`;
     }
   }
   sections.push(header);
 
-  // 2. CORE IDENTITY — core zone memories (distance < 1.0 AU).
-  // Compressed format: [TYPE] summary (no AU distance — saves tokens)
-  if (coreMemories.length > 0) {
-    const displayed = coreMemories.slice(0, MAX_CORE_DISPLAY);
+  // 2. CORE IDENTITY ??core zone memories (distance < 1.0 AU).
+  // Compressed format: [TYPE] summary (no AU distance ??saves tokens)
+  if (activeCoreMemories.length > 0) {
+    const displayed = activeCoreMemories.slice(0, MAX_CORE_DISPLAY);
     const lines = displayed
       .map(m => `  [${m.type.toUpperCase()}] ${truncSummary(m.summary)}`)
       .join('\n');
-    const overflow = coreMemories.length > MAX_CORE_DISPLAY
-      ? `\n  (+${coreMemories.length - MAX_CORE_DISPLAY} more)`
+    const overflow = activeCoreMemories.length > MAX_CORE_DISPLAY
+      ? `\n  (+${activeCoreMemories.length - MAX_CORE_DISPLAY} more)`
       : '';
-    sections.push(`\nCORE (${coreMemories.length}):\n${lines}${overflow}`);
+    sections.push(`\nCORE (${activeCoreMemories.length}):\n${lines}${overflow}`);
   }
 
   // 3. Current work.
@@ -183,16 +186,16 @@ export function formatSunContent(
     sections.push(`\nWORKING ON:\n${sun.current_work.trim()}`);
   }
 
-  // 4. ACTIVE CONTEXT — near zone memories (1.0-5.0 AU).
-  if (nearMemories.length > 0) {
-    const displayed = nearMemories.slice(0, MAX_NEAR_DISPLAY);
+  // 4. ACTIVE CONTEXT ??near zone memories (1.0-5.0 AU).
+  if (activeNearMemories.length > 0) {
+    const displayed = activeNearMemories.slice(0, MAX_NEAR_DISPLAY);
     const lines = displayed
       .map(m => `  [${m.type.toUpperCase()}] ${truncSummary(m.summary)}`)
       .join('\n');
-    const overflow = nearMemories.length > MAX_NEAR_DISPLAY
-      ? `\n  (+${nearMemories.length - MAX_NEAR_DISPLAY} more)`
+    const overflow = activeNearMemories.length > MAX_NEAR_DISPLAY
+      ? `\n  (+${activeNearMemories.length - MAX_NEAR_DISPLAY} more)`
       : '';
-    sections.push(`\nNEAR (${nearMemories.length}):\n${lines}${overflow}`);
+    sections.push(`\nNEAR (${activeNearMemories.length}):\n${lines}${overflow}`);
   }
 
   // 5. Recent decisions (max 3).
@@ -221,7 +224,7 @@ export function formatSunContent(
   for (const section of sections) {
     const candidate = result + (result.length > 0 ? '\n' : '') + section;
     if (estimateTokens(candidate) > budget) {
-      // This section would push us over — stop here.
+      // This section would push us over ??stop here.
       break;
     }
     result = candidate;
@@ -247,12 +250,12 @@ export function formatSunContent(
  * This prevents session context from being lost when Claude's process
  * ends (e.g., SIGTERM from Claude Desktop, pipe close from Claude Code).
  *
- * Uses synchronous DB calls only — async is unsafe in exit handlers.
+ * Uses synchronous DB calls only ??async is unsafe in exit handlers.
  */
 /**
  * Auto-commit modes:
- *   - 'shutdown': final commit on process exit — always writes
- *   - 'periodic': background timer — skips if a manual commit happened recently
+ *   - 'shutdown': final commit on process exit ??always writes
+ *   - 'periodic': background timer ??skips if a manual commit happened recently
  */
 export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic' = 'shutdown'): void {
   try {
@@ -282,7 +285,7 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
       byType.set(m.type, list);
     }
 
-    // Always merge with existing sun state — never overwrite.
+    // Always merge with existing sun state ??never overwrite.
     // Keep existing current_work/decisions and supplement with new memories.
     const current_work = existing?.current_work
       ? existing.current_work
@@ -323,9 +326,11 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
       `[stellar-memory] Auto-committed sun state (${mode}, ${recent.length} recent memories)\n`
     );
   } catch (err) {
-    // Exit handler must never throw — silently log and continue
+    // Exit handler must never throw ??silently log and continue
     process.stderr.write(
       `[stellar-memory] Auto-commit failed: ${err instanceof Error ? err.message : String(err)}\n`
     );
   }
 }
+
+

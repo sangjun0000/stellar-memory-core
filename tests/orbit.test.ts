@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   recencyScore,
   frequencyScore,
+  calculateImportance,
   importanceToDistance,
   distanceToImportance,
   getOrbitZone,
   applyAccessBoost,
 } from '../src/engine/orbit.js';
+import { getConfig } from '../src/utils/config.js';
+import type { Memory } from '../src/engine/types.js';
 
 describe('recencyScore', () => {
   it('returns 1.0 for brand-new memory (just created)', () => {
@@ -79,6 +82,67 @@ describe('frequencyScore', () => {
 
   it('default saturation point is 50', () => {
     expect(frequencyScore(50)).toBeCloseTo(1.0, 5);
+  });
+});
+
+describe('calculateImportance', () => {
+  function makeMemory(overrides: Partial<Memory> = {}): Memory {
+    const now = new Date().toISOString();
+    return {
+      id: 'memory-1',
+      project: 'test',
+      content: 'We decided to migrate the authentication schema to PostgreSQL',
+      summary: 'Migrate authentication schema to PostgreSQL',
+      type: 'decision',
+      tags: ['postgresql', 'authentication', 'schema'],
+      distance: 5,
+      importance: 0.5,
+      velocity: 0,
+      impact: 0.8,
+      access_count: 2,
+      last_accessed_at: now,
+      metadata: {},
+      source: 'manual',
+      source_path: null,
+      source_hash: null,
+      content_hash: null,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+      ...overrides,
+    };
+  }
+
+  it('rewards memories that match the current work context', () => {
+    const config = getConfig();
+    const relevant = calculateImportance(
+      makeMemory(),
+      'Current work: finish the PostgreSQL authentication migration',
+      config,
+      0.9,
+    );
+    const unrelated = calculateImportance(
+      makeMemory({ content: 'Updated CSS spacing for landing page', summary: 'CSS spacing update', type: 'observation', tags: ['css', 'spacing'], impact: 0.3 }),
+      'Current work: finish the PostgreSQL authentication migration',
+      config,
+      0.3,
+    );
+
+    expect(relevant.total).toBeGreaterThan(unrelated.total);
+  });
+
+  it('zeros out non-active memories even if their base signals are strong', () => {
+    const config = getConfig();
+    const active = calculateImportance(makeMemory(), 'authentication migration', config, 0.9);
+    const superseded = calculateImportance(
+      makeMemory({ superseded_by: 'replacement-memory' }),
+      'authentication migration',
+      config,
+      0.9,
+    );
+
+    expect(active.total).toBeGreaterThan(0);
+    expect(superseded.total).toBe(0);
   });
 });
 

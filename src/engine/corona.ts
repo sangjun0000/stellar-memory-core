@@ -1,8 +1,8 @@
 /**
- * corona.ts — In-memory cache layer (the Sun's corona)
+ * corona.ts ??In-memory cache layer (the Sun's corona)
  *
  * The corona is an in-memory cache of core + near zone memories that enables
- * sub-millisecond recall for the most important memories — mimicking how
+ * sub-millisecond recall for the most important memories ??mimicking how
  * humans instantly access their name, age, and profession (System 1).
  *
  * Architecture:
@@ -19,6 +19,7 @@ import type { Memory } from './types.js';
 import { tokenize } from './gravity.js';
 import { getMemoriesByProject } from '../storage/queries.js';
 import { createLogger } from '../utils/logger.js';
+import { filterActiveMemories, isMemoryCurrentlyActive } from './validity.js';
 
 const log = createLogger('corona');
 
@@ -39,12 +40,7 @@ class Corona {
 
     const memories = getMemoriesByProject(project);
     // memories are already sorted by distance ASC from the query
-    // Filter out expired memories (valid_until in the past)
-    const now = new Date().toISOString();
-    const validMemories = memories.filter(m =>
-      !m.valid_until || m.valid_until > now
-    );
-    const toCache = validMemories.slice(0, MAX_CORONA_SIZE);
+    const toCache = filterActiveMemories(memories).slice(0, MAX_CORONA_SIZE);
 
     for (const mem of toCache) {
       this.cache.set(mem.id, mem);
@@ -125,6 +121,10 @@ class Corona {
   /** Add or update a memory in the cache (if it qualifies by distance). */
   upsert(memory: Memory): void {
     if (memory.project !== this.project) return;
+    if (!isMemoryCurrentlyActive(memory)) {
+      this.evict(memory.id);
+      return;
+    }
 
     // Remove old token entries if updating
     if (this.cache.has(memory.id)) {
@@ -174,7 +174,7 @@ class Corona {
     };
   }
 
-  // ── Private helpers ─────────────────────────────────────────────────────
+  // ?�?� Private helpers ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
   private indexTokens(memory: Memory): void {
     const text = [memory.content, memory.summary, ...memory.tags].join(' ');
@@ -202,3 +202,4 @@ class Corona {
 
 /** Singleton corona instance. */
 export const corona = new Corona();
+

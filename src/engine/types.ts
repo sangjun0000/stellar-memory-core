@@ -32,6 +32,8 @@ export const DEFAULT_WEIGHTS = {
   relevance: 0.20,
 } as const;
 
+export type MemoryValidityState = 'active' | 'future' | 'expired' | 'superseded';
+
 // Memory interface
 export interface Memory {
   id: string;
@@ -116,7 +118,7 @@ export interface ImportanceComponents {
   total: number;
 }
 
-// Knowledge Graph — Constellation
+// Knowledge Graph -- Constellation
 export type RelationType = 'uses' | 'caused_by' | 'part_of' | 'contradicts' | 'supersedes' | 'related_to' | 'depends_on' | 'derived_from';
 
 export interface ConstellationEdge {
@@ -132,8 +134,8 @@ export interface ConstellationEdge {
 
 // Temporal Awareness
 export interface TemporalInfo {
-  valid_from?: string;      // ISO date — when this fact became true
-  valid_until?: string;     // ISO date — when this fact stopped being true
+  valid_from?: string;      // ISO date -- when this fact became true
+  valid_until?: string;     // ISO date -- when this fact stopped being true
   superseded_by?: string;   // memory ID that replaced this one
 }
 

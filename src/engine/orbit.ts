@@ -25,7 +25,9 @@ import { getDatabase } from '../storage/database.js';
 import { corona } from './corona.js';
 import { qualityOrbitAdjustment } from './quality.js';
 import { getProceduralDecayMultiplier } from './procedural.js';
+import { calculateContentWeight } from './content-weight.js';
 import type { MemoryType } from './types.js';
+import { getMemoryValidityState } from './validity.js';
 
 // ---------------------------------------------------------------------------
 // Scoring primitives
@@ -146,8 +148,8 @@ export function calculateImportance(
   // ACT-R activation
   const activation = recencyWeight * rec + frequencyWeight * freq;
 
-  // contentWeight: externally injected (future content-weight agent), fallback to impact
-  const cw = contentWeight ?? memory.impact;
+  // contentWeight: prefer adaptive content evaluation, then caller injection, then impact fallback.
+  const cw = contentWeight ?? calculateContentWeight(memory.content, memory.type, memory.id);
 
   // qualityModifier ∈ [0.7, 1.2]
   const qualityModifier = 0.7 + 0.5 * (memory.quality_score ?? 0.5);
@@ -191,7 +193,16 @@ export function calculateImportance(
     rel = keywordRelevance(memoryText, sunText);
   }
 
-  const total = Math.max(0, Math.min(1, activation * cw * qualityModifier));
+  const taskBoost = 0.85 + rel * 0.3;
+  const validityState = getMemoryValidityState(memory);
+  const validityModifier = validityState === 'active' ? 1 : 0;
+  const lastAccessMs = memory.last_accessed_at
+    ? new Date(/[Zz]$|[+-]\d{2}:\d{2}$/.test(memory.last_accessed_at) ? memory.last_accessed_at : `${memory.last_accessed_at}Z`).getTime()
+    : null;
+  const recentlyReused = lastAccessMs !== null && (Date.now() - lastAccessMs) <= 24 * 60 * 60 * 1000;
+  const reuseBoost = recentlyReused && rel >= 0.2 ? 1.05 : 1;
+
+  const total = Math.max(0, Math.min(1, activation * cw * qualityModifier * taskBoost * reuseBoost * validityModifier));
 
   return {
     // Sub-components

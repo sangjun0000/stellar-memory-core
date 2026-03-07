@@ -59,6 +59,11 @@ const CONTEXT_KEYWORDS = [
   '사용', '필요', '의존', '기반',
 ];
 
+const LOW_SIGNAL_PATTERNS = [
+  /\b(?:sounds good|looks good|thank you|thanks|got it|okay|ok)\b/i,
+  /\b(?:let me know|please check|can you check|follow up later)\b/i,
+];
+
 // ---------------------------------------------------------------------------
 // Stop words — filtered out during key term extraction
 // ---------------------------------------------------------------------------
@@ -111,6 +116,19 @@ export function extractKeyTerms(text: string): string[] {
   }
 
   return terms;
+}
+
+export function shouldPersistObservation(sentence: string, type: MemoryType): boolean {
+  const trimmed = sentence.trim();
+  if (trimmed.length < 20) return false;
+  if (trimmed.endsWith('?')) return false;
+  if (LOW_SIGNAL_PATTERNS.some((pattern) => pattern.test(trimmed))) return false;
+
+  const terms = extractKeyTerms(trimmed);
+  const hasActionSignal = /\b(?:decided|migrated|implemented|fixed|failed|todo|next step|will use|switched)\b/i.test(trimmed);
+  const minTerms = type === 'decision' || type === 'error' || type === 'milestone' ? 2 : 3;
+
+  return hasActionSignal || terms.length >= minTerms;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +219,7 @@ export function observe(
   for (const sentence of sentences) {
     const type = detectType(sentence);
     if (!type) continue;
+    if (!shouldPersistObservation(sentence, type)) continue;
 
     // Normalize to avoid creating duplicate memories in the same chunk
     const normalized = sentence.toLowerCase().replace(/\s+/g, ' ').trim();
