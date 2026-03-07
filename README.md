@@ -19,7 +19,7 @@ Stellar Memory is a local-first, persistent memory system for AI assistants. It 
 - **Hybrid Search** -- FTS5 keyword search + sqlite-vec KNN vector search, merged via Reciprocal Rank Fusion
 - **Local Embeddings** -- all-MiniLM-L6-v2 (384d) runs entirely in-process via `@xenova/transformers`
 - **Corona Cache** -- in-memory tier of up to 200 core memories for sub-millisecond recall
-- **MCP Native** -- 16 tools + 1 resource, works with Claude Code, Claude Desktop, and any MCP client
+- **MCP Native** -- 16 tools + 1 resource, works with Claude Code, Codex, Claude Desktop, and other MCP clients
 - **REST API** -- Hono server on port 21547 with 13 route groups
 - **3D Dashboard** -- React + Three.js solar system visualization with D3 orbital overlay
 - **Multi-Project** -- isolated memory spaces (galaxies) with cross-project universal memories
@@ -103,6 +103,26 @@ Then in Claude Code, Stellar Memory automatically:
 2. Recalls relevant memories when topics change
 3. Stores decisions, errors, and milestones as they happen
 4. Commits session state before the conversation ends
+
+### Use with Codex
+
+Add this block to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers."stellar-memory"]
+command = "node"
+args = ["/absolute/path/to/stellar-memory/dist/index.js"]
+```
+
+Or use the setup helper:
+
+```bash
+npx stellar-memory init --codex
+```
+
+That command also installs a Stellar Memory workflow section into the project `AGENTS.md` so Codex restores context, recalls before guessing, and commits before ending work.
+
+Codex does not support Claude-style session hooks. In Codex, the MCP server still works normally, and the first Stellar tool response can restore saved sun context.
 
 ### Use with Claude Desktop
 
@@ -360,3 +380,4 @@ The test suite uses a virtual module plugin in `vitest.config.ts` to bridge `nod
 ## License
 
 MIT
+
