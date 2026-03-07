@@ -1,6 +1,6 @@
 {
   "name": "stellar-memory",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "AI memory system using celestial mechanics metaphor - MCP server for persistent context across sessions",
   "type": "module",
   "main": "dist/index.js",
@@ -70,6 +70,7 @@
     "@types/ws": "^8.18.1",
     "electron": "^40.6.1",
     "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
