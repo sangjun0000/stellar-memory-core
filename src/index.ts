@@ -3,7 +3,7 @@ import { createStellarServer } from './mcp/server.js';
 import { initDatabase } from './storage/database.js';
 import { getConfig } from './utils/config.js';
 import { autoCommitOnClose } from './engine/sun.js';
-import { switchProject } from './engine/multiproject.js';
+import { switchProject, getCurrentProject } from './engine/multiproject.js';
 
 /**
  * Validate that the runtime environment meets Stellar Memory's requirements.
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const onShutdown = (): void => {
     if (shutdownDone) return;
     shutdownDone = true;
-    autoCommitOnClose(config.defaultProject);
+    autoCommitOnClose(getCurrentProject());
   };
 
   process.on('exit', onShutdown);

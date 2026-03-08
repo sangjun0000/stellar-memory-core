@@ -23,6 +23,7 @@ import { getConfig } from '../utils/config.js';
 import { filterActiveMemories } from './validity.js';
 import { createMemory } from './planet.js';
 import { corona } from './corona.js';
+import { getSessionCommitDraft } from './session-policy.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -260,6 +261,7 @@ export function formatSunContent(
 export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic' = 'shutdown'): void {
   try {
     const existing = getSunState(project);
+    const sessionDraft = getSessionCommitDraft(project, existing);
 
     // Protect recent manual commits from being overwritten by auto-generated content.
     // Shutdown: skip if commit < 30 min ago. Periodic: skip if commit < 10 min ago.
@@ -275,7 +277,7 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
     }
 
     const recent = getRecentMemories(project, 3);
-    if (recent.length === 0) return;
+    if (recent.length === 0 && !sessionDraft) return;
 
     // Group by type
     const byType = new Map<string, string[]>();
@@ -288,22 +290,26 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
     // Always merge with existing sun state ??never overwrite.
     // Keep existing current_work/decisions and supplement with new memories.
     const current_work = existing?.current_work
-      ? existing.current_work
-      : byType.get('context')?.slice(0, 3).join('; ')
-        ?? byType.get('task')?.slice(0, 3).join('; ')
-        ?? `${recent.length} memories from last session`;
+      || sessionDraft?.current_work
+      || byType.get('context')?.slice(0, 3).join('; ')
+      || byType.get('task')?.slice(0, 3).join('; ')
+      || `${recent.length} memories from last session`;
 
     const newDecisions = byType.get('decision')?.slice(0, 5) ?? [];
+    const sessionDecisions = sessionDraft?.decisions ?? [];
     const decisions = existing?.recent_decisions?.length
-      ? [...existing.recent_decisions, ...newDecisions.filter(d => !existing.recent_decisions.includes(d))].slice(0, 10)
-      : newDecisions;
+      ? [...existing.recent_decisions, ...sessionDecisions.filter(d => !existing.recent_decisions.includes(d)), ...newDecisions.filter(d => !existing.recent_decisions.includes(d) && !sessionDecisions.includes(d))].slice(0, 10)
+      : [...sessionDecisions, ...newDecisions.filter(d => !sessionDecisions.includes(d))].slice(0, 10);
 
     const newSteps = byType.get('task')?.slice(0, 5) ?? [];
+    const sessionSteps = sessionDraft?.next_steps ?? [];
     const next_steps = existing?.next_steps?.length
-      ? [...existing.next_steps, ...newSteps.filter(s => !existing.next_steps.includes(s))].slice(0, 10)
-      : newSteps;
+      ? [...existing.next_steps, ...sessionSteps.filter(s => !existing.next_steps.includes(s)), ...newSteps.filter(s => !existing.next_steps.includes(s) && !sessionSteps.includes(s))].slice(0, 10)
+      : [...sessionSteps, ...newSteps.filter(s => !sessionSteps.includes(s))].slice(0, 10);
 
-    const errors = byType.get('error')?.slice(0, 3) ?? [];
+    const recentErrors = byType.get('error')?.slice(0, 3) ?? [];
+    const sessionErrors = sessionDraft?.errors ?? [];
+    const errors = [...sessionErrors, ...recentErrors.filter(e => !sessionErrors.includes(e))].slice(0, 5);
 
     const now = new Date().toISOString();
 
@@ -314,7 +320,7 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
       recent_decisions: decisions,
       next_steps,
       active_errors:    errors.length > 0 ? errors : (existing?.active_errors ?? []),
-      project_context:  existing?.project_context ?? '',
+      project_context:  existing?.project_context || sessionDraft?.context || '',
       token_count:      0,
       last_commit_at:   now,
       updated_at:       now,

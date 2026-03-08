@@ -74,6 +74,13 @@ import {
   formatProceduralSection,
 } from '../../engine/procedural.js';
 import { corona } from '../../engine/corona.js';
+import {
+  noteRecall,
+  noteRemember,
+  noteObserve,
+  clearSessionActivity,
+  formatSessionDraftNote,
+} from '../../engine/session-policy.js';
 
 // ---------------------------------------------------------------------------
 // Corona lazy initialization
@@ -274,6 +281,7 @@ export async function handleCommit(args: {
     });
 
     const changes: OrbitChange[] = recalculateOrbits(proj, config);
+    clearSessionActivity(proj);
 
     const lines: string[] = [
       `✓ Committed | decisions: ${(args.decisions ?? []).length} | steps: ${(args.next_steps ?? []).length} | errors: ${(args.errors ?? []).length} | orbit changes: ${changes.length}`,
@@ -323,6 +331,7 @@ export async function handleRecall(args: {
     const proj = resolveProject();
     const limit = args.limit ?? 10;
     ensureCorona();
+    noteRecall(proj, args.query);
 
     const memoryType: MemoryType | undefined =
       args.type === 'all' || args.type === undefined ? undefined : (args.type as MemoryType);
@@ -353,8 +362,9 @@ export async function handleRecall(args: {
     }
 
     if (results.length === 0 && universals.length === 0) {
+      const draftNote = formatSessionDraftNote(proj);
       return {
-        content: [{ type: 'text' as const, text: `No memories found matching "${args.query}".` }],
+        content: [{ type: 'text' as const, text: draftNote ? `No memories found matching "${args.query}".\n\n${draftNote}` : `No memories found matching "${args.query}".` }],
       };
     }
 
@@ -390,6 +400,9 @@ export async function handleRecall(args: {
       }
     }
 
+    const draftNote = formatSessionDraftNote(proj);
+    if (draftNote) lines.push(draftNote);
+
     return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   } catch (err) {
     if (err instanceof McpError) throw err;
@@ -419,6 +432,7 @@ export async function handleRemember(args: {
       impact:  args.impact,
       tags:    args.tags,
     });
+    noteRemember(proj, memory);
 
     // Background: auto-extract relationships with existing memories.
     // Fire-and-forget — does not block the response.
@@ -455,6 +469,8 @@ export async function handleRemember(args: {
     if (supersessionNote) lines.push(supersessionNote);
     if (qualityFeedback) lines.push(`\nQuality tip: ${qualityFeedback}`);
     if (conflictWarnings) lines.push(`\n${conflictWarnings}`);
+    const draftNote = formatSessionDraftNote(proj);
+    if (draftNote) lines.push(`\n${draftNote}`);
 
     return {
       content: [{
@@ -1043,13 +1059,19 @@ export async function handleObserve(args: {
   try {
     const proj = args.project ?? resolveProject();
     const stats = await processConversation(args.conversation, proj);
+    noteObserve(proj, `${stats.memoriesCreated} memories from observed conversation`);
 
-    const text = [
+    const lines = [
       `Observation complete for project "${proj}":`,
       `  Memories created:    ${stats.memoriesCreated}`,
       `  Memories reinforced: ${stats.memoriesReinforced}`,
       `  Conflicts detected:  ${stats.conflictsDetected}`,
-    ].join('\n');
+    ];
+    const draftNote = formatSessionDraftNote(proj);
+    if (draftNote) {
+      lines.push('', draftNote);
+    }
+    const text = lines.join('\n');
 
     return { content: [{ type: 'text' as const, text }] };
   } catch (err) {
