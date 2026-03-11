@@ -16,6 +16,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { Memory, MemoryType } from './types.js';
 import { getMemoriesByProject, insertMemory } from '../storage/queries.js';
 import { getConfig } from '../utils/config.js';
+import { STOP_WORDS } from '../utils/stopwords.js';
 import {
   recencyScore,
   frequencyScore,
@@ -50,18 +51,12 @@ function findRepeatedPatterns(memories: Memory[]): Map<string, Memory[]> {
  * Uses the most common non-trivial words across all content.
  */
 function extractGroupKeywords(memories: Memory[]): string[] {
-  const stopWords = new Set([
-    'the', 'a', 'an', 'is', 'it', 'in', 'on', 'at', 'to', 'for',
-    'of', 'and', 'or', 'but', 'with', 'from', 'that', 'this', 'was',
-    'are', 'be', 'been', 'been', 'by', 'as', 'not', 'use', 'used',
-  ]);
-
   const wordCount = new Map<string, number>();
   for (const mem of memories) {
     const words = (mem.content + ' ' + mem.summary)
       .toLowerCase()
       .split(/[\s,.\-:;()\[\]{}'"!?/\\]+/)
-      .filter(w => w.length > 3 && !stopWords.has(w));
+      .filter(w => w.length > 3 && !STOP_WORDS.has(w));
 
     for (const w of words) {
       wordCount.set(w, (wordCount.get(w) ?? 0) + 1);
@@ -259,50 +254,3 @@ export function getProceduralDecayMultiplier(): number {
   return 0.3;
 }
 
-// ---------------------------------------------------------------------------
-// Rule suggestion
-// ---------------------------------------------------------------------------
-
-/**
- * Analyse the last 50 memories and suggest concrete procedural rules.
- *
- * Returns candidates sorted by confidence (highest first). Confidence is
- * the proportion of the tag-group that supports a consistent pattern.
- *
- * Skips rules that already exist as procedural memories (by rule text match).
- */
-export function suggestRules(
-  recentMemories: Memory[],
-): Array<{ rule: string; confidence: number; evidence: Memory[] }> {
-  const sample = recentMemories.slice(0, 50);
-  const groups = findRepeatedPatterns(sample);
-  const results: Array<{ rule: string; confidence: number; evidence: Memory[] }> = [];
-
-  for (const [tag, groupMemories] of groups) {
-    const total = groupMemories.length;
-    const type = dominantType(groupMemories);
-    const keywords = extractGroupKeywords(groupMemories);
-
-    // Confidence: how consistently the group points in one direction
-    const confidence = Math.min(1.0, (total - 2) / 10 + (type ? 0.2 : 0));
-
-    let rule: string;
-    if (type === 'error') {
-      rule = keywords.length > 0
-        ? `When facing ${tag} errors: address ${keywords.slice(0, 2).join(' and ')}`
-        : `Document and track ${tag} error resolutions systematically`;
-    } else if (type === 'decision') {
-      rule = keywords.length > 0
-        ? `For ${tag} decisions: apply ${keywords.slice(0, 2).join(' and ')} criteria`
-        : `Maintain consistent decision criteria for ${tag}`;
-    } else {
-      rule = keywords.length > 0
-        ? `${tag} work follows pattern: ${keywords.slice(0, 3).join(', ')}`
-        : `Track ${tag} as a key recurring theme`;
-    }
-
-    results.push({ rule, confidence, evidence: groupMemories });
-  }
-
-  return results.sort((a, b) => b.confidence - a.confidence);
-}

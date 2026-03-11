@@ -16,8 +16,11 @@ import {
   upsertSunState,
   getSunState,
   getMemoriesByProject,
+  getProjectMemoryCount,
+  getProjectLastUpdated,
+  getProjectHasUniversal,
+  getProjectDistributions,
 } from '../storage/queries.js';
-import { getDatabase } from '../storage/database.js';
 import { createLogger } from '../utils/logger.js';
 import { getConfig } from '../utils/config.js';
 import { corona } from './corona.js';
@@ -76,13 +79,7 @@ export function switchProject(project: string): {
 
   log.info('Switched project', { previous, current: project });
 
-  const db = getDatabase();
-  const row = db.prepare(`
-    SELECT COUNT(*) as count FROM memories
-    WHERE project = ? AND deleted_at IS NULL
-  `).get(project) as { count: number } | undefined;
-
-  const memoryCount = row?.count ?? 0;
+  const memoryCount = getProjectMemoryCount(project);
 
   // Reload the corona cache for the new project.
   corona.switchProject(project);
@@ -137,25 +134,9 @@ export function listAllProjects(): Array<{
     countMap.set('default', 0);
   }
 
-  const db = getDatabase();
-
   return [...countMap.entries()].map(([project, memoryCount]) => {
-    // Get last updated timestamp for this project
-    const lastRow = db.prepare(`
-      SELECT MAX(updated_at) as last_updated FROM memories
-      WHERE project = ? AND deleted_at IS NULL
-    `).get(project) as { last_updated: string | null } | undefined;
-
-    const lastUpdated = lastRow?.last_updated ?? new Date().toISOString();
-
-    // Check if this project has any universal memories
-    const univRow = db.prepare(`
-      SELECT COUNT(*) as count FROM memories
-      WHERE project = ? AND is_universal = 1 AND deleted_at IS NULL
-    `).get(project) as { count: number } | undefined;
-
-    const hasUniversal = (univRow?.count ?? 0) > 0;
-
+    const lastUpdated = getProjectLastUpdated(project) ?? new Date().toISOString();
+    const hasUniversal = getProjectHasUniversal(project);
     return { project, memoryCount, lastUpdated, hasUniversal };
   }).sort((a, b) => b.memoryCount - a.memoryCount);
 }
@@ -245,68 +226,14 @@ export function getProjectStats(project: string): {
   oldestMemory: string;
   newestMemory: string;
 } {
-  const db = getDatabase();
-
-  // Basic count
-  const countRow = db.prepare(`
-    SELECT COUNT(*) as count FROM memories
-    WHERE project = ? AND deleted_at IS NULL
-  `).get(project) as { count: number } | undefined;
-
-  const memoryCount = countRow?.count ?? 0;
-
-  // Zone distribution
-  const zoneRows = db.prepare(`
-    SELECT
-      CASE
-        WHEN distance < 1.0  THEN 'core'
-        WHEN distance < 5.0  THEN 'near'
-        WHEN distance < 15.0 THEN 'active'
-        WHEN distance < 40.0 THEN 'archive'
-        WHEN distance < 70.0 THEN 'fading'
-        ELSE 'forgotten'
-      END as zone,
-      COUNT(*) as count
-    FROM memories
-    WHERE project = ? AND deleted_at IS NULL
-    GROUP BY zone
-  `).all(project) as Array<{ zone: string; count: number }>;
-
-  const zoneDistribution: Record<string, number> = {};
-  for (const row of zoneRows) {
-    zoneDistribution[row.zone] = row.count;
-  }
-
-  // Type distribution
-  const typeRows = db.prepare(`
-    SELECT type, COUNT(*) as count
-    FROM memories
-    WHERE project = ? AND deleted_at IS NULL
-    GROUP BY type
-  `).all(project) as Array<{ type: string; count: number }>;
-
-  const typeDistribution: Record<string, number> = {};
-  for (const row of typeRows) {
-    typeDistribution[row.type] = row.count;
-  }
-
-  // Universal count
-  const univRow = db.prepare(`
-    SELECT COUNT(*) as count FROM memories
-    WHERE project = ? AND is_universal = 1 AND deleted_at IS NULL
-  `).get(project) as { count: number } | undefined;
-
-  const universalCount = univRow?.count ?? 0;
-
-  // Date range
-  const rangeRow = db.prepare(`
-    SELECT MIN(created_at) as oldest, MAX(created_at) as newest
-    FROM memories
-    WHERE project = ? AND deleted_at IS NULL
-  `).get(project) as { oldest: string | null; newest: string | null } | undefined;
-
-  const oldestMemory = rangeRow?.oldest ?? '';
-  const newestMemory = rangeRow?.newest ?? '';
+  const memoryCount = getProjectMemoryCount(project);
+  const {
+    zoneDistribution,
+    typeDistribution,
+    universalCount,
+    oldestMemory,
+    newestMemory,
+  } = getProjectDistributions(project);
 
   return {
     memoryCount,

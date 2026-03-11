@@ -22,6 +22,7 @@ import { createObservation } from '../storage/queries.js';
 import { updateMemoryOrbit, updateMemoryAccess } from '../storage/queries.js';
 import { applyAccessBoost } from './orbit.js';
 import { createLogger } from '../utils/logger.js';
+import { STOP_WORDS } from '../utils/stopwords.js';
 
 const log = createLogger('observation');
 
@@ -63,28 +64,6 @@ const LOW_SIGNAL_PATTERNS = [
   /\b(?:sounds good|looks good|thank you|thanks|got it|okay|ok)\b/i,
   /\b(?:let me know|please check|can you check|follow up later)\b/i,
 ];
-
-// ---------------------------------------------------------------------------
-// Stop words — filtered out during key term extraction
-// ---------------------------------------------------------------------------
-
-const STOP_WORDS = new Set([
-  // English
-  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-  'should', 'may', 'might', 'shall', 'can', 'need', 'must', 'ought',
-  'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'as',
-  'into', 'through', 'from', 'up', 'down', 'out', 'off', 'over', 'under',
-  'and', 'or', 'but', 'if', 'then', 'that', 'this', 'it', 'its',
-  'i', 'we', 'you', 'he', 'she', 'they', 'them', 'their', 'our', 'my',
-  'so', 'than', 'when', 'where', 'who', 'which', 'what', 'how', 'why',
-  'not', 'no', 'all', 'each', 'both', 'few', 'more', 'other', 'some',
-  'such', 'only', 'own', 'same', 'also', 'just', 'now', 'very', 'too',
-  // Korean particles
-  '은', '는', '이', '가', '을', '를', '의', '에', '에서', '로', '으로',
-  '와', '과', '도', '만', '가', '께', '한테', '에게', '부터', '까지',
-  '이다', '입니다', '있다', '없다', '이라', '이면', '라면', '같은',
-]);
 
 // ---------------------------------------------------------------------------
 // Key term extraction
@@ -167,7 +146,7 @@ function detectType(sentence: string): MemoryType | null {
  * Filters out empty or very short chunks.
  * Chunks are bounded to 100-500 words each.
  */
-export function splitConversation(text: string): string[] {
+function splitConversation(text: string): string[] {
   const TURN_PATTERN = /^(?:User|Assistant|Human|AI|System|사용자|어시스턴트):/im;
 
   // First try turn-based splitting
@@ -202,7 +181,7 @@ export function splitConversation(text: string): string[] {
  *
  * Returns the text observations extracted and the Memory objects created.
  */
-export function observe(
+function observe(
   conversationChunk: string,
   project: string,
 ): { observations: string[]; memories: Memory[] } {
@@ -294,7 +273,7 @@ export function observe(
  *   - If an existing memory uses contradicting signals (negation patterns) → conflicting
  *   - Otherwise → novel
  */
-export async function reflect(
+async function reflect(
   newObservations: string[],
   project: string,
 ): Promise<{

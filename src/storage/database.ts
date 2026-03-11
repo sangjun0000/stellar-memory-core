@@ -86,10 +86,14 @@ CREATE TABLE IF NOT EXISTS orbit_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- FTS5 virtual table for full-text search
+-- FTS5 virtual table for full-text search.
+-- Uses the trigram tokenizer for reliable CJK (Korean/Japanese/Chinese) support
+-- and substring matching. Trigram creates a larger index than the default
+-- unicode61 tokenizer but handles all scripts without language-specific tuning.
 CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
   content, summary, tags,
-  content='memories', content_rowid='rowid'
+  content='memories', content_rowid='rowid',
+  tokenize='trigram'
 );
 
 -- Keep FTS index in sync with the memories table
@@ -195,6 +199,88 @@ function migrateMemoriesTable(db: DatabaseSync): void {
   }
 }
 
+/**
+ * Migrate the FTS5 table from the old default (unicode61) tokenizer to the
+ * trigram tokenizer, which provides reliable CJK and substring search support.
+ *
+ * Detection: query the FTS config table for the tokenize setting.
+ * If it already says 'trigram' (or the table doesn't exist yet), do nothing.
+ * Otherwise drop the old table + its triggers and let the main DDL recreate them.
+ *
+ * Dropping and recreating loses the FTS index but it is rebuilt automatically
+ * from the content='memories' backing table on first query.
+ */
+function migrateFtsTokenizer(db: DatabaseSync): void {
+  // Check whether the FTS table exists at all
+  const tableRow = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memories_fts'`
+  ).get() as { name: string } | undefined;
+
+  if (!tableRow) {
+    // Table does not exist yet — main DDL will create it with the correct tokenizer.
+    return;
+  }
+
+  // Read the tokenizer setting from the FTS config shadow table
+  let currentTokenizer = '';
+  try {
+    const configRow = db.prepare(
+      `SELECT v FROM memories_fts_config WHERE k = 'tokenize'`
+    ).get() as { v: string } | undefined;
+    currentTokenizer = configRow?.v ?? '';
+  } catch {
+    // The config shadow table may not be queryable this way in all SQLite builds.
+    // Fall through to the recreation path to be safe.
+  }
+
+  if (currentTokenizer === 'trigram') {
+    // Already on the correct tokenizer — nothing to do.
+    return;
+  }
+
+  // Drop the sync triggers first so SQLite doesn't complain about references
+  db.exec('DROP TRIGGER IF EXISTS memories_ai;');
+  db.exec('DROP TRIGGER IF EXISTS memories_ad;');
+  db.exec('DROP TRIGGER IF EXISTS memories_au;');
+
+  // Drop the old FTS table (this also drops its shadow tables)
+  db.exec('DROP TABLE IF EXISTS memories_fts;');
+
+  // Recreate with trigram tokenizer
+  db.exec(`
+    CREATE VIRTUAL TABLE memories_fts USING fts5(
+      content, summary, tags,
+      content='memories', content_rowid='rowid',
+      tokenize='trigram'
+    );
+  `);
+
+  // Recreate the sync triggers
+  db.exec(`
+    CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+      INSERT INTO memories_fts(rowid, content, summary, tags)
+      VALUES (new.rowid, new.content, new.summary, new.tags);
+    END;
+  `);
+  db.exec(`
+    CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags)
+      VALUES ('delete', old.rowid, old.content, old.summary, old.tags);
+    END;
+  `);
+  db.exec(`
+    CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags)
+      VALUES ('delete', old.rowid, old.content, old.summary, old.tags);
+      INSERT INTO memories_fts(rowid, content, summary, tags)
+      VALUES (new.rowid, new.content, new.summary, new.tags);
+    END;
+  `);
+
+  // Rebuild the FTS index from the existing memories table
+  db.exec(`INSERT INTO memories_fts(memories_fts) VALUES ('rebuild');`);
+}
+
 export function initDatabase(dbPath: string): DatabaseSync {
   // allowExtension is required for sqlite-vec to load its native module.
   const db = new DatabaseSync(dbPath, { allowExtension: true });
@@ -219,6 +305,9 @@ export function initDatabase(dbPath: string): DatabaseSync {
 
   // Migrate existing tables that predate newer columns
   try { migrateMemoriesTable(db); } catch { /* ignore migration errors */ }
+
+  // Migrate FTS5 table to trigram tokenizer if it was created with the old default
+  try { migrateFtsTokenizer(db); } catch { /* ignore migration errors */ }
 
   // Create vector tables (separated so they run after the extension loads)
   try {

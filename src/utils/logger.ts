@@ -112,5 +112,3 @@ export function createLogger(component: string): Logger {
   return new StellarLogger(component);
 }
 
-/** Module-level default logger (used before component-specific loggers are created). */
-export const logger: Logger = createLogger('stellar-memory');

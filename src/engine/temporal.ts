@@ -8,13 +8,15 @@
  * All functions are pure (no classes), following the project style.
  */
 
-import { getDatabase } from '../storage/database.js';
 import {
   getMemoryById,
   getMemoriesAtTime,
   supersedMemory as queriesSupersedMemory,
   getSupersessionChain,
   searchMemories,
+  setTemporalBoundsQuery,
+  findSupersessionChainRoot,
+  getTemporalStats,
 } from '../storage/queries.js';
 import type { Memory } from './types.js';
 import { createLogger } from '../utils/logger.js';
@@ -36,24 +38,7 @@ export function setTemporalBounds(
   validFrom?: string,
   validUntil?: string,
 ): void {
-  const db = getDatabase();
-  const now = new Date().toISOString();
-
-  const sets: string[] = ['updated_at = ?'];
-  const values: (string | null)[] = [now];
-
-  if (validFrom !== undefined) {
-    sets.push('valid_from = ?');
-    values.push(validFrom);
-  }
-  if (validUntil !== undefined) {
-    sets.push('valid_until = ?');
-    values.push(validUntil);
-  }
-
-  values.push(memoryId);
-  db.prepare(`UPDATE memories SET ${sets.join(', ')} WHERE id = ?`).run(...values);
-
+  setTemporalBoundsQuery(memoryId, validFrom, validUntil);
   log.debug('Temporal bounds set', { memoryId, validFrom, validUntil });
 }
 
@@ -101,37 +86,10 @@ export function getContextAtTime(project: string, timestamp: string): Memory[] {
  * Returns the full lineage in chronological order (oldest first).
  */
 export function getEvolutionChain(memoryId: string): Memory[] {
-  // First find the root (walk backward via content search is not feasible —
-  // we look for any memory whose superseded_by points to our target, recursively).
-  const root = findChainRoot(memoryId);
-
-  // Now walk forward from root using getSupersessionChain (follows superseded_by).
+  // Walk backward to find the root, then forward using getSupersessionChain.
+  const root = findSupersessionChainRoot(memoryId);
   const chain = getSupersessionChain(root);
-
-  // Sort chronologically by created_at
   return chain.sort((a, b) => a.created_at.localeCompare(b.created_at));
-}
-
-/**
- * Walk backward to find the oldest ancestor in the supersession chain.
- * A memory is a root if no other non-deleted memory has superseded_by = its id.
- */
-function findChainRoot(memoryId: string): string {
-  const db = getDatabase();
-  let currentId = memoryId;
-
-  for (let depth = 0; depth < 50; depth++) {
-    const row = db.prepare(`
-      SELECT id FROM memories
-      WHERE superseded_by = ? AND deleted_at IS NULL
-      LIMIT 1
-    `).get(currentId) as { id: string } | undefined;
-
-    if (!row) break;
-    currentId = row.id;
-  }
-
-  return currentId;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,46 +188,15 @@ export function detectSupersession(
  *   - Recent supersession events (last 5)
  */
 export function getTemporalSummary(project: string): string {
-  const db = getDatabase();
-  const now = new Date().toISOString();
-
-  // Active: not deleted, valid_from ≤ now, valid_until IS NULL or > now
-  const activeRow = db.prepare(`
-    SELECT COUNT(*) as count FROM memories
-    WHERE project = ?
-      AND deleted_at IS NULL
-      AND (valid_from IS NULL OR valid_from <= ?)
-      AND (valid_until IS NULL OR valid_until > ?)
-  `).get(project, now, now) as { count: number };
-
-  // Superseded: has superseded_by set
-  const supersededRow = db.prepare(`
-    SELECT COUNT(*) as count FROM memories
-    WHERE project = ? AND deleted_at IS NULL AND superseded_by IS NOT NULL
-  `).get(project) as { count: number };
-
-  // Recent supersessions
-  const recentRows = db.prepare(`
-    SELECT id, summary, superseded_by, updated_at FROM memories
-    WHERE project = ?
-      AND deleted_at IS NULL
-      AND superseded_by IS NOT NULL
-    ORDER BY updated_at DESC
-    LIMIT 5
-  `).all(project) as Array<{
-    id: string;
-    summary: string;
-    superseded_by: string;
-    updated_at: string;
-  }>;
+  const { activeCount, supersededCount, recentSupersessions } = getTemporalStats(project);
 
   const lines: string[] = [
-    `Temporal: ${activeRow.count} active, ${supersededRow.count} superseded`,
+    `Temporal: ${activeCount} active, ${supersededCount} superseded`,
   ];
 
-  if (recentRows.length > 0) {
+  if (recentSupersessions.length > 0) {
     lines.push('Recent supersessions:');
-    for (const row of recentRows) {
+    for (const row of recentSupersessions) {
       const date = row.updated_at.slice(0, 10);
       lines.push(`  [${date}] "${row.summary}" → superseded by ${row.superseded_by.slice(0, 8)}`);
     }

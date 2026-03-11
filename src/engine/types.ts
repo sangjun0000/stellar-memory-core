@@ -24,14 +24,6 @@ export const IMPACT_DEFAULTS: Record<MemoryType, number> = {
   procedural:  0.5,
 };
 
-// Importance weights
-export const DEFAULT_WEIGHTS = {
-  recency:   0.30,
-  frequency: 0.20,
-  impact:    0.30,
-  relevance: 0.20,
-} as const;
-
 export type MemoryValidityState = 'active' | 'future' | 'expired' | 'superseded';
 
 // Memory interface
@@ -68,12 +60,6 @@ export interface Memory {
   quality_score?: number;
   // Multi-project
   is_universal?: boolean;
-}
-
-// Vector search result returned by searchByVector in vec.ts
-export interface VectorSearchResult {
-  memoryId: string;
-  distance: number;        // L2 distance from sqlite-vec (lower = more similar)
 }
 
 // Sun state interface
@@ -130,13 +116,6 @@ export interface ConstellationEdge {
   project: string;
   created_at: string;
   metadata?: Record<string, unknown>;
-}
-
-// Temporal Awareness
-export interface TemporalInfo {
-  valid_from?: string;      // ISO date -- when this fact became true
-  valid_until?: string;     // ISO date -- when this fact stopped being true
-  superseded_by?: string;   // memory ID that replaced this one
 }
 
 // Conflict Detection

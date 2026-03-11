@@ -2,7 +2,8 @@
  * Lightweight token estimator for mixed English/Korean text.
  *
  * Unicode-aware estimation:
- *   - ASCII/Latin text: ~1.3 tokens per whitespace-delimited word
+ *   - ASCII/Latin text: ~1.1 tokens per whitespace-delimited word
+ *     (cl100k_base / Claude tokenizer average; old 1.3 overestimated by ~20%)
  *   - CJK characters (Korean/Chinese/Japanese): ~2.0 tokens per character
  *   - Other Unicode: ~1.5 tokens per word
  *
@@ -35,14 +36,15 @@ export function estimateTokens(text: string): number {
         }
       }
     } else {
-      // English/Latin word: ~1.3 tokens per word
-      tokens += 1.3;
+      // English/Latin word: ~1.1 tokens per word (cl100k_base average)
+      tokens += 1.1;
     }
   }
 
-  // Account for whitespace tokens (roughly 1 token per 4 spaces/newlines)
+  // Whitespace contributes a small additional overhead (already largely
+  // captured by word-splitting above; this covers newlines and separators).
   const whitespace = text.length - text.replace(/\s/g, '').length;
-  tokens += whitespace * 0.25;
+  tokens += whitespace * 0.1;
 
   return Math.ceil(tokens);
 }

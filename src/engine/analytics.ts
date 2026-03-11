@@ -14,8 +14,10 @@ import {
   getTopTags,
   getMemoriesByProject,
   getConflicts,
+  getSurvivalData,
+  getOrbitMovementLog,
+  getAccessEventLog,
 } from '../storage/queries.js';
-import { getDatabase } from '../storage/database.js';
 
 // ---------------------------------------------------------------------------
 // getFullAnalytics
@@ -47,24 +49,7 @@ export function getSurvivalCurve(project: string): Array<{
   accessedCount: number;
   forgottenCount: number;
 }> {
-  const db = getDatabase();
-
-  const rows = db.prepare(`
-    SELECT
-      CAST(
-        (julianday('now') - julianday(created_at)) AS INTEGER
-      ) as age_days,
-      distance,
-      access_count,
-      deleted_at
-    FROM memories
-    WHERE project = ?
-  `).all(project) as Array<{
-    age_days: number;
-    distance: number;
-    access_count: number;
-    deleted_at: string | null;
-  }>;
+  const rows = getSurvivalData(project);
 
   // Bucket by age: 0, 1, 3, 7, 14, 30, 60, 90, 180, 365+
   const BUCKETS = [0, 1, 3, 7, 14, 30, 60, 90, 180, 365];
@@ -130,24 +115,7 @@ export function getOrbitMovements(
   movements: Array<{ timestamp: string; oldDistance: number; newDistance: number; trigger: string }>;
   netMovement: number;
 }> {
-  const db = getDatabase();
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-
-  const logRows = db.prepare(`
-    SELECT ol.memory_id, ol.old_distance, ol.new_distance, ol.trigger, ol.created_at,
-           m.summary
-    FROM orbit_log ol
-    LEFT JOIN memories m ON m.id = ol.memory_id
-    WHERE ol.project = ? AND ol.created_at >= ?
-    ORDER BY ol.created_at ASC
-  `).all(project, cutoff) as Array<{
-    memory_id: string;
-    old_distance: number;
-    new_distance: number;
-    trigger: string;
-    created_at: string;
-    summary: string | null;
-  }>;
+  const logRows = getOrbitMovementLog(project, days);
 
   // Group by memory_id
   const grouped = new Map<string, {
@@ -277,17 +245,7 @@ export function detectAccessPatterns(project: string): Array<{
   description: string;
   frequency: string;
 }> {
-  const db = getDatabase();
-
-  // Get access events (trigger = 'access') from orbit_log in last 30 days
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-  const accessRows = db.prepare(`
-    SELECT memory_id, created_at
-    FROM orbit_log
-    WHERE project = ? AND trigger = 'access' AND created_at >= ?
-    ORDER BY created_at ASC
-  `).all(project, cutoff) as Array<{ memory_id: string; created_at: string }>;
+  const accessRows = getAccessEventLog(project, 30);
 
   if (accessRows.length === 0) return [];
 

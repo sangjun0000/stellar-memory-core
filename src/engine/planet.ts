@@ -49,8 +49,21 @@ import { getDatabase, withTransaction } from '../storage/database.js';
 import { createLogger } from '../utils/logger.js';
 import { corona } from './corona.js';
 import { calculateQuality } from './quality.js';
-import { trackBgError } from '../mcp/tools/memory-tools.js';
 import { runConsolidation, findSimilarMemory, enrichMemory } from './consolidation.js';
+
+// ---------------------------------------------------------------------------
+// Error reporter callback (breaks engine → mcp circular dependency)
+// ---------------------------------------------------------------------------
+
+type ErrorReporter = (category: string) => void;
+let _errorReporter: ErrorReporter = (category) => {
+  // Default: log to stderr. MCP layer overrides this via setErrorReporter().
+  console.error(`[stellar-memory] Background error in category: ${category}`);
+};
+
+export function setErrorReporter(fn: ErrorReporter): void {
+  _errorReporter = fn;
+}
 
 const log = createLogger('planet');
 
@@ -195,7 +208,7 @@ export function createMemory(data: {
     const projectMemories = getMemoriesByProject(data.project);
     if (projectMemories.length > 100) {
       runConsolidation(data.project).catch(() => {
-        try { trackBgError('consolidation'); } catch { /* ignore */ }
+        _errorReporter('consolidation');
       });
     }
   } catch {
@@ -257,7 +270,7 @@ function scheduleEmbedding(memoryId: string, text: string): void {
     })
     .catch(() => {
       // Model not loaded / network error — FTS5 fallback remains active
-      try { trackBgError('embedding'); } catch { /* ignore circular import at startup */ }
+      _errorReporter('embedding');
     });
 }
 
@@ -479,7 +492,7 @@ export async function recallMemoriesAsync(
     try {
       const db = getDatabase();
       queryEmbedding = await generateEmbedding(query);
-      const vecResults = searchByVector(db, queryEmbedding, fetchN);
+      const vecResults = searchByVector(db, queryEmbedding, fetchN, project);
       vecIds = vecResults.map(r => r.memoryId);
     } catch {
       // Model not ready or vec tables unavailable — FTS5 covers it
@@ -500,8 +513,13 @@ export async function recallMemoriesAsync(
     if (queryEmbedding) {
       try {
         const db = getDatabase();
+        // Join memory_embedding_map (vec_rowid) → memory_embeddings to recover embeddings by memory_id
+        const placeholders = merged.map(() => '?').join(',');
         const rows = db.prepare(
-          `SELECT memory_id, embedding FROM memory_vec WHERE memory_id IN (${merged.map(() => '?').join(',')})`
+          `SELECT map.memory_id, e.embedding
+           FROM memory_embedding_map map
+           JOIN memory_embeddings e ON e.rowid = map.vec_rowid
+           WHERE map.memory_id IN (${placeholders})`
         ).all(...merged.map(m => m.id)) as Array<{ memory_id: string; embedding: Buffer }>;
         memEmbeddingMap = new Map(rows.map(r => [
           r.memory_id,

@@ -109,24 +109,56 @@ export function insertEmbedding(
  * sqlite-vec requires a LIMIT clause in the WHERE … MATCH subquery.
  * We use a subquery-then-join pattern to keep the LIMIT inside the
  * vec0 scan while still resolving memory_id from the companion table.
+ *
+ * Results are post-filtered by project and deleted_at IS NULL so that
+ * soft-deleted or cross-project memories never surface in search results.
+ * We over-fetch (limit × 3) from the vec0 KNN to absorb any filtered rows.
  */
 export function searchByVector(
   db: DatabaseSync,
   queryEmbedding: Float32Array,
   limit: number = 20,
+  project?: string,
 ): VectorSearchResult[] {
-  const rows = db.prepare(`
-    SELECT m.memory_id, knn.distance
-    FROM (
-      SELECT rowid, distance
-      FROM memory_embeddings
-      WHERE embedding MATCH ?
-      ORDER BY distance
-      LIMIT ?
-    ) knn
-    JOIN memory_embedding_map m ON knn.rowid = m.vec_rowid
-    ORDER BY knn.distance
-  `).all(queryEmbedding, limit) as Array<{ memory_id: string; distance: number }>;
+  // Over-fetch to account for rows that may be filtered out by project/deletion
+  const fetchLimit = limit * 3;
+
+  // When project is provided, JOIN with memories table to filter by project/deletion.
+  // When project is omitted (e.g. in tests or cross-project search), skip the JOIN.
+  const sql = project !== undefined
+    ? `
+      SELECT map.memory_id, knn.distance
+      FROM (
+        SELECT rowid, distance
+        FROM memory_embeddings
+        WHERE embedding MATCH ?
+        ORDER BY distance
+        LIMIT ?
+      ) knn
+      JOIN memory_embedding_map map ON knn.rowid = map.vec_rowid
+      JOIN memories mem ON mem.id = map.memory_id
+      WHERE mem.deleted_at IS NULL AND mem.project = ?
+      ORDER BY knn.distance
+      LIMIT ?`
+    : `
+      SELECT map.memory_id, knn.distance
+      FROM (
+        SELECT rowid, distance
+        FROM memory_embeddings
+        WHERE embedding MATCH ?
+        ORDER BY distance
+        LIMIT ?
+      ) knn
+      JOIN memory_embedding_map map ON knn.rowid = map.vec_rowid
+      ORDER BY knn.distance
+      LIMIT ?`;
+
+  const rows = db.prepare(sql).all(
+    queryEmbedding,
+    fetchLimit,
+    ...(project !== undefined ? [project] : []),
+    limit,
+  ) as Array<{ memory_id: string; distance: number }>;
 
   return rows.map(r => ({ memoryId: r.memory_id, distance: r.distance }));
 }

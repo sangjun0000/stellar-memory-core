@@ -13,7 +13,7 @@ import { extname, basename, dirname, resolve } from 'node:path';
 // Types
 // ---------------------------------------------------------------------------
 
-export interface FileMetaEntry {
+interface FileMetaEntry {
   path: string;
   name: string;
   extension: string;
@@ -31,13 +31,13 @@ export interface MetaScanConfig {
   abortSignal?: AbortSignal;
 }
 
-export type MetaScanCategory = 'core' | 'active' | 'archive' | 'forgotten';
+type MetaScanCategory = 'core' | 'active' | 'archive' | 'forgotten';
 
 // ---------------------------------------------------------------------------
 // Classification sets
 // ---------------------------------------------------------------------------
 
-export const CODE_EXTENSIONS = new Set([
+const CODE_EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
   '.py', '.pyw',
   '.java', '.kt', '.kts',
@@ -57,7 +57,7 @@ export const CODE_EXTENSIONS = new Set([
   '.vue', '.svelte',
 ]);
 
-export const DOC_EXTENSIONS = new Set([
+const DOC_EXTENSIONS = new Set([
   '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
   '.pdf', '.txt', '.md', '.mdx', '.rst', '.rtf',
   '.odt', '.ods', '.odp',
@@ -65,31 +65,31 @@ export const DOC_EXTENSIONS = new Set([
   '.tex', '.latex',
 ]);
 
-export const CONFIG_EXTENSIONS = new Set([
+const CONFIG_EXTENSIONS = new Set([
   '.env', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg',
   '.xml', '.conf', '.config', '.properties',
   '.editorconfig', '.gitignore', '.gitattributes',
   '.eslintrc', '.prettierrc', '.babelrc',
 ]);
 
-export const DATA_EXTENSIONS = new Set([
+const DATA_EXTENSIONS = new Set([
   '.csv', '.sql', '.db', '.sqlite', '.sqlite3',
   '.parquet', '.avro', '.json', '.jsonl', '.ndjson',
   '.xls', '.xlsx',
 ]);
 
-export const IMAGE_EXTENSIONS = new Set([
+const IMAGE_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
   '.bmp', '.ico', '.tiff', '.tif',
   '.psd', '.ai', '.sketch', '.fig', '.xd',
 ]);
 
-export const ARCHIVE_EXTENSIONS = new Set([
+const ARCHIVE_EXTENSIONS = new Set([
   '.zip', '.tar', '.gz', '.tgz', '.bz2', '.xz',
   '.7z', '.rar', '.cab',
 ]);
 
-export const BINARY_EXTENSIONS = new Set([
+const BINARY_EXTENSIONS = new Set([
   '.exe', '.dll', '.sys', '.msi', '.msp', '.msm',
   '.ocx', '.drv', '.cpl', '.scr',
   '.so', '.dylib', '.a', '.lib', '.obj', '.o',
@@ -97,7 +97,7 @@ export const BINARY_EXTENSIONS = new Set([
   '.wasm',
 ]);
 
-export const MEDIA_EXTENSIONS = new Set([
+const MEDIA_EXTENSIONS = new Set([
   '.mp3', '.mp4', '.avi', '.mkv', '.mov', '.wmv',
   '.flac', '.wav', '.ogg', '.aac', '.m4a',
   '.webm', '.flv', '.m4v',
@@ -108,7 +108,7 @@ export const MEDIA_EXTENSIONS = new Set([
 // ---------------------------------------------------------------------------
 
 /** Directories to completely skip (never enter) */
-export const SYSTEM_EXCLUDE_DIRS = new Set([
+const SYSTEM_EXCLUDE_DIRS = new Set([
   '$recycle.bin',
   'system volume information',
   'pagefile.sys',
@@ -156,7 +156,7 @@ const CACHE_EXCLUDE_DIRS = new Set([
 ]);
 
 /** Path segments that indicate game directories */
-export const GAME_DIR_PATTERNS = [
+const GAME_DIR_PATTERNS = [
   'steam', 'steamapps', 'epic games', 'riot games',
   'ubisoft', 'origin', 'gog galaxy', 'battlenet',
   'ea games', 'rockstar games',

@@ -17,8 +17,8 @@ import {
   createConflict as queriesCreateConflict,
   getConflicts,
   resolveConflict as queriesResolveConflict,
+  getConflictById,
 } from '../storage/queries.js';
-import { getDatabase } from '../storage/database.js';
 import { supersedeMemory, extractKeyTerms } from './temporal.js';
 import type { Memory, MemoryConflict } from './types.js';
 import { createLogger } from '../utils/logger.js';
@@ -376,11 +376,7 @@ export function resolveConflict(
   // Fetch it via getConflicts (no direct getConflictById, but we can filter).
   // Since we only need it for supersede, we'll proceed directly.
   if (action === 'supersede') {
-    const db = getDatabase();
-    const row = db.prepare(
-      `SELECT memory_id, conflicting_memory_id FROM memory_conflicts WHERE id = ?`,
-    ).get(conflictId) as { memory_id: string; conflicting_memory_id: string } | undefined;
-
+    const row = getConflictById(conflictId);
     if (row) {
       supersedeMemory(row.conflicting_memory_id, row.memory_id);
     }

@@ -20,7 +20,15 @@
 import { createLogger } from '../utils/logger.js';
 import { recalculateOrbits } from '../engine/orbit.js';
 import { getConfig } from '../utils/config.js';
-import { getMemoriesInZone, softDeleteMemory, getAllDataSources, getMemoriesByProject } from '../storage/queries.js';
+import {
+  getMemoriesInZone,
+  softDeleteMemory,
+  getAllDataSources,
+  getMemoriesByProject,
+  getAllProjects,
+  purgeDeletedMemories,
+  curateMemories,
+} from '../storage/queries.js';
 import { StellarScanner } from '../scanner/index.js';
 import { scoreAllMemories } from '../engine/quality.js';
 import { runConsolidation } from '../engine/consolidation.js';
@@ -291,27 +299,49 @@ export class StellarScheduler {
   }
 
   private async cleanupForgottenZone(): Promise<void> {
-    const oortMemories = getMemoriesInZone(this.config.project, 'forgotten');
+    // Process every project that has memories, not just the configured default.
+    const projects = getAllProjects();
     const cutoff = new Date(
       Date.now() - this.config.oortCleanupAgeDays * 24 * 60 * 60 * 1000
     );
 
-    let removed = 0;
-    for (const memory of oortMemories) {
-      const lastTouched = memory.last_accessed_at
-        ? new Date(memory.last_accessed_at)
-        : new Date(memory.created_at);
+    let totalInspected = 0;
+    let totalRemoved = 0;
+    let totalPurged = 0;
+    let totalCurated = 0;
 
-      if (lastTouched < cutoff) {
-        softDeleteMemory(memory.id);
-        removed++;
+    for (const project of projects) {
+      // 1. Soft-delete stale Oort cloud (forgotten zone) memories
+      const oortMemories = getMemoriesInZone(project, 'forgotten');
+      let removed = 0;
+      for (const memory of oortMemories) {
+        const lastTouched = memory.last_accessed_at
+          ? new Date(memory.last_accessed_at)
+          : new Date(memory.created_at);
+
+        if (lastTouched < cutoff) {
+          softDeleteMemory(memory.id);
+          removed++;
+        }
       }
+      totalInspected += oortMemories.length;
+      totalRemoved += removed;
+
+      // 2. Curate noisy / superseded / consolidated memories
+      const curationResult = curateMemories(project);
+      totalCurated += curationResult.deleted;
+
+      // 3. Hard-delete soft-deleted memories older than oortCleanupAgeDays
+      const purged = purgeDeletedMemories(project, this.config.oortCleanupAgeDays);
+      totalPurged += purged;
     }
 
     log.info('Oort cloud cleanup complete', {
-      project:   this.config.project,
-      inspected: oortMemories.length,
-      removed,
+      projects:   projects.length,
+      inspected:  totalInspected,
+      softDeleted: totalRemoved,
+      curated:    totalCurated,
+      purged:     totalPurged,
       cutoffDays: this.config.oortCleanupAgeDays,
     });
   }

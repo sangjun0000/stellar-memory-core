@@ -39,7 +39,7 @@ class StellarEventBus extends EventEmitter {
   }
 }
 
-export const eventBus = new StellarEventBus();
+const eventBus = new StellarEventBus();
 
 // ---------------------------------------------------------------------------
 // WebSocket server

@@ -17,7 +17,9 @@ import {
   getSunState,
   upsertSunState,
   getRecentMemories,
+  getConflicts,
 } from '../storage/queries.js';
+import { getDatabase } from '../storage/database.js';
 import { estimateTokens } from '../utils/tokenizer.js';
 import { getConfig } from '../utils/config.js';
 import { filterActiveMemories } from './validity.js';
@@ -116,6 +118,114 @@ export function commitToSun(
 }
 
 // ---------------------------------------------------------------------------
+// Proactive alerts
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an array of single-line alert strings (max 100 chars each) for the
+ * ALERTS section of the sun context.  Priorities:
+ *   1. Unresolved conflicts (high urgency)
+ *   2. Stale task memories (> 7 days old, never accessed)
+ *   3. Core/near decision memories related to current work
+ *
+ * Returns at most MAX_ALERTS entries.
+ */
+function generateProactiveAlerts(
+  project: string,
+  coreMemories: Memory[],
+  nearMemories: Memory[],
+  sun: SunState,
+): string[] {
+  const MAX_ALERTS = 5;
+  const MAX_ALERT_LEN = 100;
+  const alerts: string[] = [];
+
+  const trunc = (s: string): string =>
+    s.length > MAX_ALERT_LEN ? s.slice(0, MAX_ALERT_LEN - 3).trimEnd() + '...' : s;
+
+  // 1. Unresolved conflicts
+  try {
+    const conflicts = getConflicts(project, 'open');
+    for (const c of conflicts.slice(0, 2)) {
+      const desc = c.description.slice(0, 60);
+      alerts.push(trunc(`! CONFLICT: ${desc}`));
+      if (alerts.length >= MAX_ALERTS) return alerts;
+    }
+  } catch {
+    // Non-fatal: conflicts table may not exist in older DBs.
+  }
+
+  // 2. Stale tasks (> 7 days old, access_count <= 1)
+  try {
+    const db = getDatabase();
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const rows = db.prepare(`
+      SELECT id, summary, created_at, access_count
+      FROM memories
+      WHERE project = ?
+        AND type = 'task'
+        AND access_count <= 1
+        AND created_at < ?
+        AND deleted_at IS NULL
+      ORDER BY created_at ASC
+      LIMIT 3
+    `).all(project, cutoff) as Array<{
+      id: string;
+      summary: string;
+      created_at: string;
+      access_count: number;
+    }>;
+
+    for (const row of rows) {
+      const ageMs = Date.now() - new Date(
+        /[Zz]$|[+-]\d{2}:\d{2}$/.test(row.created_at)
+          ? row.created_at
+          : row.created_at + 'Z'
+      ).getTime();
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      const accessed = row.access_count === 0 ? 'never accessed' : 'rarely accessed';
+      const summary = row.summary.length > 40
+        ? row.summary.slice(0, 40).trimEnd() + '...'
+        : row.summary;
+      alerts.push(trunc(`STALE TASK: "${summary}" (${ageDays}d ago, ${accessed})`));
+      if (alerts.length >= MAX_ALERTS) return alerts;
+    }
+  } catch {
+    // Non-fatal: skip stale task alerts if DB query fails.
+  }
+
+  // 3. Recent decisions in core/near that may relate to current work
+  if (sun.current_work && sun.current_work.trim().length > 0) {
+    const currentWorkWords = new Set(
+      sun.current_work.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+    );
+    const decisionCandidates = [...coreMemories, ...nearMemories]
+      .filter(m => m.type === 'decision');
+
+    for (const m of decisionCandidates) {
+      if (alerts.length >= MAX_ALERTS) break;
+      const summaryWords = m.summary.toLowerCase().split(/\s+/);
+      const hasOverlap = summaryWords.some(w => w.length > 3 && currentWorkWords.has(w));
+      if (!hasOverlap) continue;
+
+      const ageMs = Date.now() - new Date(
+        /[Zz]$|[+-]\d{2}:\d{2}$/.test(m.created_at)
+          ? m.created_at
+          : m.created_at + 'Z'
+      ).getTime();
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      const ageStr = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+      const summary = m.summary.length > 45
+        ? m.summary.slice(0, 45).trimEnd() + '...'
+        : m.summary;
+      alerts.push(trunc(`DECISION: "${summary}" (${ageStr}) -- may relate to current work`));
+    }
+  }
+
+  return alerts;
+}
+
+// ---------------------------------------------------------------------------
 // Formatter
 // ---------------------------------------------------------------------------
 
@@ -126,12 +236,16 @@ export function commitToSun(
  * remaining token budget before being appended (progressive truncation).
  * This ensures the most critical context always fits regardless of budget.
  *
- * New priority order (Corona-aware):
+ * Priority order (Corona-aware):
  *   1. Header
- *   2. CORE IDENTITY ??core zone memories (instant recall, ~40% budget)
- *   3. WORKING ON (current_work, ~10%)
- *   4. ACTIVE CONTEXT ??near zone memories (~25%)
- *   5. RECENT DECISIONS / NEXT STEPS / ACTIVE ISSUES (~25%)
+ *   2. ALERTS    -- proactive conflict/stale-task/decision notices (high priority)
+ *   3. CORE      -- core zone memories (instant recall, ~40% budget)
+ *   4. WORKING ON  (current_work, ~10%)
+ *   5. NEAR      -- near zone memories (~25%)
+ *   6. RECENT DECISIONS / NEXT STEPS / ACTIVE ISSUES (~25%)
+ *
+ * IMPORTANT: Callers must NOT append additional content to the result.
+ * All sections (alerts, core, near, working state) are budget-managed here.
  */
 export function formatSunContent(
   sun: SunState,
@@ -169,7 +283,15 @@ export function formatSunContent(
   }
   sections.push(header);
 
-  // 2. CORE IDENTITY ??core zone memories (distance < 1.0 AU).
+  // 2. ALERTS -- proactive notices (conflicts, stale tasks, related decisions).
+  // Generated before CORE so high-priority alerts appear near the top of output
+  // and are subject to the same progressive budget truncation as other sections.
+  const alertLines = generateProactiveAlerts(sun.project, activeCoreMemories, activeNearMemories, sun);
+  if (alertLines.length > 0) {
+    sections.push(`\nALERTS:\n${alertLines.map(a => `  ${a}`).join('\n')}`);
+  }
+
+  // 3. CORE IDENTITY -- core zone memories (distance < 1.0 AU).
   // Compressed format: [TYPE] summary (no AU distance ??saves tokens)
   if (activeCoreMemories.length > 0) {
     const displayed = activeCoreMemories.slice(0, MAX_CORE_DISPLAY);
@@ -182,12 +304,12 @@ export function formatSunContent(
     sections.push(`\nCORE (${activeCoreMemories.length}):\n${lines}${overflow}`);
   }
 
-  // 3. Current work.
+  // 4. Current work.
   if (sun.current_work && sun.current_work.trim().length > 0) {
     sections.push(`\nWORKING ON:\n${sun.current_work.trim()}`);
   }
 
-  // 4. ACTIVE CONTEXT ??near zone memories (1.0-5.0 AU).
+  // 5. NEAR zone memories (1.0-5.0 AU).
   if (activeNearMemories.length > 0) {
     const displayed = activeNearMemories.slice(0, MAX_NEAR_DISPLAY);
     const lines = displayed
@@ -199,21 +321,21 @@ export function formatSunContent(
     sections.push(`\nNEAR (${activeNearMemories.length}):\n${lines}${overflow}`);
   }
 
-  // 5. Recent decisions (max 3).
+  // 6. Recent decisions (max 3).
   const decisions = sun.recent_decisions.slice(0, 3);
   if (decisions.length > 0) {
     const lines = decisions.map((d, i) => `  ${i + 1}. ${d}`).join('\n');
     sections.push(`\nRECENT DECISIONS:\n${lines}`);
   }
 
-  // 6. Next steps (max 3).
+  // 7. Next steps (max 3).
   const steps = sun.next_steps.slice(0, 3);
   if (steps.length > 0) {
     const lines = steps.map((s, i) => `  ${i + 1}. ${s}`).join('\n');
     sections.push(`\nNEXT STEPS:\n${lines}`);
   }
 
-  // 7. Active issues (max 2).
+  // 8. Active issues (max 2).
   const errors = sun.active_errors.slice(0, 2);
   if (errors.length > 0) {
     const lines = errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');

@@ -1,5 +1,5 @@
 import { opendir, readFile, stat } from 'node:fs/promises';
-import { join, extname, basename } from 'node:path';
+import { join, extname } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { FileEntry, ScanConfig } from '../types.js';
 
@@ -225,7 +225,3 @@ export async function collectFilesWithStats(
   return { entries, skippedCount };
 }
 
-/** Return true if the filename looks like a typical dotfile to skip. */
-export function isDotfile(name: string): boolean {
-  return basename(name).startsWith('.');
-}

@@ -52,7 +52,7 @@ function detectProject(): string {
   return dirName || 'default';
 }
 
-export function loadConfig(): StellarConfig {
+function loadConfig(): StellarConfig {
   return {
     dbPath: resolveDbPath(),
     defaultProject: detectProject(),

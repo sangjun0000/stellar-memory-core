@@ -177,7 +177,9 @@ class Corona {
   // ?�?� Private helpers ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
   private indexTokens(memory: Memory): void {
-    const text = [memory.content, memory.summary, ...memory.tags].join(' ');
+    // Index only summary + tags — full content is ~70% of text but adds
+    // negligible recall value vs the summary, which is already the distilled form.
+    const text = [memory.summary, ...memory.tags].join(' ');
     const tokens = tokenize(text);
     for (const token of tokens) {
       let ids = this.tokenIndex.get(token);

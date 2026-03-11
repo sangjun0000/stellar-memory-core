@@ -9,7 +9,8 @@ import type { OrbitZone, MemoryType } from '../../engine/types.js';
 import { distanceToImportance } from '../../engine/orbit.js';
 import { updateMemoryOrbit, insertOrbitLog } from '../../storage/queries.js';
 import type { OrbitChange } from '../../engine/types.js';
-import { createMemory, recallMemoriesAsync, forgetMemory } from '../../engine/planet.js';
+import { recallMemoriesAsync, forgetMemory } from '../../engine/planet.js';
+import { createMemoryFull } from '../../engine/services/memory-service.js';
 import { emitMemoryCreated, emitMemoryDeleted, emitMemoryUpdated } from '../websocket.js';
 
 const app = new Hono();
@@ -157,10 +158,13 @@ app.post('/', async (c) => {
     return c.json({ ok: false, error: 'content is required' }, 400);
   }
 
-  const memory = createMemory({ project, content, summary, type, impact, tags });
-  emitMemoryCreated(project, memory);
+  const result = await createMemoryFull(
+    { content, summary, type, impact, tags },
+    project,
+  );
+  emitMemoryCreated(project, result.memory);
 
-  return c.json({ ok: true, data: memory }, 201);
+  return c.json({ ok: true, data: result.memory }, 201);
 });
 
 // POST /api/memories/:id/forget — forget a memory (push to Forgotten or soft-delete)

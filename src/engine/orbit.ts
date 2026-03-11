@@ -34,6 +34,29 @@ import { getMemoryValidityState } from './validity.js';
 // ---------------------------------------------------------------------------
 
 /**
+ * Type-differentiated base half-lives (hours).
+ *
+ * Architecture decisions persist for weeks; ephemeral observations fade in days.
+ * Falls back to the config value (`decayHalfLifeHours`) for unknown types.
+ * Procedural memories are handled separately via getProceduralDecayMultiplier().
+ */
+const TYPE_HALF_LIVES: Record<string, number> = {
+  decision:    720,  // 30 days — architecture decisions persist
+  milestone:   360,  // 15 days — important but can be superseded
+  error:       168,  //  7 days — relevant until fixed
+  procedural:  720,  // 30 days — behavioral patterns are stable (also slowed by multiplier)
+  context:     168,  //  7 days — background knowledge
+  task:         72,  //  3 days — time-sensitive
+  observation:  48,  //  2 days — ephemeral unless proved useful
+};
+
+/**
+ * Importance floor — memories never auto-decay below this value.
+ * Only an explicit `forget` (push mode, sets distance ≥ 95 AU) can go lower.
+ */
+const IMPORTANCE_FLOOR = 0.15;
+
+/**
  * Calculate recency score using ACT-R adaptive half-life.
  *
  * The effective half-life grows with access count so that frequently-accessed
@@ -67,11 +90,13 @@ export function recencyScore(
   const now = new Date();
   const hoursSince = (now.getTime() - refMs) / (1000 * 60 * 60);
 
-  // Adaptive half-life: grows with access frequency, capped at maxStabilityHours
-  // Procedural memories use a slower base decay rate (~3.3× slower than normal)
+  // Adaptive half-life: grows with access frequency, capped at maxStabilityHours.
+  // Type-differentiated: each memory type has its own base half-life.
+  // Procedural memories additionally use a slower decay multiplier on top.
+  const typeBase = memoryType ? (TYPE_HALF_LIVES[memoryType] ?? halfLifeHours) : halfLifeHours;
   const baseHalfLife = memoryType === 'procedural'
-    ? halfLifeHours / getProceduralDecayMultiplier()
-    : halfLifeHours;
+    ? typeBase / getProceduralDecayMultiplier()
+    : typeBase;
 
   const effectiveHalflife = Math.min(
     maxStabilityHours,
@@ -125,10 +150,11 @@ export function calculateImportance(
   const recencyWeight     = config.activationRecencyWeight   ?? 0.6;
   const frequencyWeight   = config.activationFrequencyWeight ?? 0.4;
 
-  // Effective half-life exposed for callers
+  // Effective half-life exposed for callers — type-differentiated base
+  const typeBase = TYPE_HALF_LIVES[memory.type] ?? config.decayHalfLifeHours;
   const baseHalfLife = memory.type === 'procedural'
-    ? config.decayHalfLifeHours / getProceduralDecayMultiplier()
-    : config.decayHalfLifeHours;
+    ? typeBase / getProceduralDecayMultiplier()
+    : typeBase;
   const effectiveHalflife = Math.min(
     maxStabilityHours,
     baseHalfLife * Math.pow(stabilityGrowth, Math.min(memory.access_count, 15)),
@@ -162,8 +188,12 @@ export function calculateImportance(
   let rel: number;
   try {
     const db = getDatabase();
+    // Join memory_embedding_map (vec_rowid) → memory_embeddings to get the embedding
     const memRow = db.prepare(
-      'SELECT embedding FROM memory_vec WHERE memory_id = ?'
+      `SELECT e.embedding
+       FROM memory_embeddings e
+       JOIN memory_embedding_map m ON m.vec_rowid = e.rowid
+       WHERE m.memory_id = ?`
     ).get(memory.id) as { embedding: Buffer } | undefined;
 
     const sunState = getSunState(memory.project);
@@ -174,9 +204,13 @@ export function calculateImportance(
     if (memRow?.embedding) {
       const memEmbedding = new Float32Array(memRow.embedding.buffer, memRow.embedding.byteOffset, memRow.embedding.byteLength / 4);
 
+      // Get embedding of the highest-importance active memory in this project as
+      // a proxy for the current "sun" embedding.
       const sunRow = db.prepare(
-        `SELECT mv.embedding FROM memory_vec mv
-         JOIN memories m ON m.id = mv.memory_id
+        `SELECT e.embedding
+         FROM memory_embeddings e
+         JOIN memory_embedding_map map ON map.vec_rowid = e.rowid
+         JOIN memories m ON m.id = map.memory_id
          WHERE m.project = ? AND m.deleted_at IS NULL
          ORDER BY m.importance DESC LIMIT 1`
       ).get(memory.project) as { embedding: Buffer } | undefined;
@@ -202,7 +236,15 @@ export function calculateImportance(
   const recentlyReused = lastAccessMs !== null && (Date.now() - lastAccessMs) <= 24 * 60 * 60 * 1000;
   const reuseBoost = recentlyReused && rel >= 0.2 ? 1.05 : 1;
 
-  const total = Math.max(0, Math.min(1, activation * cw * qualityModifier * taskBoost * reuseBoost * validityModifier));
+  let total = Math.max(0, Math.min(1, activation * cw * qualityModifier * taskBoost * reuseBoost * validityModifier));
+
+  // Importance floor: auto-decay never pushes below IMPORTANCE_FLOOR (≈ Archive zone).
+  // Exceptions: explicit forget (distance > 70 AU) or non-active validity (superseded/expired).
+  const isExplicitlyForgotten = memory.distance > 70.0;
+  const isNonActive = validityModifier === 0;
+  if (total < IMPORTANCE_FLOOR && !isExplicitlyForgotten && !isNonActive) {
+    total = IMPORTANCE_FLOOR;
+  }
 
   return {
     // Sub-components

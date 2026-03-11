@@ -24,6 +24,7 @@ import {
   deleteEdge,
   getMemoryByIds,
   searchMemories,
+  getEdgeIdsForMemory,
 } from '../storage/queries.js';
 import { getDatabase } from '../storage/database.js';
 import { generateEmbedding } from './embedding.js';
@@ -418,23 +419,15 @@ export function suggestRelationships(
  * Should be called when a memory is deleted to prevent orphan edges.
  */
 export function cleanupEdges(memoryId: string): void {
-  // getEdges returns all edges where memoryId is source OR target
-  // We need the project, but edges carry it — we can fetch edges without project filter.
-  // Since deleteEdge only needs the edge ID, we get all edges for this memory first.
-  // We don't have a project in scope here, so we query directly.
-  const db = getDatabase();
-  const rows = db.prepare(`
-    SELECT id FROM constellation_edges
-    WHERE source_id = ? OR target_id = ?
-  `).all(memoryId, memoryId) as Array<{ id: string }>;
+  const ids = getEdgeIdsForMemory(memoryId);
 
-  for (const row of rows) {
+  for (const id of ids) {
     try {
-      deleteEdge(row.id);
+      deleteEdge(id);
     } catch (err) {
-      log.warn('Failed to delete constellation edge during cleanup', { edgeId: row.id, err });
+      log.warn('Failed to delete constellation edge during cleanup', { edgeId: id, err });
     }
   }
 
-  log.debug('Cleaned up constellation edges', { memoryId, count: rows.length });
+  log.debug('Cleaned up constellation edges', { memoryId, count: ids.length });
 }

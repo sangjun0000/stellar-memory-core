@@ -82,7 +82,7 @@ function getChangedFiles(cwd: string, hash: string): string[] {
  * Extract recent git commits from a repository at `repoPath`.
  * `limit` caps the number of commits to avoid huge imports.
  */
-export function getRecentCommits(repoPath: string, limit = 50): GitCommit[] {
+function getRecentCommits(repoPath: string, limit = 50): GitCommit[] {
   if (!isGitRepo(repoPath)) return [];
 
   const format = `--pretty=format:%H${GIT_SEP}%h${GIT_SEP}%an${GIT_SEP}%aI${GIT_SEP}%s`;

@@ -26,11 +26,11 @@ import {
   updateMemoryOrbit,
   updateMemoryContent,
   insertOrbitLog,
+  getStoredEmbeddingForMemory,
 } from '../storage/queries.js';
 import { createMemory } from './planet.js';
 import { generateEmbedding } from './embedding.js';
 import { cosineSimilarity } from './gravity.js';
-import { getDatabase } from '../storage/database.js';
 import { createLogger } from '../utils/logger.js';
 
 const log = createLogger('consolidation');
@@ -145,31 +145,8 @@ function splitIntoSentences(text: string): string[] {
 // Similarity helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Look up the stored embedding for a memory from the vec table.
- * Returns null if no embedding is stored.
- */
-function getStoredEmbedding(memoryId: string): Float32Array | null {
-  try {
-    const db = getDatabase();
-    const row = db.prepare(
-      `SELECT me.embedding
-       FROM memory_embeddings me
-       JOIN memory_embedding_map mm ON mm.vec_rowid = me.rowid
-       WHERE mm.memory_id = ?`
-    ).get(memoryId) as { embedding: Buffer } | undefined;
-
-    if (!row?.embedding) return null;
-
-    return new Float32Array(
-      row.embedding.buffer,
-      row.embedding.byteOffset,
-      row.embedding.byteLength / 4,
-    );
-  } catch {
-    return null;
-  }
-}
+// Use the shared query function — no local DB access needed.
+const getStoredEmbedding = getStoredEmbeddingForMemory;
 
 /**
  * Text-based similarity between two memories using Jaccard on tokenized content.
