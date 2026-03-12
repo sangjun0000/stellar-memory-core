@@ -8,6 +8,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import { processConversation } from '../../engine/observation.js';
 import { findConsolidationCandidates, runConsolidation } from '../../engine/consolidation.js';
+import { noteObserve } from '../../engine/session-policy.js';
 import { type McpResponse, resolveProject } from './shared.js';
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,11 @@ export async function handleObserve(args: {
   try {
     const proj = args.project ?? resolveProject();
     const stats = await processConversation(args.conversation, proj);
+
+    // Track in session-policy for smart auto-commit
+    if (stats.memoriesCreated > 0 || stats.memoriesReinforced > 0) {
+      noteObserve(proj, `Extracted ${stats.memoriesCreated} new, reinforced ${stats.memoriesReinforced}`);
+    }
 
     const text = [
       `Observation complete for project "${proj}":`,

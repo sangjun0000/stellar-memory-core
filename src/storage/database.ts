@@ -287,6 +287,7 @@ export function initDatabase(dbPath: string): DatabaseSync {
 
   // Enable WAL mode for better concurrent read performance
   db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA busy_timeout = 5000;');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec('PRAGMA synchronous = NORMAL;');
 

@@ -1,8 +1,12 @@
+import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createStellarServer } from './mcp/server.js';
 import { initDatabase } from './storage/database.js';
 import { getConfig } from './utils/config.js';
 import { autoCommitOnClose } from './engine/sun.js';
+import { processConversation } from './engine/observation.js';
 import { switchProject, getCurrentProject } from './engine/multiproject.js';
 
 /**
@@ -63,6 +67,37 @@ async function main(): Promise<void> {
   process.on('exit', onShutdown);
   process.on('SIGTERM', () => { onShutdown(); process.exit(0); });
   process.on('SIGINT', () => { onShutdown(); process.exit(0); });
+
+  // ── Periodic auto-commit timer ──────────────────────────────────────────
+  // Every 5 minutes: auto-commit sun state + process hook buffer file.
+  // Runs in-process (no spawn), non-blocking to Claude's responses.
+  const AUTO_COMMIT_INTERVAL = 5 * 60 * 1000;
+  const BUFFER_PATH = join(homedir(), '.stellar-memory', 'hook-buffer.txt');
+
+  const periodicTimer = setInterval(async () => {
+    try {
+      autoCommitOnClose(getCurrentProject(), 'periodic');
+    } catch (err) {
+      console.error(`[stellar-memory] Periodic auto-commit failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Process hook buffer file if it has enough content
+    try {
+      if (existsSync(BUFFER_PATH)) {
+        const stat = statSync(BUFFER_PATH);
+        if (stat.size > 500) {
+          const buffer = readFileSync(BUFFER_PATH, 'utf-8');
+          await processConversation(buffer, getCurrentProject());
+          // Keep tail for continuity
+          writeFileSync(BUFFER_PATH, buffer.slice(-500));
+        }
+      }
+    } catch (err) {
+      console.error(`[stellar-memory] Buffer processing failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, AUTO_COMMIT_INTERVAL);
+
+  process.on('exit', () => clearInterval(periodicTimer));
 
   // Connect via stdio transport (used by Claude Code / Claude Desktop)
   const transport = new StdioServerTransport();

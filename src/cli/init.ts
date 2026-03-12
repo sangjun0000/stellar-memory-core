@@ -4,11 +4,12 @@
  *
  * Usage:
  *   npx stellar-memory init                # Configure Claude Code + download model
- *   npx stellar-memory init --codex        # Configure Codex + download model
- *   npx stellar-memory init --client=both  # Configure Claude Code and Codex
+ *   npx stellar-memory init --desktop      # Configure Claude Desktop
+ *   npx stellar-memory init --codex        # Configure Codex
+ *   npx stellar-memory init --client=all   # Configure Claude Code + Desktop + Codex
  *   npx stellar-memory init --skip-model   # Skip embedding model download
- *   npx stellar-memory init --global       # Claude: register MCP globally (default)
- *   npx stellar-memory init --project      # Claude: register MCP in .mcp.json (project-level)
+ *   npx stellar-memory init --global       # Claude Code: register MCP globally (default)
+ *   npx stellar-memory init --project      # Claude Code: register MCP in .mcp.json (project-level)
  */
 
 import { execSync, spawnSync } from 'node:child_process';
@@ -30,7 +31,7 @@ const RESET = '\x1b[0m';
 
 const CODEX_AGENTS_MARKER = '## Stellar Memory Workflow (Codex)';
 
-type ClientTarget = 'claude' | 'codex' | 'both';
+type ClientTarget = 'claude' | 'codex' | 'desktop' | 'both' | 'all';
 
 function log(msg: string): void {
   console.log(msg);
@@ -72,7 +73,7 @@ function parseClientTarget(args: string[]): ClientTarget {
   const explicit = args.find((arg) => arg.startsWith('--client='));
   if (explicit) {
     const value = explicit.slice('--client='.length).toLowerCase();
-    if (value === 'claude' || value === 'codex' || value === 'both') {
+    if (value === 'claude' || value === 'codex' || value === 'desktop' || value === 'both' || value === 'all') {
       return value;
     }
     warn(`Unknown client target "${value}" -- defaulting to Claude`);
@@ -81,8 +82,11 @@ function parseClientTarget(args: string[]): ClientTarget {
 
   const wantsClaude = args.includes('--claude');
   const wantsCodex = args.includes('--codex');
+  const wantsDesktop = args.includes('--desktop');
 
+  if (wantsClaude && wantsCodex && wantsDesktop) return 'all';
   if (wantsClaude && wantsCodex) return 'both';
+  if (wantsDesktop) return 'desktop';
   if (wantsCodex) return 'codex';
   return 'claude';
 }
@@ -161,6 +165,58 @@ function configureMCPGlobal(): boolean {
   writeFileSync(settingsPath, JSON.stringify(config, null, 2));
   success('MCP registered globally (~/.claude/mcp_settings.json)');
   log(`  ${CYAN}Scope:${RESET} all Claude Code projects`);
+  return true;
+}
+
+function getClaudeDesktopConfigPath(): string {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    return join(process.env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
+  }
+  if (platform === 'darwin') {
+    return join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+  }
+  // Linux
+  return join(process.env['XDG_CONFIG_HOME'] ?? join(homedir(), '.config'), 'Claude', 'claude_desktop_config.json');
+}
+
+function configureClaudeDesktop(): boolean {
+  const configPath = getClaudeDesktopConfigPath();
+  const configDir = dirname(configPath);
+
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true });
+  }
+
+  let config: Record<string, unknown> = {};
+
+  if (existsSync(configPath)) {
+    try {
+      config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    } catch {
+      warn('claude_desktop_config.json exists but is unreadable -- preserving and adding mcpServers');
+    }
+  }
+
+  const servers = (config.mcpServers ?? {}) as Record<string, unknown>;
+
+  if (servers['stellar-memory']) {
+    success('MCP already registered in Claude Desktop');
+    return true;
+  }
+
+  // On Windows, Claude Desktop needs npx.cmd (no shell by default)
+  const desktopConfig = process.platform === 'win32'
+    ? { command: 'npx.cmd', args: ['-y', 'stellar-memory'] }
+    : MCP_SERVER_CONFIG;
+
+  servers['stellar-memory'] = desktopConfig;
+  config.mcpServers = servers;
+
+  writeFileSync(configPath, JSON.stringify(config, null, 2));
+  success(`MCP registered in Claude Desktop`);
+  log(`  ${CYAN}Config:${RESET} ${configPath}`);
+  log(`  ${CYAN}Action:${RESET} Restart Claude Desktop to activate`);
   return true;
 }
 
@@ -344,7 +400,26 @@ async function main(): Promise<void> {
 
   const args = process.argv.slice(2);
   const skipModel = args.includes('--skip-model');
-  const clientTarget = parseClientTarget(args);
+  const hasExplicitTarget = args.some((a) =>
+    a.startsWith('--client=') || a === '--claude' || a === '--desktop' || a === '--codex'
+  );
+  let clientTarget = parseClientTarget(args);
+
+  // Interactive client selection when no explicit target given
+  if (!hasExplicitTarget && process.stdin.isTTY) {
+    log('  Which client do you use?');
+    log(`  ${CYAN}[1]${RESET} Claude Code ${BOLD}(recommended for developers)${RESET}`);
+    log(`  ${CYAN}[2]${RESET} Claude Desktop ${BOLD}(recommended for everyone)${RESET}`);
+    log(`  ${CYAN}[3]${RESET} Codex`);
+    log(`  ${CYAN}[4]${RESET} All of the above`);
+    log('');
+    const answer = await prompt('  Enter 1-4 [2]: ');
+    if (answer === '1') clientTarget = 'claude';
+    else if (answer === '3') clientTarget = 'codex';
+    else if (answer === '4') clientTarget = 'all';
+    else clientTarget = 'desktop';
+    log('');
+  }
 
   if (!skipModel) {
     await downloadModel();
@@ -352,14 +427,24 @@ async function main(): Promise<void> {
     warn('Skipping model download (--skip-model)');
   }
 
-  if (clientTarget === 'claude' || clientTarget === 'both') {
+  const wantsClaude = clientTarget === 'claude' || clientTarget === 'both' || clientTarget === 'all';
+  const wantsDesktop = clientTarget === 'desktop' || clientTarget === 'all';
+  const wantsCodex = clientTarget === 'codex' || clientTarget === 'both' || clientTarget === 'all';
+
+  if (wantsClaude) {
     await configureClaude(args);
 
     const { installHooks } = await import('./hooks/install.js');
     installHooks();
   }
 
-  if (clientTarget === 'codex' || clientTarget === 'both') {
+  if (wantsDesktop) {
+    log('');
+    log('Configuring Claude Desktop...');
+    configureClaudeDesktop();
+  }
+
+  if (wantsCodex) {
     log('');
     log('Configuring Codex MCP server...');
     configureCodex();
@@ -373,12 +458,16 @@ async function main(): Promise<void> {
   if (clientTarget === 'claude') {
     log('  Stellar Memory will activate automatically in Claude Code.');
     log('  Start a conversation and your memories will persist across sessions.');
+  } else if (clientTarget === 'desktop') {
+    log('  Stellar Memory is registered in Claude Desktop.');
+    log('  Restart Claude Desktop and your memories will persist across conversations.');
   } else if (clientTarget === 'codex') {
     log('  Stellar Memory is registered in Codex as an MCP server.');
     log('  Codex workspace guidance was installed in AGENTS.md for automatic recall and commit behavior.');
   } else {
-    log('  Stellar Memory is registered for Claude Code and Codex.');
-    log('  Claude gets hooks; Codex gets workspace guidance plus direct MCP access after restart.');
+    const targets = [wantsClaude && 'Claude Code', wantsDesktop && 'Claude Desktop', wantsCodex && 'Codex'].filter(Boolean).join(', ');
+    log(`  Stellar Memory is registered for ${targets}.`);
+    if (wantsDesktop) log('  Restart Claude Desktop to activate.');
   }
 
   log('');

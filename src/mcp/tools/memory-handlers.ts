@@ -17,6 +17,7 @@ import { calculateQuality, getQualityFeedback } from '../../engine/quality.js';
 import { detectConflicts, formatConflictWarnings } from '../../engine/conflict.js';
 import { detectSupersession, supersedeMemory, setTemporalBounds } from '../../engine/temporal.js';
 import { corona } from '../../engine/corona.js';
+import { noteRecall, noteRemember } from '../../engine/session-policy.js';
 import {
   type McpResponse,
   trackBgError,
@@ -47,6 +48,9 @@ export async function handleRemember(args: {
       impact:  args.impact,
       tags:    args.tags,
     });
+
+    // Track in session-policy for smart auto-commit
+    noteRemember(proj, { type: memory.type, summary: memory.summary, content: memory.content });
 
     // Background: auto-extract relationships with existing memories.
     // Fire-and-forget — does not block the response.
@@ -112,6 +116,9 @@ export async function handleRecall(args: {
     const proj = resolveProject();
     const limit = args.limit ?? 10;
     ensureCorona();
+
+    // Track in session-policy for smart auto-commit
+    noteRecall(proj, args.query);
 
     const memoryType: MemoryType | undefined =
       args.type === 'all' || args.type === undefined ? undefined : (args.type as MemoryType);

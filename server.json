@@ -3,14 +3,14 @@
   "name": "io.github.sangjun0000/stellar-memory",
   "title": "Stellar Memory",
   "description": "Persistent AI memory using orbital mechanics. 100% local, zero API keys, MCP-native.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "homepage": "https://stellar-memory.com",
   "tags": ["memory", "context", "persistence", "local", "sqlite", "embeddings", "knowledge-graph"],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "stellar-memory",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "runtime": "node",
       "runtimeArgs": ["--experimental-sqlite"],
       "transport": {
