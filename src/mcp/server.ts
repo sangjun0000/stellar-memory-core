@@ -42,7 +42,19 @@ setErrorReporter((category) => {
 // ---------------------------------------------------------------------------
 
 export function createStellarServer(): McpServer {
-  const server = new McpServer({ name: 'stellar-memory', version: '0.4.0' });
+  const MEMORY_PROTOCOL = [
+    'Stellar Memory is a persistent memory system. Use it automatically and invisibly:',
+    'SESSION START: Call recall() with keywords from the user\'s first message.',
+    'DURING WORK: Call remember() when decisions are made, errors resolved, milestones reached, or context discovered.',
+    'SESSION END: Call commit() with current_work, decisions, next_steps, and errors.',
+    'TOPIC CHANGE: Call recall() with new keywords to surface relevant past context.',
+  ].join(' ');
+
+  const server = new McpServer({
+    name: 'stellar-memory',
+    version: '1.0.1',
+    description: MEMORY_PROTOCOL,
+  });
 
   // ── Session auto-context injection ────────────────────────────────────────
   //

@@ -11,54 +11,117 @@ interface Star {
   angle: number;
 }
 
+interface OrbitalRing {
+  a: number;         // semi-major axis
+  b: number;         // semi-minor axis
+  tilt: number;      // rotation angle of ellipse
+  tiltZ: number;     // z-axis tilt (3D projection factor)
+  speed: number;     // angular speed
+  offset: number;    // phase offset
+  color: string;
+  glowColor: string;
+  particleCount: number;
+  dotSize: number;
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const GITHUB_RELEASES = 'https://github.com/sangjun0000/stellar-memory-core/releases/latest';
-const GITHUB_REPO     = 'https://github.com/sangjun0000/stellar-memory-core';
-const NPM_PACKAGE     = 'https://www.npmjs.com/package/stellar-memory';
-const INSTALL_CMD     = 'npx stellar-memory init';
+const NPM_PACKAGE = 'https://www.npmjs.com/package/stellar-memory';
+const INSTALL_CMD = 'npx stellar-memory init';
 
 const FEATURES = [
   {
     icon: '⬡',
     color: '#60a5fa',
     glow: 'rgba(59,130,246,0.35)',
-    title: 'Orbital Memory Decay',
+    title: 'Natural Forgetting',
     description:
-      'Importance decays naturally. High-impact memories stay in tight orbit; forgotten ones drift to the Oort Cloud. Exponential decay with a 72-hour half-life mirrors real human forgetting curves.',
+      'Important memories stay close. Stale ones gradually drift away — just like real human memory. No manual cleanup needed.',
   },
   {
     icon: '◎',
     color: '#a78bfa',
     glow: 'rgba(139,92,246,0.35)',
-    title: 'Hybrid Search',
+    title: 'Smart Search',
     description:
-      'FTS5 keyword search + sqlite-vec KNN vector search fused via Reciprocal Rank Fusion. Handles both exact matches and semantic understanding — all local, no API keys.',
+      'Find memories by meaning, not just keywords. Ask naturally and get the most relevant results — all processed locally on your machine.',
   },
   {
     icon: '☀',
     color: '#fbbf24',
     glow: 'rgba(251,191,36,0.35)',
-    title: '3D Solar System Dashboard',
+    title: 'Visual Dashboard',
     description:
-      'React + Three.js renders your memories as orbiting planets. Watch decisions orbit close and stale knowledge drift away. Drag memories to manually adjust their orbital distance.',
+      'See your memories as orbiting planets in an interactive 3D solar system. Drag them closer or let them drift — you\'re in control.',
   },
   {
     icon: '⬡',
     color: '#34d399',
     glow: 'rgba(52,211,153,0.35)',
-    title: 'Multi-Project Isolation',
+    title: 'Multi-Project',
     description:
-      'Each project is its own star system. Mark memories as "universal" to share them across all projects — like coding style preferences that apply everywhere.',
+      'Each project has its own memory space. Share common preferences across all projects, or keep everything isolated.',
   },
 ] as const;
 
 const STATS = [
-  { value: '252', label: 'Tests' },
   { value: '100%', label: 'Local' },
-  { value: '0.1 AU', label: 'Core orbit' },
-  { value: '<1ms', label: 'Corona recall' },
+  { value: '0', label: 'API keys' },
+  { value: '18', label: 'MCP tools' },
+  { value: '<1ms', label: 'Recall speed' },
 ] as const;
+
+const COMPARISONS = [
+  {
+    label: 'Context retained across sessions',
+    without: { value: 0, display: '0%' },
+    withSTM: { value: 95, display: '95%' },
+  },
+  {
+    label: 'Repeated instructions per week',
+    without: { value: 85, display: '~15x' },
+    withSTM: { value: 12, display: '~2x' },
+  },
+  {
+    label: 'Time to first useful response',
+    without: { value: 75, display: '~3 min' },
+    withSTM: { value: 8, display: '~10 sec' },
+  },
+  {
+    label: 'Decision consistency',
+    without: { value: 40, display: '~40%' },
+    withSTM: { value: 92, display: '92%' },
+  },
+] as const;
+
+// ─── Orbital rings definition ─────────────────────────────────────────────────
+
+const ORBITAL_RINGS: OrbitalRing[] = [
+  {
+    a: 180, b: 55, tilt: 0.3, tiltZ: 0.55,
+    speed: 0.00035, offset: 0,
+    color: '#34d399', glowColor: 'rgba(52,211,153,0.8)',
+    particleCount: 100, dotSize: 2.2,
+  },
+  {
+    a: 160, b: 45, tilt: 2.1, tiltZ: 0.4,
+    speed: 0.00048, offset: Math.PI * 0.7,
+    color: '#f59e0b', glowColor: 'rgba(245,158,11,0.8)',
+    particleCount: 90, dotSize: 2.0,
+  },
+  {
+    a: 200, b: 60, tilt: 1.2, tiltZ: 0.65,
+    speed: 0.00028, offset: Math.PI * 1.3,
+    color: '#c084fc', glowColor: 'rgba(192,132,252,0.8)',
+    particleCount: 110, dotSize: 2.4,
+  },
+  {
+    a: 140, b: 38, tilt: 3.5, tiltZ: 0.3,
+    speed: 0.00060, offset: Math.PI * 0.4,
+    color: '#22d3ee', glowColor: 'rgba(34,211,238,0.8)',
+    particleCount: 80, dotSize: 1.8,
+  },
+];
 
 // ─── StarField ────────────────────────────────────────────────────────────────
 
@@ -80,13 +143,12 @@ function StarField() {
     resize();
     window.addEventListener('resize', resize);
 
-    // Generate stars
-    starsRef.current = Array.from({ length: 200 }, () => ({
+    starsRef.current = Array.from({ length: 220 }, () => ({
       x:       Math.random() * window.innerWidth,
       y:       Math.random() * window.innerHeight,
-      r:       Math.random() * 1.2 + 0.2,
-      opacity: Math.random() * 0.6 + 0.1,
-      speed:   Math.random() * 0.015 + 0.005,
+      r:       Math.random() * 1.1 + 0.2,
+      opacity: Math.random() * 0.5 + 0.1,
+      speed:   Math.random() * 0.012 + 0.004,
       angle:   Math.random() * Math.PI * 2,
     }));
 
@@ -95,7 +157,6 @@ function StarField() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       frame++;
       for (const s of starsRef.current) {
-        // Gentle twinkle
         const twinkle = Math.sin(frame * s.speed + s.angle) * 0.25 + 0.75;
         ctx.beginPath();
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
@@ -116,10 +177,137 @@ function StarField() {
     <canvas
       ref={canvasRef}
       style={{
-        position:  'fixed',
-        inset:     0,
-        zIndex:    0,
+        position:      'fixed',
+        inset:         0,
+        zIndex:        0,
         pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+// ─── OrbitalAnimation ─────────────────────────────────────────────────────────
+
+function OrbitalAnimation() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef    = useRef<number>(0);
+  const timeRef   = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const SIZE = 460;
+    canvas.width  = SIZE;
+    canvas.height = SIZE;
+    const cx = SIZE / 2;
+    const cy = SIZE / 2;
+
+    const draw = (ts: number) => {
+      timeRef.current = ts;
+      ctx.clearRect(0, 0, SIZE, SIZE);
+
+      for (const ring of ORBITAL_RINGS) {
+        const { a, b, tilt, tiltZ, speed, offset, color, glowColor, particleCount, dotSize } = ring;
+
+        // Draw faint ellipse guide line
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(tilt);
+        ctx.scale(1, tiltZ);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = color.replace(')', ', 0.08)').replace('rgb', 'rgba').replace('#', 'rgba(').replace('rgba(', '');
+        // Simpler: just use a semi-transparent stroke
+        ctx.strokeStyle = `${color}14`;
+        ctx.lineWidth   = 1 / tiltZ;
+        ctx.stroke();
+        ctx.restore();
+
+        // Draw particles along the ellipse
+        for (let i = 0; i < particleCount; i++) {
+          const theta = (i / particleCount) * Math.PI * 2;
+          const t     = theta + offset + ts * speed;
+
+          // Parametric ellipse in 3D tilted projection
+          const cosT  = Math.cos(t);
+          const sinT  = Math.sin(t);
+          const cosTilt = Math.cos(tilt);
+          const sinTilt = Math.sin(tilt);
+
+          const px = a * cosT * cosTilt - b * sinT * sinTilt;
+          const py = (a * cosT * sinTilt + b * sinT * cosTilt) * tiltZ;
+
+          const x = cx + px;
+          const y = cy + py;
+
+          // Depth-based opacity (simulate 3D — dots "behind" are dimmer)
+          // y position as proxy for depth: lower y = closer to viewer
+          const depthFactor = 0.4 + 0.6 * ((py / (b * tiltZ) + 1) / 2);
+          const alpha = Math.max(0.15, depthFactor);
+
+          // Vary size by depth slightly
+          const sz = dotSize * (0.7 + 0.5 * depthFactor);
+
+          ctx.save();
+          ctx.shadowBlur  = 8;
+          ctx.shadowColor = glowColor;
+          ctx.beginPath();
+          ctx.arc(x, y, sz, 0, Math.PI * 2);
+          ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2, '0');
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // Central glow (sun)
+      const sunGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 28);
+      sunGrad.addColorStop(0,   'rgba(253,230,138,1)');
+      sunGrad.addColorStop(0.4, 'rgba(251,191,36,0.9)');
+      sunGrad.addColorStop(0.8, 'rgba(245,158,11,0.4)');
+      sunGrad.addColorStop(1,   'rgba(217,119,6,0)');
+
+      ctx.save();
+      ctx.shadowBlur  = 40;
+      ctx.shadowColor = 'rgba(251,191,36,0.7)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+      ctx.fillStyle = sunGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // Outer corona pulse
+      const pulse = Math.sin(ts * 0.001) * 0.5 + 0.5;
+      const coronaGrad = ctx.createRadialGradient(cx, cy, 14, cx, cy, 50);
+      coronaGrad.addColorStop(0,   `rgba(251,191,36,${0.12 + pulse * 0.08})`);
+      coronaGrad.addColorStop(1,   'rgba(251,191,36,0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+      ctx.fillStyle = coronaGrad;
+      ctx.fill();
+
+      rafRef.current = requestAnimationFrame(draw);
+    };
+
+    rafRef.current = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position:      'absolute',
+        top:           '50%',
+        left:          '50%',
+        transform:     'translate(-50%, -50%)',
+        pointerEvents: 'none',
+        opacity:       0.92,
       }}
     />
   );
@@ -144,20 +332,20 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       style={{
-        flexShrink:      0,
-        display:         'flex',
-        alignItems:      'center',
-        gap:             '6px',
-        padding:         '6px 14px',
-        borderRadius:    '6px',
-        border:          '1px solid rgba(96,165,250,0.3)',
-        background:      copied ? 'rgba(52,211,153,0.12)' : 'rgba(59,130,246,0.1)',
-        color:           copied ? '#34d399' : '#93c5fd',
-        fontSize:        '12px',
-        fontWeight:      600,
-        cursor:          'pointer',
-        transition:      'all 0.2s ease',
-        whiteSpace:      'nowrap',
+        flexShrink:   0,
+        display:      'flex',
+        alignItems:   'center',
+        gap:          '6px',
+        padding:      '6px 14px',
+        borderRadius: '6px',
+        border:       '1px solid rgba(96,165,250,0.3)',
+        background:   copied ? 'rgba(52,211,153,0.12)' : 'rgba(59,130,246,0.1)',
+        color:        copied ? '#34d399' : '#93c5fd',
+        fontSize:     '12px',
+        fontWeight:   600,
+        cursor:       'pointer',
+        transition:   'all 0.2s ease',
+        whiteSpace:   'nowrap',
       }}
       aria-label="Copy install command"
     >
@@ -181,134 +369,359 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+// ─── ComparisonSection ───────────────────────────────────────────────────────
+
+function ComparisonSection() {
+  const [animated, setAnimated] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setAnimated(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <section
+      id="comparison"
+      ref={sectionRef}
+      style={{
+        padding:  'clamp(60px, 8vw, 100px) clamp(20px, 5vw, 60px)',
+        maxWidth: '900px',
+        margin:   '0 auto',
+      }}
+    >
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+        <p style={{
+          fontSize:      '11px',
+          fontWeight:    700,
+          color:         '#60a5fa',
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          marginBottom:  '12px',
+        }}>
+          Comparison
+        </p>
+        <h2 style={{
+          fontSize:      'clamp(26px, 4vw, 40px)',
+          fontWeight:    800,
+          letterSpacing: '-0.02em',
+          color:         '#f1f5f9',
+          margin:        '0 0 14px',
+        }}>
+          Why Stellar Memory?
+        </h2>
+        <p style={{
+          fontSize:   '15px',
+          color:      '#64748b',
+          lineHeight: 1.7,
+          maxWidth:   '480px',
+          margin:     '0 auto',
+        }}>
+          Without persistent memory, every session starts from zero. See the difference.
+        </p>
+      </div>
+
+      {/* Comparison card */}
+      <div style={{
+        background:     'rgba(255,255,255,0.025)',
+        border:         '1px solid rgba(255,255,255,0.08)',
+        borderRadius:   '16px',
+        padding:        'clamp(24px, 4vw, 40px)',
+        backdropFilter: 'blur(12px)',
+      }}>
+        {/* Legend */}
+        <div style={{
+          display:       'flex',
+          gap:           '24px',
+          marginBottom:  '36px',
+          flexWrap:      'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width:        '12px',
+              height:       '12px',
+              borderRadius: '3px',
+              background:   '#334155',
+              flexShrink:   0,
+            }} />
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Without STM</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width:        '12px',
+              height:       '12px',
+              borderRadius: '3px',
+              background:   'linear-gradient(90deg, #3b82f6, #34d399)',
+              flexShrink:   0,
+            }} />
+            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>With Stellar Memory</span>
+          </div>
+        </div>
+
+        {/* Metric rows */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          {COMPARISONS.map((metric, i) => (
+            <div key={i}>
+              {/* Metric label */}
+              <div style={{
+                fontSize:     '12px',
+                fontWeight:   600,
+                color:        '#94a3b8',
+                marginBottom: '10px',
+                letterSpacing: '0.01em',
+              }}>
+                {metric.label}
+              </div>
+
+              {/* Bars */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                {/* Without bar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    flex:     1,
+                    height:   '22px',
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: '4px',
+                    overflow:  'hidden',
+                    position:  'relative',
+                  }}>
+                    <div style={{
+                      position:   'absolute',
+                      top:        0,
+                      left:       0,
+                      height:     '100%',
+                      width:      animated ? `${metric.without.value}%` : '0%',
+                      background: '#334155',
+                      borderRadius: '4px',
+                      transition: `width 1s ease-out ${i * 150}ms`,
+                      minWidth:   animated && metric.without.value === 0 ? '0px' : undefined,
+                    }} />
+                  </div>
+                  <span style={{
+                    fontSize:   '11px',
+                    fontWeight: 600,
+                    color:      '#475569',
+                    minWidth:   '52px',
+                    textAlign:  'right',
+                  }}>
+                    {animated ? metric.without.display : '—'}
+                  </span>
+                </div>
+
+                {/* With STM bar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    flex:       1,
+                    height:     '22px',
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: '4px',
+                    overflow:   'hidden',
+                    position:   'relative',
+                  }}>
+                    <div style={{
+                      position:   'absolute',
+                      top:        0,
+                      left:       0,
+                      height:     '100%',
+                      width:      animated ? `${metric.withSTM.value}%` : '0%',
+                      background: 'linear-gradient(90deg, #3b82f6 0%, #34d399 100%)',
+                      borderRadius: '4px',
+                      transition: `width 1s ease-out ${i * 150 + 80}ms`,
+                      boxShadow:  animated ? '0 0 12px rgba(59,130,246,0.35)' : 'none',
+                    }} />
+                  </div>
+                  <span style={{
+                    fontSize:   '11px',
+                    fontWeight: 700,
+                    color:      '#34d399',
+                    minWidth:   '52px',
+                    textAlign:  'right',
+                  }}>
+                    {animated ? metric.withSTM.display : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Main LandingPage ─────────────────────────────────────────────────────────
 
 export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () => void }) {
-  const [version, setVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Attempt to read version from npm registry (best-effort, no CORS issues for public packages)
-    fetch('https://registry.npmjs.org/stellar-memory/latest')
-      .then((r) => r.json())
-      .then((d) => { if (d.version) setVersion(d.version); })
-      .catch(() => {/* ignore */});
-  }, []);
 
   return (
     <div
       style={{
-        minHeight:   '100vh',
-        background:  '#020408',
-        color:       '#e2e8f0',
-        fontFamily:  "'Inter', system-ui, sans-serif",
-        position:    'relative',
-        overflowX:   'hidden',
+        minHeight:  '100vh',
+        background: '#080a0f',
+        color:      '#e2e8f0',
+        fontFamily: "'Inter', system-ui, sans-serif",
+        position:   'relative',
+        overflowX:  'hidden',
       }}
     >
       {/* Animated star background */}
       <StarField />
 
-      {/* Gradient overlays */}
+      {/* Ambient gradient overlays */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        {/* Deep radial glow behind hero */}
         <div style={{
-          position:   'absolute',
-          top:        '-20%',
-          left:       '50%',
-          transform:  'translateX(-50%)',
-          width:      '80vw',
-          height:     '60vw',
-          background: 'radial-gradient(ellipse at center, rgba(59,130,246,0.06) 0%, transparent 70%)',
+          position:     'absolute',
+          top:          '-10%',
+          left:         '50%',
+          transform:    'translateX(-50%)',
+          width:        '90vw',
+          height:       '70vw',
+          background:   'radial-gradient(ellipse at center, rgba(34,211,238,0.04) 0%, rgba(139,92,246,0.03) 40%, transparent 70%)',
           borderRadius: '50%',
         }} />
-        {/* Bottom fade */}
         <div style={{
           position:   'absolute',
           bottom:     0,
           left:       0,
           right:      0,
           height:     '200px',
-          background: 'linear-gradient(to top, #020408, transparent)',
+          background: 'linear-gradient(to top, #080a0f, transparent)',
         }} />
       </div>
 
-      {/* ── NAV ── */}
+      {/* ── NAV ─────────────────────────────────────────────────────────────── */}
       <nav style={{
-        position:   'fixed',
-        top:        0,
-        left:       0,
-        right:      0,
-        zIndex:     100,
-        display:    'flex',
-        alignItems: 'center',
+        position:       'fixed',
+        top:            0,
+        left:           0,
+        right:          0,
+        zIndex:         100,
+        display:        'flex',
+        alignItems:     'center',
         justifyContent: 'space-between',
-        padding:    '0 clamp(20px, 5vw, 60px)',
-        height:     '60px',
-        background: 'rgba(2,4,8,0.8)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        backdropFilter: 'blur(16px)',
+        padding:        '0 clamp(20px, 5vw, 64px)',
+        height:         '64px',
+        background:     'rgba(8,10,15,0.75)',
+        borderBottom:   '1px solid rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
       }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width:        '28px',
-            height:       '28px',
+            width:        '30px',
+            height:       '30px',
             borderRadius: '50%',
-            background:   'radial-gradient(circle at 35% 35%, #fbbf24 0%, #f59e0b 40%, #d97706 100%)',
-            boxShadow:    '0 0 12px rgba(251,191,36,0.5), 0 0 24px rgba(251,191,36,0.2)',
+            background:   'radial-gradient(circle at 35% 35%, #fde68a 0%, #fbbf24 40%, #d97706 100%)',
+            boxShadow:    '0 0 10px rgba(251,191,36,0.55), 0 0 20px rgba(251,191,36,0.2)',
             flexShrink:   0,
           }} />
-          <span style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>
+          <span style={{
+            fontSize:      '15px',
+            fontWeight:    700,
+            color:         '#f1f5f9',
+            letterSpacing: '-0.015em',
+          }}>
             Stellar Memory
           </span>
         </div>
 
-        {/* Nav links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <a
-            href={GITHUB_REPO}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ padding: '6px 14px', borderRadius: '6px', color: '#94a3b8', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}
-            onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#e2e8f0'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
-            onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#94a3b8'; (e.target as HTMLElement).style.background = 'transparent'; }}
-          >
-            GitHub
-          </a>
+        {/* Center nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <a
             href={NPM_PACKAGE}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ padding: '6px 14px', borderRadius: '6px', color: '#94a3b8', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}
-            onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#e2e8f0'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
-            onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#94a3b8'; (e.target as HTMLElement).style.background = 'transparent'; }}
+            style={{
+              padding:        '6px 16px',
+              borderRadius:   '6px',
+              color:          '#94a3b8',
+              fontSize:       '13px',
+              fontWeight:     500,
+              textDecoration: 'none',
+              transition:     'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = '#e2e8f0';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = '#94a3b8';
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+            }}
           >
             npm
           </a>
-          <button
-            onClick={onNavigateDashboard}
+          <a
+            href="#install"
             style={{
-              padding:      '6px 16px',
-              borderRadius: '7px',
-              border:       '1px solid rgba(96,165,250,0.35)',
-              background:   'rgba(59,130,246,0.1)',
-              color:        '#93c5fd',
-              fontSize:     '13px',
-              fontWeight:   600,
-              cursor:       'pointer',
+              padding:        '6px 16px',
+              borderRadius:   '6px',
+              color:          '#94a3b8',
+              fontSize:       '13px',
+              fontWeight:     500,
+              textDecoration: 'none',
+              transition:     'all 0.15s ease',
             }}
-            onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(59,130,246,0.2)'; }}
-            onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'rgba(59,130,246,0.1)'; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = '#e2e8f0';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = '#94a3b8';
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+            }}
           >
-            Dashboard
-          </button>
+            Install
+          </a>
         </div>
+
+        {/* Right CTA — white pill like reference */}
+        <button
+          onClick={onNavigateDashboard}
+          style={{
+            padding:      '8px 20px',
+            borderRadius: '999px',
+            border:       'none',
+            background:   '#ffffff',
+            color:        '#0a0a0a',
+            fontSize:     '13px',
+            fontWeight:   700,
+            cursor:       'pointer',
+            transition:   'all 0.15s ease',
+            letterSpacing: '-0.01em',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = '#e2e8f0';
+            (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = '#ffffff';
+            (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+          }}
+        >
+          Dashboard
+        </button>
       </nav>
 
       {/* ── CONTENT ── */}
       <div style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* ─ HERO ─ */}
+        {/* ─ HERO ──────────────────────────────────────────────────────────── */}
         <section style={{
           minHeight:      '100vh',
           display:        'flex',
@@ -317,232 +730,242 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
           justifyContent: 'center',
           textAlign:      'center',
           padding:        'clamp(100px, 12vh, 160px) clamp(20px, 5vw, 60px) clamp(60px, 8vh, 100px)',
+          position:       'relative',
         }}>
-          {/* Sun graphic */}
+          {/* Orbital animation — centered, behind text */}
           <div style={{
-            position:     'relative',
-            width:        '90px',
-            height:       '90px',
-            marginBottom: '40px',
+            position:      'absolute',
+            top:           '50%',
+            left:          '50%',
+            transform:     'translate(-50%, -50%)',
+            width:         '460px',
+            height:        '460px',
+            pointerEvents: 'none',
+            zIndex:        0,
           }}>
-            {/* Outer glow rings */}
-            {[1.8, 1.5, 1.2].map((scale, i) => (
-              <div
-                key={i}
-                style={{
-                  position:     'absolute',
-                  inset:        `${-(scale - 1) * 45}px`,
-                  borderRadius: '50%',
-                  background:   `radial-gradient(circle, rgba(251,191,36,${0.03 - i * 0.01}) 0%, transparent 70%)`,
-                  animation:    `pulse-soft ${3 + i * 0.5}s ease-in-out infinite`,
-                  animationDelay: `${i * 0.4}s`,
-                }}
-              />
-            ))}
-            {/* Orbit ring */}
+            <OrbitalAnimation />
+          </div>
+
+          {/* Hero text — on top of animation */}
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            {/* Pre-headline badge */}
             <div style={{
-              position:     'absolute',
-              inset:        '-32px',
-              borderRadius: '50%',
-              border:       '1px solid rgba(251,191,36,0.15)',
-            }} />
-            {/* Core sun */}
-            <div style={{
-              position:     'absolute',
-              inset:        0,
-              borderRadius: '50%',
-              background:   'radial-gradient(circle at 35% 35%, #fde68a 0%, #fbbf24 40%, #f59e0b 70%, #d97706 100%)',
-              boxShadow:    '0 0 24px rgba(251,191,36,0.7), 0 0 60px rgba(251,191,36,0.3), 0 0 100px rgba(251,191,36,0.1)',
-              animation:    'glow 2.4s ease-in-out infinite',
-            }} />
-            {/* Orbiting planet */}
-            <div style={{
-              position:  'absolute',
-              top:       '50%',
-              left:      '50%',
-              width:     '122px',
-              height:    '122px',
-              marginTop: '-61px',
-              marginLeft: '-61px',
-              animation: 'spin 8s linear infinite',
+              display:        'inline-flex',
+              alignItems:     'center',
+              gap:            '6px',
+              padding:        '5px 14px',
+              borderRadius:   '999px',
+              border:         '1px solid rgba(251,191,36,0.25)',
+              background:     'rgba(251,191,36,0.06)',
+              marginBottom:   '32px',
+              fontSize:       '11px',
+              fontWeight:     700,
+              color:          '#fbbf24',
+              letterSpacing:  '0.12em',
+              textTransform:  'uppercase',
             }}>
-              <div style={{
-                position:     'absolute',
-                top:          '-5px',
-                left:         '50%',
-                transform:    'translateX(-50%)',
-                width:        '10px',
-                height:       '10px',
+              <span style={{
+                width:        '5px',
+                height:       '5px',
                 borderRadius: '50%',
-                background:   'radial-gradient(circle at 35% 35%, #93c5fd, #3b82f6)',
-                boxShadow:    '0 0 6px rgba(59,130,246,0.6)',
+                background:   '#fbbf24',
+                boxShadow:    '0 0 6px rgba(251,191,36,0.8)',
+                display:      'inline-block',
               }} />
+              MCP-native · Fully local · Zero API keys
             </div>
-          </div>
 
-          {/* Headline */}
-          <h1 style={{
-            fontSize:     'clamp(36px, 6vw, 72px)',
-            fontWeight:   800,
-            lineHeight:   1.08,
-            letterSpacing: '-0.03em',
-            marginBottom: '20px',
-            background:   'linear-gradient(135deg, #f1f5f9 0%, #93c5fd 50%, #c4b5fd 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            maxWidth:     '800px',
-          }}>
-            AI memory that orbits<br />like planets
-          </h1>
+            {/* Main headline — three-word bold pattern */}
+            <h1 style={{
+              fontSize:      'clamp(52px, 8vw, 96px)',
+              fontWeight:    900,
+              lineHeight:    1.0,
+              letterSpacing: '-0.04em',
+              marginBottom:  '28px',
+              color:         '#ffffff',
+            }}>
+              <span style={{ display: 'block' }}>Remember.</span>
+              <span style={{
+                display:              'block',
+                background:           'linear-gradient(135deg, #34d399 0%, #22d3ee 50%, #818cf8 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor:  'transparent',
+                backgroundClip:       'text',
+              }}>
+                Recall.
+              </span>
+              <span style={{ display: 'block' }}>Evolve.</span>
+            </h1>
 
-          {/* Subheadline */}
-          <p style={{
-            fontSize:     'clamp(16px, 2.2vw, 20px)',
-            color:        '#94a3b8',
-            maxWidth:     '560px',
-            lineHeight:   1.65,
-            marginBottom: '48px',
-          }}>
-            Persistent memory for AI assistants using orbital mechanics.
-            Important memories stay close. Forgotten ones drift away. Fully local, MCP-native, open source.
-          </p>
+            {/* Subtitle */}
+            <p style={{
+              fontSize:     'clamp(15px, 2vw, 18px)',
+              color:        '#64748b',
+              maxWidth:     '480px',
+              lineHeight:   1.7,
+              marginBottom: '44px',
+              margin:       '0 auto 44px',
+            }}>
+              Persistent memory for AI assistants using orbital mechanics.
+              Important memories stay close. Forgotten ones drift away.
+            </p>
 
-          {/* CTA buttons */}
-          <div style={{
-            display:    'flex',
-            flexWrap:   'wrap',
-            gap:        '12px',
-            justifyContent: 'center',
-            marginBottom: '64px',
-          }}>
-            {/* Primary: Get Started */}
-            <a
-              href="#install"
-              style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          '8px',
-                padding:      '13px 28px',
-                borderRadius: '9px',
-                background:   'linear-gradient(135deg, #3b82f6, #2563eb)',
-                color:        '#fff',
-                fontSize:     '15px',
-                fontWeight:   700,
-                textDecoration: 'none',
-                boxShadow:    '0 0 24px rgba(59,130,246,0.4), 0 4px 12px rgba(0,0,0,0.3)',
-                transition:   'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => { const el = e.currentTarget; el.style.transform = 'translateY(-2px)'; el.style.boxShadow = '0 0 32px rgba(59,130,246,0.55), 0 8px 20px rgba(0,0,0,0.35)'; }}
-              onMouseLeave={(e) => { const el = e.currentTarget; el.style.transform = 'none'; el.style.boxShadow = '0 0 24px rgba(59,130,246,0.4), 0 4px 12px rgba(0,0,0,0.3)'; }}
-            >
-              Get Started
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-              </svg>
-            </a>
-
-            {/* Secondary: Download App */}
-            <a
-              href={GITHUB_RELEASES}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          '8px',
-                padding:      '13px 28px',
-                borderRadius: '9px',
-                border:       '1px solid rgba(255,255,255,0.12)',
-                background:   'rgba(255,255,255,0.05)',
-                color:        '#e2e8f0',
-                fontSize:     '15px',
-                fontWeight:   600,
-                textDecoration: 'none',
-                backdropFilter: 'blur(8px)',
-                transition:   'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = 'rgba(255,255,255,0.09)'; el.style.borderColor = 'rgba(255,255,255,0.2)'; el.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = 'rgba(255,255,255,0.05)'; el.style.borderColor = 'rgba(255,255,255,0.12)'; el.style.transform = 'none'; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Download .exe
-            </a>
-
-            {/* Tertiary: Dashboard */}
-            <button
-              onClick={onNavigateDashboard}
-              style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          '8px',
-                padding:      '13px 28px',
-                borderRadius: '9px',
-                border:       '1px solid rgba(167,139,250,0.25)',
-                background:   'rgba(139,92,246,0.08)',
-                color:        '#c4b5fd',
-                fontSize:     '15px',
-                fontWeight:   600,
-                cursor:       'pointer',
-                transition:   'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = 'rgba(139,92,246,0.15)'; el.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = 'rgba(139,92,246,0.08)'; el.style.transform = 'none'; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
-              </svg>
-              Open Dashboard
-            </button>
-          </div>
-
-          {/* Stats bar */}
-          <div style={{
-            display:    'flex',
-            flexWrap:   'wrap',
-            gap:        '0',
-            background: 'rgba(255,255,255,0.03)',
-            border:     '1px solid rgba(255,255,255,0.07)',
-            borderRadius: '12px',
-            overflow:   'hidden',
-            backdropFilter: 'blur(12px)',
-          }}>
-            {STATS.map((s, i) => (
-              <div
-                key={i}
+            {/* CTA row */}
+            <div style={{
+              display:        'flex',
+              flexWrap:       'wrap',
+              gap:            '12px',
+              justifyContent: 'center',
+              marginBottom:   '72px',
+            }}>
+              {/* Primary: white pill — matches reference "Explore Our Work" */}
+              <a
+                href="#install"
                 style={{
-                  padding:       '18px 32px',
-                  textAlign:     'center',
-                  borderRight:   i < STATS.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                  minWidth:      '100px',
+                  display:        'inline-flex',
+                  alignItems:     'center',
+                  gap:            '8px',
+                  padding:        '14px 32px',
+                  borderRadius:   '999px',
+                  border:         'none',
+                  background:     '#ffffff',
+                  color:          '#0a0a0a',
+                  fontSize:       '15px',
+                  fontWeight:     700,
+                  textDecoration: 'none',
+                  transition:     'all 0.2s ease',
+                  letterSpacing:  '-0.01em',
+                  boxShadow:      '0 2px 20px rgba(255,255,255,0.15)',
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background   = '#f1f5f9';
+                  el.style.transform    = 'translateY(-2px)';
+                  el.style.boxShadow    = '0 6px 28px rgba(255,255,255,0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background   = '#ffffff';
+                  el.style.transform    = 'none';
+                  el.style.boxShadow    = '0 2px 20px rgba(255,255,255,0.15)';
                 }}
               >
-                <div style={{ fontSize: '22px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>
-                  {s.value}
+                Get Started
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                </svg>
+              </a>
+
+              {/* Secondary: open dashboard */}
+              <button
+                onClick={onNavigateDashboard}
+                style={{
+                  display:      'inline-flex',
+                  alignItems:   'center',
+                  gap:          '8px',
+                  padding:      '14px 28px',
+                  borderRadius: '999px',
+                  border:       '1px solid rgba(255,255,255,0.14)',
+                  background:   'rgba(255,255,255,0.05)',
+                  color:        '#e2e8f0',
+                  fontSize:     '15px',
+                  fontWeight:   600,
+                  cursor:       'pointer',
+                  transition:   'all 0.2s ease',
+                  backdropFilter: 'blur(8px)',
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background   = 'rgba(255,255,255,0.1)';
+                  el.style.borderColor  = 'rgba(255,255,255,0.24)';
+                  el.style.transform    = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background  = 'rgba(255,255,255,0.05)';
+                  el.style.borderColor = 'rgba(255,255,255,0.14)';
+                  el.style.transform   = 'none';
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
+                </svg>
+                Open Dashboard
+              </button>
+            </div>
+
+            {/* Stats bar */}
+            <div style={{
+              display:        'flex',
+              flexWrap:       'wrap',
+              gap:            '0',
+              background:     'rgba(255,255,255,0.025)',
+              border:         '1px solid rgba(255,255,255,0.06)',
+              borderRadius:   '14px',
+              overflow:       'hidden',
+              backdropFilter: 'blur(16px)',
+            }}>
+              {STATS.map((s, i) => (
+                <div
+                  key={i}
+                  style={{
+                    padding:     '20px 36px',
+                    textAlign:   'center',
+                    borderRight: i < STATS.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                    minWidth:    '110px',
+                  }}
+                >
+                  <div style={{
+                    fontSize:      '22px',
+                    fontWeight:    800,
+                    color:         '#f1f5f9',
+                    letterSpacing: '-0.02em',
+                  }}>
+                    {s.value}
+                  </div>
+                  <div style={{
+                    fontSize:      '10px',
+                    color:         '#475569',
+                    marginTop:     '3px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    fontWeight:    600,
+                  }}>
+                    {s.label}
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-                  {s.label}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* ─ FEATURES ─ */}
+        {/* ─ COMPARISON ────────────────────────────────────────────────────── */}
+        <ComparisonSection />
+
+        {/* ─ FEATURES ──────────────────────────────────────────────────────── */}
         <section style={{
-          padding:   'clamp(60px, 8vw, 100px) clamp(20px, 5vw, 60px)',
-          maxWidth:  '1100px',
-          margin:    '0 auto',
+          padding:  'clamp(60px, 8vw, 100px) clamp(20px, 5vw, 60px)',
+          maxWidth: '1100px',
+          margin:   '0 auto',
         }}>
           <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#60a5fa', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>
+            <p style={{
+              fontSize:      '11px',
+              fontWeight:    700,
+              color:         '#60a5fa',
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              marginBottom:  '12px',
+            }}>
               What makes it different
             </p>
-            <h2 style={{ fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', margin: 0 }}>
+            <h2 style={{
+              fontSize:      'clamp(26px, 4vw, 40px)',
+              fontWeight:    800,
+              letterSpacing: '-0.02em',
+              color:         '#f1f5f9',
+              margin:        0,
+            }}>
               Memory with physics
             </h2>
           </div>
@@ -558,7 +981,7 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
           </div>
         </section>
 
-        {/* ─ INSTALL ─ */}
+        {/* ─ INSTALL ───────────────────────────────────────────────────────── */}
         <section
           id="install"
           style={{
@@ -568,10 +991,23 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
             textAlign: 'center',
           }}
         >
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#34d399', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>
+          <p style={{
+            fontSize:      '11px',
+            fontWeight:    700,
+            color:         '#34d399',
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase',
+            marginBottom:  '12px',
+          }}>
             One-liner setup
           </p>
-          <h2 style={{ fontSize: 'clamp(26px, 4vw, 38px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', margin: '0 0 16px' }}>
+          <h2 style={{
+            fontSize:      'clamp(26px, 4vw, 38px)',
+            fontWeight:    800,
+            letterSpacing: '-0.02em',
+            color:         '#f1f5f9',
+            margin:        '0 0 16px',
+          }}>
             Up and running in seconds
           </h2>
           <p style={{ fontSize: '16px', color: '#64748b', lineHeight: 1.7, marginBottom: '40px' }}>
@@ -595,10 +1031,10 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
           }}>
             <span style={{ color: '#34d399', fontFamily: 'monospace', fontSize: '12px', flexShrink: 0 }}>$</span>
             <code style={{
-              flex:       1,
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-              fontSize:   'clamp(13px, 2vw, 16px)',
-              color:      '#e2e8f0',
+              flex:          1,
+              fontFamily:    "'JetBrains Mono', 'Fira Code', monospace",
+              fontSize:      'clamp(13px, 2vw, 16px)',
+              color:         '#e2e8f0',
               letterSpacing: '-0.01em',
             }}>
               {INSTALL_CMD}
@@ -608,15 +1044,15 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
 
           {/* Steps */}
           <div style={{
-            display:   'grid',
+            display:             'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap:       '16px',
-            textAlign: 'left',
+            gap:                 '16px',
+            textAlign:           'left',
           }}>
             {[
-              { step: '01', title: 'Init project', desc: 'Creates config and SQLite database in ~/.stellar-memory' },
-              { step: '02', title: 'Claude integration', desc: 'Add to claude_desktop_config.json or use with Claude Code' },
-              { step: '03', title: 'Start remembering', desc: 'Claude automatically stores decisions, errors, and milestones' },
+              { step: '01', title: 'Init project',       desc: 'Creates config and SQLite database in ~/.stellar-memory' },
+              { step: '02', title: 'Claude integration',  desc: 'Add to claude_desktop_config.json or use with Claude Code' },
+              { step: '03', title: 'Start remembering',   desc: 'Claude automatically stores decisions, errors, and milestones' },
             ].map((item) => (
               <div
                 key={item.step}
@@ -627,7 +1063,14 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
                   borderRadius: '10px',
                 }}
               >
-                <div style={{ fontSize: '10px', fontWeight: 800, color: '#3b82f6', letterSpacing: '0.1em', marginBottom: '8px', fontFamily: 'monospace' }}>
+                <div style={{
+                  fontSize:     '10px',
+                  fontWeight:   800,
+                  color:        '#3b82f6',
+                  letterSpacing: '0.1em',
+                  marginBottom: '8px',
+                  fontFamily:   'monospace',
+                }}>
                   {item.step}
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>{item.title}</div>
@@ -637,177 +1080,12 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
           </div>
         </section>
 
-        {/* ─ DOWNLOAD ─ */}
-        <section style={{
-          padding:  'clamp(60px, 8vw, 100px) clamp(20px, 5vw, 60px)',
-          maxWidth: '760px',
-          margin:   '0 auto',
-        }}>
-          <div
-            style={{
-              background:     'rgba(10,22,40,0.72)',
-              border:         '1px solid rgba(255,255,255,0.08)',
-              borderRadius:   '16px',
-              padding:        'clamp(32px, 5vw, 56px)',
-              backdropFilter: 'blur(20px)',
-              boxShadow:      '0 4px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
-              textAlign:      'center',
-            }}
-          >
-            {/* Windows logo */}
-            <div style={{ fontSize: '40px', marginBottom: '20px', lineHeight: 1 }}>⊞</div>
-            <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 32px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', margin: '0 0 10px' }}>
-              Desktop App for Windows
-            </h2>
-            <p style={{ fontSize: '15px', color: '#64748b', marginBottom: '28px', lineHeight: 1.6 }}>
-              One-click installer. Electron app with embedded REST API, background daemon, and solar system dashboard.
-            </p>
 
-            {/* Version badge */}
-            {version && (
-              <div style={{ marginBottom: '20px' }}>
-                <span style={{
-                  display:      'inline-block',
-                  padding:      '3px 12px',
-                  borderRadius: '999px',
-                  fontSize:     '11px',
-                  fontWeight:   700,
-                  background:   'rgba(52,211,153,0.1)',
-                  border:       '1px solid rgba(52,211,153,0.25)',
-                  color:        '#34d399',
-                  letterSpacing: '0.05em',
-                }}>
-                  v{version}
-                </span>
-              </div>
-            )}
-
-            {/* Download button */}
-            <a
-              href={GITHUB_RELEASES}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display:        'inline-flex',
-                alignItems:     'center',
-                gap:            '10px',
-                padding:        '14px 32px',
-                borderRadius:   '10px',
-                background:     'linear-gradient(135deg, #3b82f6, #2563eb)',
-                color:          '#fff',
-                fontSize:       '15px',
-                fontWeight:     700,
-                textDecoration: 'none',
-                boxShadow:      '0 0 24px rgba(59,130,246,0.4), 0 4px 12px rgba(0,0,0,0.3)',
-                marginBottom:   '24px',
-                transition:     'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => { const el = e.currentTarget; el.style.transform = 'translateY(-2px)'; el.style.boxShadow = '0 0 32px rgba(59,130,246,0.55), 0 8px 20px rgba(0,0,0,0.35)'; }}
-              onMouseLeave={(e) => { const el = e.currentTarget; el.style.transform = 'none'; el.style.boxShadow = '0 0 24px rgba(59,130,246,0.4), 0 4px 12px rgba(0,0,0,0.3)'; }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Download for Windows
-            </a>
-
-            <div style={{ fontSize: '13px', color: '#475569' }}>
-              Or install via npm —{' '}
-              <code style={{
-                fontFamily:   'monospace',
-                fontSize:     '12px',
-                color:        '#93c5fd',
-                background:   'rgba(59,130,246,0.08)',
-                padding:      '2px 8px',
-                borderRadius: '4px',
-              }}>
-                npm install -g stellar-memory
-              </code>
-            </div>
-          </div>
-        </section>
-
-        {/* ─ HOW IT WORKS ─ */}
-        <section style={{
-          padding:   'clamp(60px, 8vw, 100px) clamp(20px, 5vw, 60px)',
-          maxWidth:  '900px',
-          margin:    '0 auto',
-          textAlign: 'center',
-        }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>
-            The model
-          </p>
-          <h2 style={{ fontSize: 'clamp(26px, 4vw, 38px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', margin: '0 0 48px' }}>
-            Importance as orbital distance
-          </h2>
-
-          {/* Formula */}
-          <div style={{
-            background:     'rgba(10,22,40,0.8)',
-            border:         '1px solid rgba(167,139,250,0.2)',
-            borderRadius:   '12px',
-            padding:        '28px 32px',
-            marginBottom:   '40px',
-            backdropFilter: 'blur(12px)',
-            boxShadow:      '0 0 32px rgba(139,92,246,0.08)',
-          }}>
-            <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '14px' }}>
-              Importance Formula
-            </div>
-            <code style={{
-              display:       'block',
-              fontFamily:    "'JetBrains Mono', 'Fira Code', monospace",
-              fontSize:      'clamp(12px, 1.8vw, 15px)',
-              color:         '#e2e8f0',
-              lineHeight:    1.8,
-              letterSpacing: '-0.01em',
-              whiteSpace:    'pre-wrap',
-              wordBreak:     'break-all',
-            }}>
-              {'importance = 0.30 × recency\n             + 0.20 × frequency\n             + 0.30 × impact\n             + 0.20 × relevance'}
-            </code>
-          </div>
-
-          {/* Zone table */}
-          <div style={{
-            display:             'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-            gap:                 '12px',
-            textAlign:           'left',
-          }}>
-            {[
-              { zone: 'Core',     au: '0.1–1 AU',    color: '#fbbf24', desc: 'Instant recall' },
-              { zone: 'Near',     au: '1–5 AU',      color: '#60a5fa', desc: 'Recently accessed' },
-              { zone: 'Active',   au: '5–15 AU',     color: '#34d399', desc: 'In-context' },
-              { zone: 'Archive',  au: '15–40 AU',    color: '#94a3b8', desc: 'Older knowledge' },
-              { zone: 'Fading',   au: '40–70 AU',    color: '#64748b', desc: 'Losing relevance' },
-              { zone: 'Oort',     au: '70–100 AU',   color: '#334155', desc: 'Soft-deleted' },
-            ].map((z) => (
-              <div
-                key={z.zone}
-                style={{
-                  padding:      '14px',
-                  background:   'rgba(255,255,255,0.025)',
-                  border:       `1px solid ${z.color}22`,
-                  borderLeft:   `3px solid ${z.color}`,
-                  borderRadius: '8px',
-                }}
-              >
-                <div style={{ fontSize: '12px', fontWeight: 700, color: z.color, marginBottom: '2px' }}>{z.zone}</div>
-                <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>{z.au}</div>
-                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>{z.desc}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ─ FOOTER ─ */}
+        {/* ─ FOOTER ────────────────────────────────────────────────────────── */}
         <footer style={{
-          borderTop:   '1px solid rgba(255,255,255,0.05)',
-          padding:     'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 60px)',
-          textAlign:   'center',
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+          padding:   'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 60px)',
+          textAlign: 'center',
         }}>
           <div style={{
             display:        'flex',
@@ -818,60 +1096,37 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
             marginBottom:   '20px',
           }}>
             <a
-              href={GITHUB_REPO}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#64748b', textDecoration: 'none', fontSize: '13px', fontWeight: 500 }}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#94a3b8'; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#64748b'; }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
-              GitHub
-            </a>
-            <a
               href={NPM_PACKAGE}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#64748b', textDecoration: 'none', fontSize: '13px', fontWeight: 500 }}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#94a3b8'; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#64748b'; }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#94a3b8'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
             >
               npm
             </a>
-            <a
-              href={`${GITHUB_REPO}/blob/main/LICENSE`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#64748b', textDecoration: 'none', fontSize: '13px', fontWeight: 500 }}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#94a3b8'; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#64748b'; }}
-            >
-              MIT License
-            </a>
             <button
               onClick={onNavigateDashboard}
-              style={{ color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, padding: 0 }}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#94a3b8'; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#64748b'; }}
+              style={{
+                color:      '#64748b',
+                background: 'none',
+                border:     'none',
+                cursor:     'pointer',
+                fontSize:   '13px',
+                fontWeight: 500,
+                padding:    0,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#94a3b8'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
             >
               Dashboard
             </button>
           </div>
           <p style={{ fontSize: '12px', color: '#334155', margin: 0 }}>
-            Stellar Memory — Local-first AI memory. No cloud. No keys. Just physics.
+            Stellar Memory v1.0 — Local-first AI memory. No cloud. No keys. Just physics.
           </p>
         </footer>
       </div>
-
-      {/* Keyframe for orbit spin */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -896,29 +1151,28 @@ function FeatureCard({ feature }: { feature: typeof FEATURES[number] }) {
         cursor:       'default',
       }}
     >
-      {/* Icon */}
       <div style={{
-        width:        '44px',
-        height:       '44px',
-        borderRadius: '10px',
-        background:   `${feature.color}18`,
-        border:       `1px solid ${feature.color}33`,
-        display:      'flex',
-        alignItems:   'center',
+        width:          '44px',
+        height:         '44px',
+        borderRadius:   '10px',
+        background:     `${feature.color}18`,
+        border:         `1px solid ${feature.color}33`,
+        display:        'flex',
+        alignItems:     'center',
         justifyContent: 'center',
-        fontSize:     '20px',
-        color:        feature.color,
-        marginBottom: '18px',
-        flexShrink:   0,
+        fontSize:       '20px',
+        color:          feature.color,
+        marginBottom:   '18px',
+        flexShrink:     0,
       }}>
         {feature.icon}
       </div>
 
       <h3 style={{
-        fontSize:     '15px',
-        fontWeight:   700,
-        color:        '#f1f5f9',
-        margin:       '0 0 10px',
+        fontSize:      '15px',
+        fontWeight:    700,
+        color:         '#f1f5f9',
+        margin:        '0 0 10px',
         letterSpacing: '-0.01em',
       }}>
         {feature.title}

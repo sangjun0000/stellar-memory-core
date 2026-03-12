@@ -1,0 +1,77 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sangjun0000/stellar-memory",
+  "title": "Stellar Memory",
+  "description": "Persistent AI memory using orbital mechanics. 100% local, zero API keys, MCP-native.",
+  "version": "1.0.2",
+  "homepage": "https://stellar-memory.com",
+  "tags": ["memory", "context", "persistence", "local", "sqlite", "embeddings", "knowledge-graph"],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "stellar-memory",
+      "version": "1.0.2",
+      "runtime": "node",
+      "runtimeArgs": ["--experimental-sqlite"],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "STELLAR_PROJECT",
+          "description": "Active project name for memory isolation",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "STELLAR_DB_PATH",
+          "description": "Path to SQLite database file (default: ~/.stellar-memory/stellar.db)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "STELLAR_API_PORT",
+          "description": "REST API port (default: 21547)",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false
+        },
+        {
+          "name": "STELLAR_SUN_TOKEN_BUDGET",
+          "description": "Max tokens for Sun context (default: 800)",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "tools": [
+    { "name": "status", "description": "View memories grouped by orbital zone" },
+    { "name": "commit", "description": "Save session state (work, decisions, next steps, errors) to the Sun" },
+    { "name": "recall", "description": "Search memories by content — matching results are pulled closer to the Sun" },
+    { "name": "remember", "description": "Store a new memory, auto-placed by type and impact" },
+    { "name": "orbit", "description": "Recalculate all memory positions based on current importance" },
+    { "name": "forget", "description": "Push a memory further from the Sun or soft-delete it" },
+    { "name": "scan", "description": "Register and scan local directories as data sources" },
+    { "name": "daemon", "description": "Start or stop the background scheduler for auto-decay and consolidation" },
+    { "name": "constellation", "description": "Explore the knowledge graph between memories" },
+    { "name": "export", "description": "Export memories as JSON or Markdown" },
+    { "name": "galaxy", "description": "Manage projects: switch, list, create, stats, or mark universal memories" },
+    { "name": "analytics", "description": "Memory analytics: health, topics, survival, or movements reports" },
+    { "name": "observe", "description": "Extract memories from conversation text automatically" },
+    { "name": "consolidate", "description": "Merge similar memories to reduce noise" },
+    { "name": "resolve_conflict", "description": "List, resolve, or dismiss memory conflicts" },
+    { "name": "temporal", "description": "Time-based queries: point-in-time recall, evolution chains, or bounds" }
+  ],
+  "resources": [
+    {
+      "name": "sun",
+      "uri": "stellar://sun",
+      "description": "Current working context: project state, decisions, next steps, and core memories",
+      "mimeType": "text/plain"
+    }
+  ]
+}

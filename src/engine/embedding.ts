@@ -18,7 +18,7 @@
 // and load it lazily.
 
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-const MAX_CHARS  = 2000; // roughly 512 tokens for mixed Korean/English text
+const MAX_CHARS = 2000; // roughly 512 tokens for mixed Korean/English text
 
 // Lazily resolved singleton pipeline instance.
 // Typed as `unknown` to avoid pulling in the full @xenova/transformers types
@@ -29,9 +29,9 @@ let _loading: Promise<unknown> | null = null;
 // ── Progress tracking ────────────────────────────────────────────────────────
 
 let _downloadStartTime = 0;
-let _lastProgressPct   = -1;
-let _currentFile       = '';
-let _loggedFiles       = new Set<string>();
+let _lastProgressPct = -1;
+let _currentFile = '';
+let _loggedFiles = new Set<string>();
 
 function _formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -78,12 +78,12 @@ function _onDownloadProgress(info: ProgressInfo): void {
     const pct = Math.min(100, Math.round(progress));
     if (pct > _lastProgressPct + 10 || (pct === 100 && _lastProgressPct < 100)) {
       _lastProgressPct = pct;
-      const elapsed  = (Date.now() - _downloadStartTime) / 1000;
-      const eta      = pct > 0 ? (elapsed / pct) * (100 - pct) : 0;
+      const elapsed = (Date.now() - _downloadStartTime) / 1000;
+      const eta = pct > 0 ? (elapsed / pct) * (100 - pct) : 0;
       const sizeInfo = loaded != null && total != null
         ? `  ${_formatBytes(loaded)} / ${_formatBytes(total)}`
         : '';
-      const etaInfo  = eta > 1 ? `  ETA: ${_formatTime(eta)}` : '';
+      const etaInfo = eta > 1 ? `  ETA: ${_formatTime(eta)}` : '';
       console.error(`[stellar-memory] Downloading [${fileName}]: ${pct}%${sizeInfo}${etaInfo}`);
     }
   }
@@ -98,9 +98,9 @@ function _onDownloadProgress(info: ProgressInfo): void {
       : '';
     console.error(`[stellar-memory] Embedding model ready${elapsed}`);
     _downloadStartTime = 0;
-    _lastProgressPct   = -1;
-    _currentFile       = '';
-    _loggedFiles       = new Set();
+    _lastProgressPct = -1;
+    _currentFile = '';
+    _loggedFiles = new Set();
   }
 }
 
@@ -142,7 +142,7 @@ async function getPipeline(): Promise<unknown> {
  */
 export function _resetPipeline(): void {
   _pipeline = null;
-  _loading  = null;
+  _loading = null;
 }
 
 /**
@@ -151,7 +151,7 @@ export function _resetPipeline(): void {
  */
 export function _setPipelineForTest(mock: unknown): void {
   _pipeline = mock;
-  _loading  = null;
+  _loading = null;
 }
 
 // ---------------------------------------------------------------------------
