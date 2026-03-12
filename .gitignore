@@ -16,3 +16,5 @@ screenshots/
 benchmarks/results/*.json
 benchmarks/results/*.md
 !benchmarks/results/.gitkeep
+.mcpregistry_github_token
+.mcpregistry_registry_token
