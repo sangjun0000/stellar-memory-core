@@ -33,7 +33,7 @@ export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .split(/\s+/)
-    .map(word => word.replace(/[^\w]/g, ''))
+    .map(word => word.replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u1100-\u11FF]/g, ''))
     .filter(word => word.length >= 2);
 }
 
@@ -44,7 +44,7 @@ export function tokenize(text: string): string[] {
  *   1. Tokenize both texts.
  *   2. Build a Set from sun tokens.
  *   3. Count how many memory tokens appear in the sun set.
- *   4. Score = min(1.0, overlap / max(3, sunTokens.length * 0.3))
+ *   4. Score = min(1.0, overlap / max(5, sunTokens.length * 0.3))
  *
  * Returns a score between 0 and 1.
  * Returns 0 if sunText is empty.

@@ -232,7 +232,7 @@ function scheduleEmbedding(memoryId: string, text: string): void {
         const db = getDatabase();
         insertEmbedding(db, memoryId, embedding);
       } catch {
-        // DB may have been reset (tests) — ignore silently
+        _errorReporter('embedding');
         return;
       }
 
@@ -520,11 +520,15 @@ export async function recallMemoriesAsync(
            FROM memory_embedding_map map
            JOIN memory_embeddings e ON e.rowid = map.vec_rowid
            WHERE map.memory_id IN (${placeholders})`
-        ).all(...merged.map(m => m.id)) as Array<{ memory_id: string; embedding: Buffer }>;
-        memEmbeddingMap = new Map(rows.map(r => [
-          r.memory_id,
-          new Float32Array(r.embedding.buffer, r.embedding.byteOffset, r.embedding.byteLength / 4),
-        ]));
+        ).all(...merged.map(m => m.id)) as Array<{ memory_id: string; embedding: Buffer | null }>;
+        memEmbeddingMap = new Map(
+          rows
+            .filter(r => r.embedding != null)
+            .map(r => [
+              r.memory_id,
+              new Float32Array(r.embedding!.buffer, r.embedding!.byteOffset, r.embedding!.byteLength / 4),
+            ])
+        );
       } catch {
         // embeddings unavailable — fall back to keyword+proximity
       }

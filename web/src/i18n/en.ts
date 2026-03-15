@@ -11,7 +11,7 @@ const en = {
 
   // ── Tabs (with description for UX) ────────────────────────────
   tabs: {
-    solar:     { label: 'Solar System', description: '3D memory visualization' },
+    solar:     { label: 'Graph', description: 'Force-directed memory graph' },
     analytics: { label: 'Analytics',    description: 'Health & distribution charts' },
     conflicts: { label: 'Conflicts',    description: 'Resolve contradictions' },
     rules:     { label: 'Rules',        description: 'Repeated pattern rules' },

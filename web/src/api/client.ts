@@ -283,6 +283,12 @@ export const api = {
     get<{ data: DataSource[] }>('/api/sources', { project }),
 
   // Constellation
+  getAllEdges: (project?: string, limit?: number) =>
+    get<{ ok: boolean; data: ConstellationEdge[]; total: number }>(
+      '/api/constellation',
+      { project, limit } as Record<string, string | number | undefined>,
+    ),
+
   getConstellation: (id: string, project?: string, depth?: number) =>
     get<{ ok: boolean; data: ConstellationGraph }>(
       `/api/constellation/${id}`,

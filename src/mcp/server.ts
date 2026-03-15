@@ -52,7 +52,7 @@ export function createStellarServer(): McpServer {
 
   const server = new McpServer({
     name: 'stellar-memory',
-    version: '1.0.3',
+    version: '1.0.4',
     description: MEMORY_PROTOCOL,
   });
 

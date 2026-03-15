@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getMemoryById } from '../../storage/queries.js';
+import { getDatabase } from '../../storage/database.js';
 import {
   getConstellationGraph,
   findRelatedMemories,
@@ -7,8 +8,32 @@ import {
   suggestRelationships,
   cleanupEdges,
 } from '../../engine/constellation.js';
+import type { ConstellationEdge } from '../../engine/types.js';
+import { deserializeConstellationEdge, type RawConstellationEdgeRow } from '../../storage/queries/shared.js';
 
 const app = new Hono();
+
+// GET /api/constellation — fetch ALL edges for a project (for graph view)
+//
+// Query params:
+//   project  (default: "default")
+//   limit    (integer, default 500)
+app.get('/', (c) => {
+  const project  = c.req.query('project') ?? 'default';
+  const limitRaw = c.req.query('limit');
+  const limit    = limitRaw ? Math.min(2000, Math.max(1, parseInt(limitRaw, 10))) : 500;
+
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT * FROM constellation_edges
+    WHERE project = ?
+    ORDER BY weight DESC
+    LIMIT ?
+  `).all(project, limit) as unknown[];
+
+  const edges = rows.map((r) => deserializeConstellationEdge(r as RawConstellationEdgeRow));
+  return c.json({ ok: true, data: edges as ConstellationEdge[], total: edges.length });
+});
 
 // GET /api/constellation/:id — fetch constellation graph for a memory
 //

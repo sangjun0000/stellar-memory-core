@@ -39,7 +39,7 @@ export async function handleStatus(args: {
   try {
     const proj          = resolveProject();
     ensureCorona();
-    const effectiveLimit = args.limit ?? 50;
+    const effectiveLimit = args.limit ?? 20;
     const effectiveZone  = args.zone  ?? 'all';
     const effectiveShow  = args.show  ?? 'memories';
 

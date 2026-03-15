@@ -4,7 +4,7 @@ import type { Memory, SunState, ZoneStat, OrbitZone, ConstellationEdge } from '.
 import { useTranslation } from './i18n/context';
 import { useWebSocket } from './hooks/useWebSocket';
 import { Layout } from './components/Layout';
-import { SolarSystem } from './components/SolarSystem';
+import { GraphView } from './components/GraphView';
 import { MemoryDetail } from './components/MemoryDetail';
 import { ZoneStats } from './components/ZoneStats';
 import { SearchBar } from './components/SearchBar';
@@ -130,7 +130,8 @@ export default function App() {
   const [isRefreshing, setIsRefreshing]     = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt]   = useState<number | null>(null);
   const [constellationEdges, setConstellationEdges] = useState<ConstellationEdge[]>([]);
-  const [activeTab, setActiveTab]           = useState<AppTab>('solar');
+  const [, setIsLoadingEdges] = useState(false);
+  const [activeTab, setActiveTab]           = useState<AppTab>('analytics');
   // Analytics / health stats for StatsBar enrichment
   const [avgQuality, setAvgQuality]         = useState<number | null>(null);
   const [conflictCount, setConflictCount]   = useState<number>(0);
@@ -210,6 +211,23 @@ export default function App() {
   }, []);
 
   // ---------------------------------------------------------------------------
+  // Load all constellation edges for the graph view
+  // ---------------------------------------------------------------------------
+
+  const loadAllEdges = useCallback(async (proj: string) => {
+    setIsLoadingEdges(true);
+    try {
+      const res = await api.getAllEdges(proj);
+      setConstellationEdges(res.data);
+    } catch {
+      // Edges are best-effort — show graph without edges if unavailable
+      setConstellationEdges([]);
+    } finally {
+      setIsLoadingEdges(false);
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // WebSocket event handler — react to real-time events
   // ---------------------------------------------------------------------------
 
@@ -275,7 +293,7 @@ export default function App() {
       }
     };
     void init();
-  }, [loadAll, project]);
+  }, [loadAll, loadAllEdges, project]);
 
   // Show onboarding when memories list is empty (after loading completes)
   useEffect(() => {
@@ -380,20 +398,6 @@ export default function App() {
   }, [project, loadAll]);
 
   // ---------------------------------------------------------------------------
-  // Constellation — load edges when a memory is selected
-  // ---------------------------------------------------------------------------
-
-  const loadConstellation = useCallback(async (memoryId: string) => {
-    try {
-      const res = await api.getConstellation(memoryId, project);
-      setConstellationEdges(res.data.edges);
-    } catch {
-      // Constellation unavailable — show no lines
-      setConstellationEdges([]);
-    }
-  }, [project]);
-
-  // ---------------------------------------------------------------------------
   // Forget
   // ---------------------------------------------------------------------------
 
@@ -404,19 +408,6 @@ export default function App() {
       void loadAll(project);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to forget memory');
-    }
-  }, [project, loadAll]);
-
-  // ---------------------------------------------------------------------------
-  // Drag — update orbit distance
-  // ---------------------------------------------------------------------------
-
-  const handleDragEnd = useCallback(async (memoryId: string, newDistance: number) => {
-    try {
-      await api.updateOrbit(memoryId, newDistance);
-      void loadAll(project);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update orbit');
     }
   }, [project, loadAll]);
 
@@ -437,7 +428,6 @@ export default function App() {
   // Derived values
   // ---------------------------------------------------------------------------
 
-  const selectedId   = detail?.type === 'memory' ? detail.memory.id : null;
   const totalMemories = zones.reduce((sum, z) => sum + z.count, 0) || memories.length;
 
   // Filter out empty/contentless memories from the 3D view
@@ -462,6 +452,7 @@ export default function App() {
             onProjectChange={(p) => {
               setProject(p);
               void loadAll(p);
+              if (activeTab === 'solar') void loadAllEdges(p);
             }}
           />
         </div>
@@ -530,7 +521,14 @@ export default function App() {
           return (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab === 'solar') {
+                  void loadAllEdges(project);
+                } else {
+                  setConstellationEdges([]);
+                }
+              }}
               style={{
                 display:      'flex',
                 flexDirection: 'column',
@@ -675,25 +673,14 @@ export default function App() {
           </div>
         ) : (
           <>
-            <SolarSystem
+            <GraphView
               memories={visibleMemories}
-              sun={sun}
-              selectedId={selectedId}
+              selectedMemory={detail?.type === 'memory' ? detail.memory : null}
               onSelectMemory={(m) => {
                 setDetail(m ? { type: 'memory', memory: m } : null);
-                if (m) {
-                  void loadConstellation(m.id);
-                } else {
-                  setConstellationEdges([]);
-                }
               }}
-              onSelectSun={() => {
-                setDetail({ type: 'sun' });
-                setConstellationEdges([]);
-              }}
-              onDragEnd={handleDragEnd}
-              totalCount={memories.length}
-              constellationEdges={constellationEdges}
+              project={project}
+              edges={constellationEdges}
             />
             {showOnboarding && memories.length === 0 && (
               <OnboardingScreen

@@ -47,11 +47,12 @@ class Corona {
       this.indexTokens(mem);
     }
 
+    const { core, near } = this.getCoreAndNear();
     log.debug('Corona warmed up', {
       project,
       total: toCache.length,
-      core: this.getCoreMemories().length,
-      near: this.getNearMemories().length,
+      core: core.length,
+      near: near.length,
     });
   }
 
@@ -60,26 +61,30 @@ class Corona {
     this.warmup(project);
   }
 
-  /** Return memories in the core zone (distance < 1.0 AU). */
-  getCoreMemories(): Memory[] {
-    const result: Memory[] = [];
+  /** Return core + near memories in a single pass (avoids iterating cache twice). */
+  getCoreAndNear(): { core: Memory[]; near: Memory[] } {
+    const core: Memory[] = [];
+    const near: Memory[] = [];
     for (const mem of this.cache.values()) {
       if (mem.distance < CORE_THRESHOLD) {
-        result.push(mem);
+        core.push(mem);
+      } else if (mem.distance < NEAR_THRESHOLD) {
+        near.push(mem);
       }
     }
-    return result.sort((a, b) => a.distance - b.distance);
+    core.sort((a, b) => a.distance - b.distance);
+    near.sort((a, b) => a.distance - b.distance);
+    return { core, near };
+  }
+
+  /** Return memories in the core zone (distance < 1.0 AU). */
+  getCoreMemories(): Memory[] {
+    return this.getCoreAndNear().core;
   }
 
   /** Return memories in the near zone (1.0 <= distance < 5.0 AU). */
   getNearMemories(): Memory[] {
-    const result: Memory[] = [];
-    for (const mem of this.cache.values()) {
-      if (mem.distance >= CORE_THRESHOLD && mem.distance < NEAR_THRESHOLD) {
-        result.push(mem);
-      }
-    }
-    return result.sort((a, b) => a.distance - b.distance);
+    return this.getCoreAndNear().near;
   }
 
   /** Token-based search across cached memories. Returns scored results. */
@@ -164,12 +169,13 @@ class Corona {
     return this.project;
   }
 
-  /** Return cache statistics. */
+  /** Return cache statistics (single-pass). */
   stats(): { total: number; core: number; near: number; project: string } {
+    const { core, near } = this.getCoreAndNear();
     return {
       total: this.cache.size,
-      core: this.getCoreMemories().length,
-      near: this.getNearMemories().length,
+      core: core.length,
+      near: near.length,
       project: this.project,
     };
   }

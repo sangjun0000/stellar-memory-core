@@ -79,11 +79,10 @@ export function labelToZoneKey(label: string): OrbitZone {
 }
 
 export function formatDistance(distance: number): string {
-  const label = getOrbitZone(distance);
-  return `${distance.toFixed(2)} AU (${label})`;
+  return `${distance.toFixed(1)} AU`;
 }
 
 export function formatMemoryLine(m: Memory): string {
   const pct = (m.importance * 100).toFixed(0);
-  return `  [${m.type.toUpperCase()}] ${m.summary} | ${m.distance.toFixed(2)} AU | ${pct}% | ${m.id}`;
+  return `  [${m.type.toUpperCase()}] ${m.summary} | ${m.distance.toFixed(1)} AU | ${pct}% | ${m.id.slice(0, 8)}`;
 }

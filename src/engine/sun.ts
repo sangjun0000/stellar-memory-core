@@ -42,9 +42,10 @@ export function getSunContent(project: string): string {
     return `[STELLAR MEMORY - project: ${project}]\n\nNo memories committed yet. Use stellar_commit to record your current work.`;
   }
 
-  // Read from the corona in-memory cache instead of hitting the DB.
-  const coreMemories = filterActiveMemories(corona.getCoreMemories());
-  const nearMemories = filterActiveMemories(corona.getNearMemories());
+  // Read from the corona in-memory cache instead of hitting the DB (single pass).
+  const { core, near } = corona.getCoreAndNear();
+  const coreMemories = filterActiveMemories(core);
+  const nearMemories = filterActiveMemories(near);
   return formatSunContent(sun, coreMemories, nearMemories);
 }
 
@@ -99,10 +100,9 @@ export function commitToSun(
     updated_at:       now,
   };
 
-  // Calculate token usage for the formatted sun content so the consumer can
-  // make informed truncation decisions.
-  const coreMemories  = corona.getCoreMemories();
-  const nearMemories  = corona.getNearMemories();
+  // Refresh corona cache before token estimation to avoid stale data.
+  corona.warmup(project);
+  const { core: coreMemories, near: nearMemories } = corona.getCoreAndNear();
   const formatted     = formatSunContent(updated, coreMemories, nearMemories);
   updated.token_count = estimateTokens(formatted);
 

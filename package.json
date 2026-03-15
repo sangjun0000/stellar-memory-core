@@ -1,7 +1,7 @@
 {
   "name": "stellar-memory",
   "mcpName": "io.github.sangjun0000/stellar-memory",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "AI memory system using celestial mechanics metaphor - MCP server for persistent context across sessions",
   "type": "module",
   "main": "dist/index.js",

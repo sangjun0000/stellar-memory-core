@@ -155,6 +155,32 @@ export function _setPipelineForTest(mock: unknown): void {
 }
 
 // ---------------------------------------------------------------------------
+// Query embedding cache (LRU, avoids regenerating for repeated/similar queries)
+// ---------------------------------------------------------------------------
+
+const QUERY_CACHE_SIZE = 32;
+const _queryCache = new Map<string, Float32Array>();
+
+function getCachedEmbedding(key: string): Float32Array | undefined {
+  const cached = _queryCache.get(key);
+  if (cached) {
+    // Move to end (most recently used)
+    _queryCache.delete(key);
+    _queryCache.set(key, cached);
+  }
+  return cached;
+}
+
+function setCachedEmbedding(key: string, embedding: Float32Array): void {
+  if (_queryCache.size >= QUERY_CACHE_SIZE) {
+    // Evict oldest (first entry)
+    const oldest = _queryCache.keys().next().value;
+    if (oldest !== undefined) _queryCache.delete(oldest);
+  }
+  _queryCache.set(key, embedding);
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -164,6 +190,8 @@ export function _setPipelineForTest(mock: unknown): void {
  * The returned Float32Array is L2-normalized so that cosine similarity
  * reduces to a simple dot product.
  *
+ * Includes an LRU cache (32 entries) so repeated queries skip inference.
+ *
  * Text preprocessing:
  *   - Trims whitespace
  *   - Caps at MAX_CHARS characters to stay within the tokenizer limit
@@ -171,6 +199,10 @@ export function _setPipelineForTest(mock: unknown): void {
  */
 export async function generateEmbedding(text: string): Promise<Float32Array> {
   const input = preprocessText(text);
+
+  // Check LRU cache first (exact match on preprocessed text)
+  const cached = getCachedEmbedding(input);
+  if (cached) return cached;
 
   const pipe = await getPipeline();
 
@@ -184,7 +216,9 @@ export async function generateEmbedding(text: string): Promise<Float32Array> {
     normalize: true,
   });
 
-  return new Float32Array(output.data);
+  const embedding = new Float32Array(output.data);
+  setCachedEmbedding(input, embedding);
+  return embedding;
 }
 
 /**

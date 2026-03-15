@@ -332,8 +332,9 @@ export function getOrbitZone(distance: number): string {
  */
 export function applyAccessBoost(currentDistance: number): number {
   const BOOST_FACTOR = 0.3;
-  const MIN_BOOST    = 0.5;
-  const pull = Math.max(MIN_BOOST, currentDistance * BOOST_FACTOR);
+  const MIN_BOOST    = 0.05;
+  // Pull is proportional to distance, but capped at 50% to maintain proportionality
+  const pull = Math.min(currentDistance * 0.5, Math.max(MIN_BOOST, currentDistance * BOOST_FACTOR));
   return Math.max(0.1, currentDistance - pull);
 }
 

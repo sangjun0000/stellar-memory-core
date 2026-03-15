@@ -7,7 +7,8 @@
 import { getSunContent } from '../../engine/sun.js';
 import { getUnresolvedConflicts } from '../../engine/conflict.js';
 import { getTemporalSummary } from '../../engine/temporal.js';
-import { getProceduralMemories, formatProceduralSection } from '../../engine/procedural.js';
+import { formatProceduralSection } from '../../engine/procedural.js';
+import { corona } from '../../engine/corona.js';
 import { ensureCorona, resolveProject } from './shared.js';
 
 // ---------------------------------------------------------------------------
@@ -19,8 +20,12 @@ export function handleSunResource(uriHref: string): { contents: [{ uri: string; 
   ensureCorona();
   let content = getSunContent(proj);
 
-  // Append procedural memories section (Navigation Rules)
-  const proceduralMems = getProceduralMemories(proj);
+  // Extract procedural memories from corona cache (avoids full table scan).
+  // Procedural memories with high importance are already in corona.
+  const { core, near } = corona.getCoreAndNear();
+  const proceduralMems = [...core, ...near]
+    .filter(m => m.type === 'procedural')
+    .sort((a, b) => b.importance - a.importance);
   if (proceduralMems.length > 0) {
     content += '\n\n' + formatProceduralSection(proceduralMems);
   }

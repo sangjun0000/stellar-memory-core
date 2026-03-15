@@ -772,7 +772,7 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
                 boxShadow:    '0 0 6px rgba(251,191,36,0.8)',
                 display:      'inline-block',
               }} />
-              MCP-native · Fully local · Zero API keys
+              Claude Code & Desktop · Fully local · Zero API keys
             </div>
 
             {/* Main headline — three-word bold pattern */}
@@ -1010,36 +1010,90 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
           }}>
             Up and running in seconds
           </h2>
-          <p style={{ fontSize: '16px', color: '#64748b', lineHeight: 1.7, marginBottom: '40px' }}>
+          <p style={{ fontSize: '16px', color: '#64748b', lineHeight: 1.7, marginBottom: '16px' }}>
             One command sets up the MCP server, SQLite database, and downloads the embedding model.
             No API keys. No cloud account. No data leaves your machine.
           </p>
 
-          {/* Command box */}
-          <div style={{
-            display:        'flex',
-            alignItems:     'center',
-            gap:            '12px',
-            background:     'rgba(10,22,40,0.8)',
-            border:         '1px solid rgba(96,165,250,0.2)',
-            borderRadius:   '10px',
-            padding:        '14px 18px',
-            backdropFilter: 'blur(12px)',
-            boxShadow:      '0 0 24px rgba(59,130,246,0.08), inset 0 1px 0 rgba(255,255,255,0.04)',
-            marginBottom:   '32px',
-            textAlign:      'left',
+          {/* Prerequisite */}
+          <p style={{
+            fontSize:     '13px',
+            color:        '#f59e0b',
+            marginBottom: '36px',
+            display:      'flex',
+            alignItems:   'center',
+            justifyContent: 'center',
+            gap:          '6px',
           }}>
-            <span style={{ color: '#34d399', fontFamily: 'monospace', fontSize: '12px', flexShrink: 0 }}>$</span>
-            <code style={{
-              flex:          1,
-              fontFamily:    "'JetBrains Mono', 'Fira Code', monospace",
-              fontSize:      'clamp(13px, 2vw, 16px)',
-              color:         '#e2e8f0',
-              letterSpacing: '-0.01em',
-            }}>
-              {INSTALL_CMD}
-            </code>
-            <CopyButton text={INSTALL_CMD} />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            Requires Node.js 22 or higher
+          </p>
+
+          {/* Command boxes */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
+            {/* Claude Code */}
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '8px', textAlign: 'left', letterSpacing: '0.05em' }}>
+                Claude Code
+              </div>
+              <div style={{
+                display:        'flex',
+                alignItems:     'center',
+                gap:            '12px',
+                background:     'rgba(10,22,40,0.8)',
+                border:         '1px solid rgba(96,165,250,0.2)',
+                borderRadius:   '10px',
+                padding:        '14px 18px',
+                backdropFilter: 'blur(12px)',
+                boxShadow:      '0 0 24px rgba(59,130,246,0.08), inset 0 1px 0 rgba(255,255,255,0.04)',
+                textAlign:      'left',
+              }}>
+                <span style={{ color: '#34d399', fontFamily: 'monospace', fontSize: '12px', flexShrink: 0 }}>$</span>
+                <code style={{
+                  flex:          1,
+                  fontFamily:    "'JetBrains Mono', 'Fira Code', monospace",
+                  fontSize:      'clamp(13px, 2vw, 16px)',
+                  color:         '#e2e8f0',
+                  letterSpacing: '-0.01em',
+                }}>
+                  {INSTALL_CMD}
+                </code>
+                <CopyButton text={INSTALL_CMD} />
+              </div>
+            </div>
+
+            {/* Claude Desktop */}
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '8px', textAlign: 'left', letterSpacing: '0.05em' }}>
+                Claude Desktop
+              </div>
+              <div style={{
+                display:        'flex',
+                alignItems:     'center',
+                gap:            '12px',
+                background:     'rgba(10,22,40,0.8)',
+                border:         '1px solid rgba(52,211,153,0.2)',
+                borderRadius:   '10px',
+                padding:        '14px 18px',
+                backdropFilter: 'blur(12px)',
+                boxShadow:      '0 0 24px rgba(52,211,153,0.08), inset 0 1px 0 rgba(255,255,255,0.04)',
+                textAlign:      'left',
+              }}>
+                <span style={{ color: '#34d399', fontFamily: 'monospace', fontSize: '12px', flexShrink: 0 }}>$</span>
+                <code style={{
+                  flex:          1,
+                  fontFamily:    "'JetBrains Mono', 'Fira Code', monospace",
+                  fontSize:      'clamp(13px, 2vw, 16px)',
+                  color:         '#e2e8f0',
+                  letterSpacing: '-0.01em',
+                }}>
+                  npx stellar-memory init --desktop
+                </code>
+                <CopyButton text="npx stellar-memory init --desktop" />
+              </div>
+            </div>
           </div>
 
           {/* Steps */}
@@ -1050,9 +1104,9 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
             textAlign:           'left',
           }}>
             {[
-              { step: '01', title: 'Init project',       desc: 'Creates config and SQLite database in ~/.stellar-memory' },
-              { step: '02', title: 'Claude integration',  desc: 'Add to claude_desktop_config.json or use with Claude Code' },
-              { step: '03', title: 'Start remembering',   desc: 'Claude automatically stores decisions, errors, and milestones' },
+              { step: '01', title: 'Run one command',      desc: 'Creates config, SQLite database, and downloads the embedding model (~90MB)' },
+              { step: '02', title: 'Restart your client',   desc: 'Claude Code or Claude Desktop — both supported out of the box' },
+              { step: '03', title: 'Start remembering',     desc: 'Claude automatically stores decisions, errors, and milestones across sessions' },
             ].map((item) => (
               <div
                 key={item.step}

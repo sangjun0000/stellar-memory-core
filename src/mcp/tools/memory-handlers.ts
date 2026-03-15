@@ -131,9 +131,8 @@ export async function handleRecall(args: {
     } else {
       // Exclude memories already visible in the Sun resource (corona cache)
       // to avoid token-wasting duplication between Sun and recall output.
-      const coreIds = corona.getCoreMemories().map(m => m.id);
-      const nearIds = corona.getNearMemories().map(m => m.id);
-      const excludeIds = new Set([...coreIds, ...nearIds]);
+      const { core, near } = corona.getCoreAndNear();
+      const excludeIds = new Set([...core.map(m => m.id), ...near.map(m => m.id)]);
 
       results = await recallMemoriesAsync(proj, args.query, {
         type:        memoryType,
@@ -162,18 +161,9 @@ export async function handleRecall(args: {
     ];
 
     for (const m of results) {
-      const preview = m.content.slice(0, 100) + (m.content.length > 100 ? '…' : '');
       const tags    = m.tags.length > 0 ? ` [${m.tags.join(', ')}]` : '';
       const shortId = m.id.slice(0, 8);
       lines.push(`[${m.type.toUpperCase()}] ${m.summary}${tags} | ${formatDistance(m.distance)} | ${shortId}`);
-      lines.push(`  ${preview}`);
-
-      // Include top 3 related memories (constellation)
-      const related = findRelatedMemories(m.id, proj, 3);
-      if (related.length > 0) {
-        lines.push(`  Related: ${related.map(r => `${r.summary.slice(0, 40)} (${r.id.slice(0, 8)})`).join(', ')}`);
-      }
-      lines.push('');
     }
 
     if (universals.length > 0) {

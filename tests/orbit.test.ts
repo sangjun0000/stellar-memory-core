@@ -263,6 +263,21 @@ describe('applyAccessBoost', () => {
     const boostClose = 5  - applyAccessBoost(5);
     expect(boostFar).toBeGreaterThan(boostClose);
   });
+
+  it('pull never exceeds 50% of current distance (proportionality)', () => {
+    // For small distances, pull should be capped to maintain fairness
+    for (const d of [0.2, 0.5, 1.0, 2.0, 5.0, 10.0]) {
+      const boosted = applyAccessBoost(d);
+      const pull = d - boosted;
+      expect(pull).toBeLessThanOrEqual(d * 0.5 + 0.001); // allow floating point tolerance
+    }
+  });
+
+  it('core memory at 0.2 AU does not jump to minimum', () => {
+    const boosted = applyAccessBoost(0.2);
+    // With old MIN_BOOST=0.5, this would jump to 0.1. Now should be proportional.
+    expect(boosted).toBeGreaterThan(0.1);
+  });
 });
 
 describe('Core zone reachability', () => {

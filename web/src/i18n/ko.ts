@@ -10,7 +10,7 @@ const ko: Translations = {
 
   // ── Tabs ──────────────────────────────────────────────────────
   tabs: {
-    solar:     { label: '태양계',   description: '3D 기억 시각화' },
+    solar:     { label: '그래프',   description: '포스 그래프 시각화' },
     analytics: { label: '분석',     description: '건강도·분포 차트' },
     conflicts: { label: '충돌',     description: '모순 기억 해결' },
     rules:     { label: '규칙',     description: '반복 패턴 규칙' },

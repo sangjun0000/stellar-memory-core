@@ -17,6 +17,21 @@ describe('tokenize', () => {
   it('returns empty array for empty string', () => {
     expect(tokenize('')).toEqual([]);
   });
+
+  it('preserves Korean (Hangul) characters', () => {
+    const tokens = tokenize('인증 마이그레이션 완료');
+    expect(tokens).toEqual(['인증', '마이그레이션', '완료']);
+  });
+
+  it('preserves CJK characters mixed with ASCII', () => {
+    const tokens = tokenize('PostgreSQL 인증 schema 변경');
+    expect(tokens).toEqual(['postgresql', '인증', 'schema', '변경']);
+  });
+
+  it('preserves Japanese characters', () => {
+    const tokens = tokenize('認証 スキーマ');
+    expect(tokens).toEqual(['認証', 'スキーマ']);
+  });
 });
 
 describe('keywordRelevance', () => {
