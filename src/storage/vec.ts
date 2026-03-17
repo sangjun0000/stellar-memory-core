@@ -26,6 +26,7 @@
 
 import * as sqliteVec from 'sqlite-vec';
 import type { DatabaseSync } from 'node:sqlite';
+import { EMBEDDING_DIM } from '../engine/embedding.js';
 
 // ---------------------------------------------------------------------------
 // Extension loading
@@ -46,8 +47,6 @@ export function loadVecExtension(db: DatabaseSync): void {
 // DDL helpers
 // ---------------------------------------------------------------------------
 
-const EMBEDDING_DIM = 384; // all-MiniLM-L6-v2 output dimension
-
 /**
  * SQL DDL for the embedding tables.
  * Called from database.ts as part of the main DDL block.
@@ -59,7 +58,7 @@ CREATE TABLE IF NOT EXISTS memory_embedding_map (
   vec_rowid INTEGER NOT NULL
 );
 
--- vec0 virtual table for 384-dim float32 embeddings (all-MiniLM-L6-v2)
+-- vec0 virtual table for 1024-dim float32 embeddings (BGE-M3)
 CREATE VIRTUAL TABLE IF NOT EXISTS memory_embeddings USING vec0(
   embedding float[${EMBEDDING_DIM}]
 );

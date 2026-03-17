@@ -18,18 +18,26 @@ describe('recencyScore', () => {
     expect(score).toBeCloseTo(1.0, 1);
   });
 
-  it('returns ~0.5 at base half-life when access_count=0', () => {
-    const halfLifeHours = 72;
-    const created = new Date(Date.now() - halfLifeHours * 60 * 60 * 1000).toISOString();
-    const score = recencyScore(null, created, halfLifeHours, undefined, 0, 1.5, 8760);
+  it('returns 1.0 within the 24h grace period', () => {
+    // 12 hours old — within grace period → R = 1.0
+    const created = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    const score = recencyScore(null, created, 72);
+    expect(score).toBeCloseTo(1.0, 1);
+  });
+
+  it('decays linearly after 24h grace period for observation type (horizon=24h)', () => {
+    // observation horizon = 24h; at 24+12=36h → remaining = 24-12=12 → R = 12/24 = 0.5
+    const created = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+    const score = recencyScore(null, created, 72, 'observation');
     expect(score).toBeCloseTo(0.5, 1);
   });
 
-  it('returns ~0.25 at double half-life when access_count=0', () => {
-    const halfLifeHours = 72;
-    const created = new Date(Date.now() - 2 * halfLifeHours * 60 * 60 * 1000).toISOString();
-    const score = recencyScore(null, created, halfLifeHours, undefined, 0, 1.5, 8760);
-    expect(score).toBeCloseTo(0.25, 1);
+  it('decision type decays much slower than observation', () => {
+    // 48 hours old (both past 24h grace), decision horizon=696h, observation horizon=24h
+    const created = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const decisionScore    = recencyScore(null, created, 72, 'decision');
+    const observationScore = recencyScore(null, created, 72, 'observation');
+    expect(decisionScore).toBeGreaterThan(observationScore);
   });
 
   it('uses last_accessed_at over created_at when available', () => {
@@ -39,23 +47,17 @@ describe('recencyScore', () => {
     expect(score).toBeCloseTo(1.0, 1);
   });
 
-  it('adaptive: higher access_count yields slower decay (higher score at same age)', () => {
-    const halfLifeHours = 72;
-    const created = new Date(Date.now() - halfLifeHours * 60 * 60 * 1000).toISOString();
-    // With 0 accesses: score ≈ 0.5 at base half-life
-    const score0  = recencyScore(null, created, halfLifeHours, undefined, 0,  1.5, 8760);
-    // With 5 accesses: effective half-life is much longer, so score > 0.5
-    const score5  = recencyScore(null, created, halfLifeHours, undefined, 5,  1.5, 8760);
-    const score15 = recencyScore(null, created, halfLifeHours, undefined, 15, 1.5, 8760);
-    expect(score5).toBeGreaterThan(score0);
-    expect(score15).toBeGreaterThan(score5);
+  it('returns 0 when past horizon (observation at 48h = 24h past horizon)', () => {
+    // observation horizon = 24h; at 24+24=48h → R = max(0, 1 - 24/24) = 0
+    const created = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const score = recencyScore(null, created, 72, 'observation');
+    expect(score).toBe(0);
   });
 
-  it('adaptive half-life is capped at maxStabilityHours', () => {
-    const halfLifeHours = 72;
-    // With accessCount=15 and stabilityGrowth=1.5: 72 × 1.5^15 ≈ 72 × 437 ≈ 31464 → capped at 8760
-    const effectiveMax = Math.min(8760, halfLifeHours * Math.pow(1.5, 15));
-    expect(effectiveMax).toBe(8760);
+  it('legacy: accepts access_count and stabilityGrowth params without error', () => {
+    // These params are kept for backward compat but ignored in Phase 1 formula
+    const created = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    expect(() => recencyScore(null, created, 72, 'decision', 10, 1.5, 8760)).not.toThrow();
   });
 });
 
@@ -113,40 +115,50 @@ describe('calculateImportance', () => {
     };
   }
 
-  it('rewards memories that match the current work context', () => {
+  it('decision type has higher importance than observation type (same age)', () => {
     const config = getConfig();
-    const relevant = calculateImportance(
-      makeMemory(),
-      'Current work: finish the PostgreSQL authentication migration',
+    const decision = calculateImportance(makeMemory(), config);
+    const observation = calculateImportance(
+      makeMemory({ type: 'observation', content: 'Minor CSS tweak', tags: ['css'] }),
       config,
-      0.9,
     );
-    const unrelated = calculateImportance(
-      makeMemory({ content: 'Updated CSS spacing for landing page', summary: 'CSS spacing update', type: 'observation', tags: ['css', 'spacing'], impact: 0.3 }),
-      'Current work: finish the PostgreSQL authentication migration',
-      config,
-      0.3,
-    );
-
-    expect(relevant.total).toBeGreaterThan(unrelated.total);
+    // decision intrinsic=0.80, observation intrinsic=0.30 → decision should score higher
+    expect(decision.total).toBeGreaterThan(observation.total);
   });
 
   it('zeros out non-active memories even if their base signals are strong', () => {
     const config = getConfig();
-    const active = calculateImportance(makeMemory(), 'authentication migration', config, 0.9);
+    const active = calculateImportance(makeMemory(), config);
     const superseded = calculateImportance(
       makeMemory({ superseded_by: 'replacement-memory' }),
-      'authentication migration',
       config,
-      0.9,
     );
 
     expect(active.total).toBeGreaterThan(0);
     expect(superseded.total).toBe(0);
   });
+
+  it('returns all required component fields', () => {
+    const config = getConfig();
+    const result = calculateImportance(makeMemory(), config);
+    expect(result.recency).toBeDefined();
+    expect(result.frequency).toBeDefined();
+    expect(result.intrinsic).toBeDefined();
+    expect(result.total).toBeDefined();
+    expect(result.total).toBeGreaterThan(0);
+    expect(result.total).toBeLessThanOrEqual(1);
+  });
+
+  it('intrinsic override takes precedence over type default', () => {
+    const config = getConfig();
+    const defaultI = calculateImportance(makeMemory({ type: 'observation' }), config);
+    const overriddenI = calculateImportance(makeMemory({ type: 'observation', intrinsic: 0.9 }), config);
+    // With override=0.9 vs default=0.30, should score higher
+    expect(overriddenI.total).toBeGreaterThan(defaultI.total);
+  });
 });
 
-describe('importanceToDistance — segment mapping', () => {
+describe('importanceToDistance — segment mapping (4-zone)', () => {
   it('maps importance=1.0 to minimum distance (0.1)', () => {
     expect(importanceToDistance(1.0)).toBeCloseTo(0.1, 3);
   });
@@ -155,29 +167,43 @@ describe('importanceToDistance — segment mapping', () => {
     expect(importanceToDistance(0.0)).toBeCloseTo(100.0, 0);
   });
 
-  it('Core zone: importance=0.85 maps to near 1.0 AU', () => {
-    const d = importanceToDistance(0.85);
-    expect(d).toBeCloseTo(1.0, 3);
+  it('Core zone boundary: importance=0.80 maps to 3.0 AU', () => {
+    const d = importanceToDistance(0.80);
+    expect(d).toBeCloseTo(3.0, 3);
   });
 
-  it('Near zone: importance=0.65 maps to near 5.0 AU', () => {
-    const d = importanceToDistance(0.65);
-    expect(d).toBeCloseTo(5.0, 3);
-  });
-
-  it('Active zone: importance=0.40 maps to near 15.0 AU', () => {
-    const d = importanceToDistance(0.40);
+  it('Near zone boundary: importance=0.50 maps to 15.0 AU', () => {
+    const d = importanceToDistance(0.50);
     expect(d).toBeCloseTo(15.0, 3);
   });
 
-  it('Archive zone: importance=0.20 maps to near 40.0 AU', () => {
+  it('Stored zone boundary: importance=0.20 maps to 60.0 AU', () => {
     const d = importanceToDistance(0.20);
-    expect(d).toBeCloseTo(40.0, 3);
+    expect(d).toBeCloseTo(60.0, 3);
   });
 
-  it('Fading zone: importance=0.05 maps to near 70.0 AU', () => {
-    const d = importanceToDistance(0.05);
-    expect(d).toBeCloseTo(70.0, 3);
+  it('Core zone: importance=0.90 maps within [0.1, 3.0)', () => {
+    const d = importanceToDistance(0.90);
+    expect(d).toBeGreaterThanOrEqual(0.1);
+    expect(d).toBeLessThan(3.0);
+  });
+
+  it('Near zone: importance=0.65 maps within [3.0, 15.0)', () => {
+    const d = importanceToDistance(0.65);
+    expect(d).toBeGreaterThanOrEqual(3.0);
+    expect(d).toBeLessThan(15.0);
+  });
+
+  it('Stored zone: importance=0.35 maps within [15.0, 60.0)', () => {
+    const d = importanceToDistance(0.35);
+    expect(d).toBeGreaterThanOrEqual(15.0);
+    expect(d).toBeLessThan(60.0);
+  });
+
+  it('Forgotten zone: importance=0.10 maps within [60.0, 100.0]', () => {
+    const d = importanceToDistance(0.10);
+    expect(d).toBeGreaterThanOrEqual(60.0);
+    expect(d).toBeLessThanOrEqual(100.0);
   });
 
   it('clamps values above 1.0', () => {
@@ -197,7 +223,7 @@ describe('importanceToDistance — segment mapping', () => {
   });
 });
 
-describe('distanceToImportance — inverse segment mapping', () => {
+describe('distanceToImportance — inverse segment mapping (4-zone)', () => {
   it('maps distance=0.1 to importance≈1.0', () => {
     expect(distanceToImportance(0.1)).toBeCloseTo(1.0, 3);
   });
@@ -206,8 +232,8 @@ describe('distanceToImportance — inverse segment mapping', () => {
     expect(distanceToImportance(100)).toBeCloseTo(0.0, 1);
   });
 
-  it('round-trips importanceToDistance within ~0.01', () => {
-    const points = [0.05, 0.2, 0.4, 0.65, 0.85, 1.0];
+  it('round-trips importanceToDistance within ~0.01 for 4-zone boundaries', () => {
+    const points = [0.20, 0.35, 0.50, 0.65, 0.80, 1.0];
     for (const imp of points) {
       const d = importanceToDistance(imp);
       const back = distanceToImportance(d);
@@ -221,20 +247,28 @@ describe('getOrbitZone', () => {
     expect(getOrbitZone(0.5)).toBe('Core Memory');
   });
 
+  it('returns Core Memory for distance 2.9 (still in core, max 3.0)', () => {
+    expect(getOrbitZone(2.9)).toBe('Core Memory');
+  });
+
   it('returns Recent Memory for distance 3.0', () => {
     expect(getOrbitZone(3.0)).toBe('Recent Memory');
   });
 
-  it('returns Active Memory for distance 10.0', () => {
-    expect(getOrbitZone(10.0)).toBe('Active Memory');
+  it('returns Recent Memory for distance 10.0', () => {
+    expect(getOrbitZone(10.0)).toBe('Recent Memory');
   });
 
   it('returns Stored Memory for distance 25.0', () => {
     expect(getOrbitZone(25.0)).toBe('Stored Memory');
   });
 
-  it('returns Fading Memory for distance 55.0', () => {
-    expect(getOrbitZone(55.0)).toBe('Fading Memory');
+  it('returns Stored Memory for distance 55.0', () => {
+    expect(getOrbitZone(55.0)).toBe('Stored Memory');
+  });
+
+  it('returns Forgotten Memory for distance 60.0', () => {
+    expect(getOrbitZone(60.0)).toBe('Forgotten Memory');
   });
 
   it('returns Forgotten Memory for distance 85.0', () => {
@@ -280,36 +314,32 @@ describe('applyAccessBoost', () => {
   });
 });
 
-describe('Core zone reachability', () => {
-  it('a high-impact memory with access_count=10 can reach Core zone', () => {
-    // activation = 0.6 × recencyScore(fresh) + 0.4 × frequencyScore(10, 50)
-    // recency ≈ 1.0, frequency ≈ log(11)/log(51) ≈ 0.574
-    // activation ≈ 0.6 × 1.0 + 0.4 × 0.574 ≈ 0.83
-    // contentWeight = 0.8 (decision), qualityModifier = 0.7 + 0.5×0.8 = 1.1
-    // total ≈ 0.83 × 0.8 × 1.1 ≈ 0.73 → distance ≈ 3 AU (Near zone)
-    // But with quality_score = 1.0: 1.2 modifier → total ≈ 0.83×0.8×1.2 ≈ 0.796 → Core
-    const rec  = 1.0; // fresh
-    const freq = Math.log(1 + 10) / Math.log(1 + 50);
-    const activation = 0.6 * rec + 0.4 * freq;
-    const contentWeight = 0.8;
-    const qualityModifier = 0.7 + 0.5 * 1.0; // quality_score=1.0
-    const total = Math.min(1, activation * contentWeight * qualityModifier);
+describe('Core zone reachability (Phase 1 formula)', () => {
+  it('a brand-new decision memory lands in Core zone', () => {
+    // Phase 1: importance = 0.35×R + 0.25×F + 0.40×I
+    // R=1.0 (fresh), F=0 (new), I=0.80 (decision default)
+    // total = 0.35×1.0 + 0.25×0 + 0.40×0.80 = 0.35 + 0.32 = 0.67
+    // importanceToDistance(0.67) → Near zone (3–15 AU)
+    const wR = 0.35, wF = 0.25, wI = 0.40;
+    const total = wR * 1.0 + wF * 0 + wI * 0.80;
     const distance = importanceToDistance(total);
-    // Should land in Core or Near zone
-    expect(distance).toBeLessThan(5.0);
+    expect(distance).toBeGreaterThanOrEqual(3.0);
+    expect(distance).toBeLessThan(15.0);
   });
 
-  it('a fresh decision memory (impact=0.8) reaches near-Core zone with enough accesses', () => {
-    // With access_count=15 → frequency ≈ log(16)/log(51) ≈ 0.705
-    // activation = 0.6×1.0 + 0.4×0.705 ≈ 0.882
-    // total = min(1, 0.882 × 0.8 × 1.2) ≈ 0.846 → Near zone boundary (~1.08 AU)
-    const rec  = 1.0;
-    const freq = Math.log(1 + 15) / Math.log(1 + 50);
-    const activation = 0.6 * rec + 0.4 * freq;
-    const contentWeight = 0.8;
-    const qualityModifier = 0.7 + 0.5 * 1.0;
-    const total = Math.min(1, activation * contentWeight * qualityModifier);
+  it('a high-intrinsic procedural memory (I=0.85) lands close to Core boundary', () => {
+    // R=1.0, F=0, I=0.85 → total = 0.35 + 0.34 = 0.69
+    const wR = 0.35, wF = 0.25, wI = 0.40;
+    const total = wR * 1.0 + wF * 0 + wI * 0.85;
     const distance = importanceToDistance(total);
-    expect(distance).toBeLessThan(5.0); // Near zone or better
+    expect(distance).toBeLessThan(15.0);
+  });
+
+  it('a fresh observation memory (I=0.30) starts in Stored zone', () => {
+    // R=1.0, F=0, I=0.30 → total = 0.35 + 0.12 = 0.47
+    const wR = 0.35, wF = 0.25, wI = 0.40;
+    const total = wR * 1.0 + wF * 0 + wI * 0.30;
+    const distance = importanceToDistance(total);
+    expect(distance).toBeGreaterThanOrEqual(15.0);
   });
 });

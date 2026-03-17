@@ -110,11 +110,9 @@ export function getAnalytics(project: string): MemoryAnalytics {
   const zoneRows = db.prepare(`
     SELECT
       CASE
-        WHEN distance < 1.0  THEN 'core'
-        WHEN distance < 5.0  THEN 'near'
-        WHEN distance < 15.0 THEN 'active'
-        WHEN distance < 40.0 THEN 'archive'
-        WHEN distance < 70.0 THEN 'fading'
+        WHEN distance < 3.0  THEN 'core'
+        WHEN distance < 15.0 THEN 'near'
+        WHEN distance < 60.0 THEN 'stored'
         ELSE 'forgotten'
       END as zone,
       COUNT(*) as count
@@ -292,11 +290,9 @@ export function getProjectDistributions(project: string): {
   const zoneRows = db.prepare(`
     SELECT
       CASE
-        WHEN distance < 1.0  THEN 'core'
-        WHEN distance < 5.0  THEN 'near'
-        WHEN distance < 15.0 THEN 'active'
-        WHEN distance < 40.0 THEN 'archive'
-        WHEN distance < 70.0 THEN 'fading'
+        WHEN distance < 3.0  THEN 'core'
+        WHEN distance < 15.0 THEN 'near'
+        WHEN distance < 60.0 THEN 'stored'
         ELSE 'forgotten'
       END as zone,
       COUNT(*) as count

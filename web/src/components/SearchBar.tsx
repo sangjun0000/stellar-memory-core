@@ -17,12 +17,10 @@ const MEMORY_TYPES: { value: MemoryType; label: string; color: string }[] = [
 ];
 
 const ORBIT_ZONES: { value: OrbitZone; label: string; color: string }[] = [
-  { value: 'core',      label: 'Core',      color: '#fbbf24' },
-  { value: 'near',      label: 'Near',      color: '#f97316' },
-  { value: 'active',    label: 'Active',    color: '#22c55e' },
-  { value: 'archive',   label: 'Archive',   color: '#60a5fa' },
-  { value: 'fading',    label: 'Fading',    color: '#a78bfa' },
-  { value: 'forgotten', label: 'Forgotten', color: '#9ca3af' },
+  { value: 'core',      label: 'Core',      color: '#00e5ff' },
+  { value: 'near',      label: 'Near',      color: '#3b82f6' },
+  { value: 'stored',    label: 'Stored',    color: '#6b7280' },
+  { value: 'forgotten', label: 'Forgotten', color: '#374151' },
 ];
 
 // ---------------------------------------------------------------------------

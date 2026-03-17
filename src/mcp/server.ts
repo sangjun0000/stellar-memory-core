@@ -105,7 +105,7 @@ export function createStellarServer(): McpServer {
     'status',
     'View memories grouped by orbital zone.',
     {
-      zone: z.enum(['all', 'core', 'near', 'active', 'archive', 'fading', 'forgotten'])
+      zone: z.enum(['all', 'core', 'near', 'stored', 'forgotten'])
         .optional()
         .describe('Filter to a specific orbital zone.'),
       limit: z.number().int().min(1).max(200)
@@ -262,7 +262,7 @@ export function createStellarServer(): McpServer {
       type: z.enum(['all', 'decision', 'observation', 'task', 'context', 'error', 'milestone'])
         .optional()
         .describe('Filter by memory type.'),
-      zone: z.enum(['all', 'core', 'near', 'active', 'archive', 'fading', 'forgotten'])
+      zone: z.enum(['all', 'core', 'near', 'stored', 'forgotten'])
         .optional()
         .describe('Filter by orbital zone.'),
       format: z.enum(['json', 'markdown']).optional()

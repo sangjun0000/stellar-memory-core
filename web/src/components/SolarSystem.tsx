@@ -54,12 +54,10 @@ const MIN_AU = 0.1;
 const MAX_AU = 100;
 
 const ZONE_DEFS: { zone: OrbitZone; minAU: number; maxAU: number; label: string; color: string }[] = [
-  { zone: 'core',      minAU: 0.1,  maxAU: 1.0,  label: 'CORE',      color: '#fbbf24' },
-  { zone: 'near',      minAU: 1.0,  maxAU: 5.0,  label: 'NEAR',      color: '#f97316' },
-  { zone: 'active',    minAU: 5.0,  maxAU: 15.0, label: 'ACTIVE',    color: '#22c55e' },
-  { zone: 'archive',   minAU: 15.0, maxAU: 40.0, label: 'ARCHIVE',   color: '#60a5fa' },
-  { zone: 'fading',    minAU: 40.0, maxAU: 70.0, label: 'FADING',    color: '#a78bfa' },
-  { zone: 'forgotten', minAU: 70.0, maxAU: 100.0,label: 'FORGOTTEN', color: '#9ca3af' },
+  { zone: 'core',      minAU: 0.1,  maxAU: 3.0,  label: 'CORE',      color: '#00e5ff' },
+  { zone: 'near',      minAU: 3.0,  maxAU: 15.0, label: 'NEAR',      color: '#3b82f6' },
+  { zone: 'stored',    minAU: 15.0, maxAU: 60.0, label: 'STORED',    color: '#6b7280' },
+  { zone: 'forgotten', minAU: 60.0, maxAU: 100.0,label: 'FORGOTTEN', color: '#374151' },
 ];
 
 // Log-scale AU → 3D units (1..20)

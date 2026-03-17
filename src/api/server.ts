@@ -20,6 +20,7 @@ import temporalRouter from './routes/temporal.js';
 import conflictsRouter from './routes/conflicts.js';
 import observationsRouter from './routes/observations.js';
 import consolidationRouter from './routes/consolidation.js';
+import sessionsRouter from './routes/sessions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = resolve(__dirname, '..', '..', 'web', 'dist');
@@ -70,6 +71,7 @@ app.route('/api/temporal', temporalRouter);
 app.route('/api/conflicts', conflictsRouter);
 app.route('/api/observations', observationsRouter);
 app.route('/api/consolidation', consolidationRouter);
+app.route('/api/sessions', sessionsRouter);
 
 // ---------------------------------------------------------------------------
 // Static web dashboard (serve web/dist/ if it exists)

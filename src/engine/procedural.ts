@@ -17,11 +17,8 @@ import type { Memory, MemoryType } from './types.js';
 import { getMemoriesByProject, insertMemory } from '../storage/queries.js';
 import { getConfig } from '../utils/config.js';
 import { STOP_WORDS } from '../utils/stopwords.js';
-import {
-  recencyScore,
-  frequencyScore,
-  importanceToDistance,
-} from './orbit.js';
+import { INTRINSIC_DEFAULTS } from './types.js';
+import { importanceToDistance } from './orbit.js';
 
 // ---------------------------------------------------------------------------
 // Pattern detection
@@ -160,19 +157,15 @@ export function createProceduralMemory(
     .filter(w => w.length > 3);
   const tags = ['procedural', ...new Set(ruleWords.slice(0, 4))];
 
-  // Compute initial importance (new procedural starts strong)
+  // Compute initial importance using 3-factor formula (Phase 1).
+  // R=1.0 (brand new), F=0.0 (never recalled), I=impact (explicit override).
   const now = new Date().toISOString();
-  const rec = recencyScore(null, now, config.decayHalfLifeHours);
-  const freq = frequencyScore(0, config.frequencySaturationPoint);
-  const rel = 0.5; // reasonable default for new procedural memory
+  const wR = config.weightRecency   ?? 0.35;
+  const wF = config.weightFrequency ?? 0.25;
+  const wI = config.weightIntrinsic ?? 0.40;
+  const I  = impact ?? INTRINSIC_DEFAULTS['procedural'];
 
-  const total = Math.min(
-    1.0,
-    config.weights.recency * rec +
-      config.weights.frequency * freq +
-      config.weights.impact * impact +
-      config.weights.relevance * rel,
-  );
+  const total = Math.min(1.0, wR * 1.0 + wF * 0.0 + wI * I);
 
   const distance = importanceToDistance(total);
   const contentHash = createHash('sha256').update(content).digest('hex');

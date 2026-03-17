@@ -20,17 +20,24 @@ import { tokenize } from './gravity.js';
 import { getMemoriesByProject } from '../storage/queries.js';
 import { createLogger } from '../utils/logger.js';
 import { filterActiveMemories, isMemoryCurrentlyActive } from './validity.js';
+import { getConfig } from '../utils/config.js';
 
 const log = createLogger('corona');
 
-const MAX_CORONA_SIZE = 200;
-const CORE_THRESHOLD = 1.0;   // distance < 1.0 AU
-const NEAR_THRESHOLD = 5.0;   // distance < 5.0 AU
+const CORE_THRESHOLD = 3.0;   // distance < 3.0 AU  (Phase 1: 4-zone system)
+const NEAR_THRESHOLD = 15.0;  // distance < 15.0 AU (Phase 1: 4-zone system)
 
 class Corona {
   private cache = new Map<string, Memory>();
   private tokenIndex = new Map<string, Set<string>>();
   private project: string = '';
+
+  /** Compute max cache entries from cacheMb. ~8KB avg per memory (content+summary+tags+embedding). */
+  private getMaxCacheSize(): number {
+    const mb = getConfig().cacheMb;
+    const avgBytesPerMemory = 8 * 1024; // ~8KB
+    return Math.max(50, Math.floor((mb * 1024 * 1024) / avgBytesPerMemory));
+  }
 
   /** Load core + near zone memories from DB into the cache. */
   warmup(project: string): void {
@@ -38,9 +45,10 @@ class Corona {
     this.cache.clear();
     this.tokenIndex.clear();
 
+    const maxSize = this.getMaxCacheSize();
     const memories = getMemoriesByProject(project);
     // memories are already sorted by distance ASC from the query
-    const toCache = filterActiveMemories(memories).slice(0, MAX_CORONA_SIZE);
+    const toCache = filterActiveMemories(memories).slice(0, maxSize);
 
     for (const mem of toCache) {
       this.cache.set(mem.id, mem);
@@ -137,7 +145,8 @@ class Corona {
     }
 
     // Only cache if within corona range or if we have room
-    if (this.cache.size < MAX_CORONA_SIZE || this.cache.has(memory.id)) {
+    const maxSize = this.getMaxCacheSize();
+    if (this.cache.size < maxSize || this.cache.has(memory.id)) {
       this.cache.set(memory.id, memory);
       this.indexTokens(memory);
     } else {

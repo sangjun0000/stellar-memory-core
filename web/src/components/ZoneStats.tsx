@@ -3,31 +3,25 @@ import { useTranslation } from '../i18n/context';
 
 // ── Zone color palette ──────────────────────────────────────────────────────
 const ZONE_COLORS: Record<OrbitZone, string> = {
-  core:      '#fbbf24',
-  near:      '#f97316',
-  active:    '#22c55e',
-  archive:   '#60a5fa',
-  fading:    '#a78bfa',
-  forgotten: '#9ca3af',
+  core:      '#00e5ff',
+  near:      '#3b82f6',
+  stored:    '#6b7280',
+  forgotten: '#374151',
 };
 
 // Orbital radius hint — used to render the mini position dot on the bar rail.
 // Values are 0-1, representing distance from centre.
 const ZONE_RADIUS: Record<OrbitZone, number> = {
-  core:      0.04,
-  near:      0.18,
-  active:    0.38,
-  archive:   0.58,
-  fading:    0.78,
-  forgotten: 0.95,
+  core:      0.05,
+  near:      0.25,
+  stored:    0.65,
+  forgotten: 0.92,
 };
 
 const ZONE_LABELS: Record<OrbitZone, string> = {
   core:      'Core',
   near:      'Near',
-  active:    'Active',
-  archive:   'Archive',
-  fading:    'Fading',
+  stored:    'Stored',
   forgotten: 'Forgotten',
 };
 

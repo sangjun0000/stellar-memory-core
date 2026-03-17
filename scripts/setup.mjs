@@ -5,20 +5,20 @@
  * Run once after installing:  npm run setup
  *
  * What this does:
- *   1. Downloads Xenova/all-MiniLM-L6-v2 (~90 MB, quantized) from HuggingFace.
+ *   1. Downloads Xenova/bge-m3 (~540 MB, quantized) from HuggingFace.
  *   2. Caches it in ~/.cache/huggingface (standard HuggingFace cache location).
  *   3. Shows real-time download progress so you know it's working.
  *
  * After this completes, Stellar Memory starts instantly without any network delay.
  */
 
-const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const MODEL_NAME = process.env['STELLAR_EMBEDDING_MODEL'] ?? 'Xenova/bge-m3';
+const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes (BGE-M3 is larger)
 
 console.log('Stellar Memory — Model Setup');
 console.log('============================');
 console.log(`Model: ${MODEL_NAME}`);
-console.log('Size:  ~90 MB (quantized int8)');
+console.log('Size:  ~540 MB (quantized int8)');
 console.log('Cache: ~/.cache/huggingface');
 console.log('');
 console.log('Downloading embedding model...');
@@ -102,14 +102,17 @@ const timeoutPromise = new Promise((_, reject) =>
   setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)
 );
 
+const device = process.env['STELLAR_EMBEDDING_DEVICE'] ?? 'cpu';
+
 const setupPromise = (async () => {
-  const { pipeline, env } = await import('@xenova/transformers');
+  const { pipeline, env } = await import('@huggingface/transformers');
 
   // Respect custom cache dir if set, otherwise use HuggingFace default
   env.cacheDir = process.env['TRANSFORMERS_CACHE'] ?? undefined;
 
   const pipe = await pipeline('feature-extraction', MODEL_NAME, {
-    quantized: true,
+    dtype: 'q8',
+    device,
     progress_callback: onProgress,
   });
 
@@ -134,7 +137,7 @@ try {
 } catch (err) {
   if (err.message === 'timeout') {
     console.error('');
-    console.error('ERROR: Download timed out after 5 minutes.');
+    console.error('ERROR: Download timed out after 10 minutes.');
     console.error('');
     console.error('Possible causes:');
     console.error('  - Slow internet connection');

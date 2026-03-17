@@ -78,6 +78,11 @@ export function labelToZoneKey(label: string): OrbitZone {
   return 'forgotten';
 }
 
+/** Check if a given zone key is a valid OrbitZone. */
+export function isValidZone(key: string): key is OrbitZone {
+  return key in ORBIT_ZONES;
+}
+
 export function formatDistance(distance: number): string {
   return `${distance.toFixed(1)} AU`;
 }

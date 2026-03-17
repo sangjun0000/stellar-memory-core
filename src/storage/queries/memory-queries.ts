@@ -47,6 +47,7 @@ export function insertMemory(memory: Partial<Memory>): Memory {
   const consolidated_into = memory.consolidated_into ?? null;
   const quality_score = memory.quality_score ?? null;
   const is_universal = memory.is_universal ? 1 : 0;
+  const intrinsic = memory.intrinsic ?? null;
 
   db.prepare(`
     INSERT INTO memories (
@@ -56,8 +57,9 @@ export function insertMemory(memory: Partial<Memory>): Memory {
       source, source_path, source_hash, content_hash,
       created_at, updated_at, deleted_at,
       valid_from, valid_until, superseded_by,
-      consolidated_into, quality_score, is_universal
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      consolidated_into, quality_score, is_universal,
+      intrinsic
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, project, content, summary, type, tags,
     distance, importance, velocity, impact,
@@ -65,7 +67,8 @@ export function insertMemory(memory: Partial<Memory>): Memory {
     source, source_path, source_hash, content_hash,
     created_at, updated_at, deleted_at,
     valid_from, valid_until, superseded_by,
-    consolidated_into, quality_score, is_universal
+    consolidated_into, quality_score, is_universal,
+    intrinsic
   );
 
   return {
@@ -82,6 +85,7 @@ export function insertMemory(memory: Partial<Memory>): Memory {
     consolidated_into: consolidated_into ?? undefined,
     quality_score: quality_score ?? undefined,
     is_universal: Boolean(is_universal),
+    intrinsic: intrinsic ?? null,
   };
 }
 

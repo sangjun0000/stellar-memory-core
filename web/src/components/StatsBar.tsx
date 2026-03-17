@@ -8,15 +8,13 @@ import type { WsStatus } from '../hooks/useWebSocket';
 // ---------------------------------------------------------------------------
 
 const ZONE_COLORS: Record<OrbitZone, string> = {
-  core:      '#fbbf24',
-  near:      '#f97316',
-  active:    '#22c55e',
-  archive:   '#60a5fa',
-  fading:    '#a78bfa',
-  forgotten: '#9ca3af',
+  core:      '#00e5ff',
+  near:      '#3b82f6',
+  stored:    '#6b7280',
+  forgotten: '#374151',
 };
 
-const ZONE_ORDER: OrbitZone[] = ['core', 'near', 'active', 'archive', 'fading', 'forgotten'];
+const ZONE_ORDER: OrbitZone[] = ['core', 'near', 'stored', 'forgotten'];
 
 // ---------------------------------------------------------------------------
 // CSS — once per page

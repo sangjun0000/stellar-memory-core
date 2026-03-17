@@ -69,7 +69,7 @@ export function getSurvivalCurve(project: string): Array<{
 
     const isDeleted = row.deleted_at !== null;
     const isOort = row.distance >= ORBIT_ZONES.forgotten.min;
-    const isActive = row.distance < ORBIT_ZONES.active.max; // core + near + active
+    const isActive = row.distance < ORBIT_ZONES.near.max; // core + near (< 15.0 AU)
 
     if (isDeleted || isOort) {
       entry.forgotten++;
@@ -347,8 +347,8 @@ export function getMemoryHealth(project: string): {
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Active = core + near + active (distance < 15)
-  const activeCount = memories.filter(m => m.distance < ORBIT_ZONES.active.max).length;
+  // Active = core + near (distance < 15.0 AU in 4-zone system)
+  const activeCount = memories.filter(m => m.distance < ORBIT_ZONES.near.max).length;
   const activeRatio = activeCount / totalMemories;
 
   // Stale = not accessed in 30+ days
@@ -482,7 +482,7 @@ export function generateReport(project: string): string {
     '## Zone Distribution',
   ];
 
-  const zoneOrder = ['core', 'near', 'active', 'archive', 'fading', 'forgotten'];
+  const zoneOrder = ['core', 'near', 'stored', 'forgotten'];
   for (const zone of zoneOrder) {
     const count = analytics.zone_distribution[zone] ?? 0;
     const bar = '#'.repeat(Math.min(20, count));

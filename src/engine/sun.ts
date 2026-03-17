@@ -1,5 +1,5 @@
 /**
- * sun.ts ??Sun state management
+ * sun.ts — Sun state management
  *
  * The "sun" is the gravitational centre of the memory system: it holds the
  * current working context (what the AI is doing right now).  Every memory
@@ -26,6 +26,8 @@ import { filterActiveMemories } from './validity.js';
 import { createMemory } from './planet.js';
 import { corona } from './corona.js';
 import { getSessionCommitDraft } from './session-policy.js';
+import { getSessionGap, getLastSession } from './ledger.js';
+import type { SessionGap } from './ledger.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -106,7 +108,7 @@ export function commitToSun(
   const formatted     = formatSunContent(updated, coreMemories, nearMemories);
   updated.token_count = estimateTokens(formatted);
 
-  // Warn in dev if we exceed the budget ??the consumer (getSunContent) is
+  // Warn in dev if we exceed the budget — the consumer (getSunContent) is
   // responsible for truncation, but we record the real count here.
   if (updated.token_count > config.sunTokenBudget) {
     process.stderr.write(
@@ -226,6 +228,37 @@ function generateProactiveAlerts(
 }
 
 // ---------------------------------------------------------------------------
+// Adaptive token budget
+// ---------------------------------------------------------------------------
+
+/**
+ * Scale the base token budget based on the session gap category.
+ *
+ * Longer gaps mean more context drift — give the model more room to
+ * include older memories so it can re-orient faster.
+ *
+ *   short    < 2h   → 1.0×  (fresh session, no extra budget needed)
+ *   medium   2–8h   → 1.2×
+ *   long     8–24h  → 1.5×
+ *   extended >= 24h → 1.8×
+ *
+ * Capped at 2000 tokens to avoid runaway context growth.
+ */
+export function adaptiveTokenBudget(
+  baseBudget: number,
+  gapCategory: string | null,
+): number {
+  const multipliers: Record<string, number> = {
+    short:    1.0,
+    medium:   1.2,
+    long:     1.5,
+    extended: 1.8,
+  };
+  const m = gapCategory ? (multipliers[gapCategory] ?? 1.0) : 1.0;
+  return Math.min(2000, Math.round(baseBudget * m));
+}
+
+// ---------------------------------------------------------------------------
 // Formatter
 // ---------------------------------------------------------------------------
 
@@ -251,9 +284,23 @@ export function formatSunContent(
   sun: SunState,
   coreMemories: Memory[],
   nearMemories: Memory[],
+  sessionGapOverride?: SessionGap | null,
 ): string {
   const config = getConfig();
-  const budget = config.sunTokenBudget;
+
+  // Compute adaptive budget based on how long ago the last session ended.
+  // The override lets callers (and tests) inject a gap without hitting the DB.
+  let gap: SessionGap | null;
+  if (sessionGapOverride !== undefined) {
+    gap = sessionGapOverride;
+  } else {
+    try {
+      gap = getSessionGap(sun.project);
+    } catch {
+      gap = null;
+    }
+  }
+  const budget = adaptiveTokenBudget(config.sunTokenBudget, gap?.gapCategory ?? null);
   const activeCoreMemories = filterActiveMemories(coreMemories);
   const activeNearMemories = filterActiveMemories(nearMemories);
 
@@ -268,7 +315,7 @@ export function formatSunContent(
   // Build candidate sections in priority order.
   const sections: string[] = [];
 
-  // 1. Header ??always included. Add [STALE] warning if last commit > 24h ago.
+  // 1. Header — always included. Add [STALE] warning if last commit > 24h ago.
   let header = `[STELLAR MEMORY - project: ${sun.project}]`;
   if (sun.last_commit_at) {
     const lastCommitMs = new Date(
@@ -278,10 +325,40 @@ export function formatSunContent(
     ).getTime();
     const hoursSince = (Date.now() - lastCommitMs) / (1000 * 60 * 60);
     if (hoursSince > 24) {
-      header += ` [STALE ??last commit ${Math.floor(hoursSince)}h ago. Run commit to refresh.]`;
+      header += ` [STALE — last commit ${Math.floor(hoursSince)}h ago. Run commit to refresh.]`;
     }
   }
   sections.push(header);
+
+  // 1b. SESSION CONTEXT — show gap info when resuming after a significant break.
+  // Only shown when gap > 1 hour so short re-connections don't add noise.
+  if (gap && gap.gapHours > 1) {
+    try {
+      const gapStr = gap.gapHours < 24
+        ? `${gap.gapHours.toFixed(1)}h`
+        : `${(gap.gapHours / 24).toFixed(1)}d`;
+
+      const lastSession = getLastSession(sun.project);
+      const sessionParts: string[] = [];
+      if (lastSession) {
+        if (lastSession.duration_seconds != null) {
+          const dMin = Math.round(lastSession.duration_seconds / 60);
+          sessionParts.push(`${dMin}min`);
+        }
+        if (lastSession.memories_created  > 0) sessionParts.push(`created=${lastSession.memories_created}`);
+        if (lastSession.memories_recalled > 0) sessionParts.push(`recalled=${lastSession.memories_recalled}`);
+      }
+
+      const statsStr = sessionParts.length > 0 ? ` | ${sessionParts.join(' ')}` : '';
+      const sessionLine = lastSession && sessionParts.length > 0
+        ? `\n  Last session: ${statsStr.slice(3)}`
+        : '';
+
+      sections.push(`\nSESSION: gap=${gapStr} (${gap.gapCategory})${sessionLine}`);
+    } catch {
+      // Non-fatal — skip session context on any error
+    }
+  }
 
   // 2. ALERTS -- proactive notices (conflicts, stale tasks, related decisions).
   // Generated before CORE so high-priority alerts appear near the top of output
@@ -292,7 +369,7 @@ export function formatSunContent(
   }
 
   // 3. CORE IDENTITY -- core zone memories (distance < 1.0 AU).
-  // Compressed format: [TYPE] summary (no AU distance ??saves tokens)
+  // Compressed format: [TYPE] summary (no AU distance — saves tokens)
   if (activeCoreMemories.length > 0) {
     const displayed = activeCoreMemories.slice(0, MAX_CORE_DISPLAY);
     const lines = displayed
@@ -347,7 +424,7 @@ export function formatSunContent(
   for (const section of sections) {
     const candidate = result + (result.length > 0 ? '\n' : '') + section;
     if (estimateTokens(candidate) > budget) {
-      // This section would push us over ??stop here.
+      // This section would push us over — stop here.
       break;
     }
     result = candidate;
@@ -373,12 +450,12 @@ export function formatSunContent(
  * This prevents session context from being lost when Claude's process
  * ends (e.g., SIGTERM from Claude Desktop, pipe close from Claude Code).
  *
- * Uses synchronous DB calls only ??async is unsafe in exit handlers.
+ * Uses synchronous DB calls only — async is unsafe in exit handlers.
  */
 /**
  * Auto-commit modes:
- *   - 'shutdown': final commit on process exit ??always writes
- *   - 'periodic': background timer ??skips if a manual commit happened recently
+ *   - 'shutdown': final commit on process exit — always writes
+ *   - 'periodic': background timer — skips if a manual commit happened recently
  */
 export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic' = 'shutdown'): void {
   try {
@@ -409,7 +486,7 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
       byType.set(m.type, list);
     }
 
-    // Always merge with existing sun state ??never overwrite.
+    // Always merge with existing sun state — never overwrite.
     // Keep existing current_work/decisions and supplement with new memories.
     const current_work = existing?.current_work
       || sessionDraft?.current_work
@@ -454,7 +531,7 @@ export function autoCommitOnClose(project: string, mode: 'shutdown' | 'periodic'
       `[stellar-memory] Auto-committed sun state (${mode}, ${recent.length} recent memories)\n`
     );
   } catch (err) {
-    // Exit handler must never throw ??silently log and continue
+    // Exit handler must never throw — silently log and continue
     process.stderr.write(
       `[stellar-memory] Auto-commit failed: ${err instanceof Error ? err.message : String(err)}\n`
     );

@@ -17,7 +17,7 @@
 
 import { randomUUID, createHash } from 'node:crypto';
 import type { Memory, MemoryType } from './types.js';
-import { IMPACT_DEFAULTS } from './types.js';
+import { IMPACT_DEFAULTS, INTRINSIC_DEFAULTS } from './types.js';
 import {
   insertMemory,
   searchMemories,
@@ -27,7 +27,6 @@ import {
   insertOrbitLog,
   softDeleteMemory,
   getMemoryById,
-  getSunState,
   getMemoryByIds,
   getMemoryByContentHash,
   updateQualityScore,
@@ -39,8 +38,6 @@ import {
   calculateImportance,
   importanceToDistance,
   applyAccessBoost,
-  recencyScore,
-  frequencyScore,
 } from './orbit.js';
 import { keywordRelevance, retrievalScore } from './gravity.js';
 import { generateEmbedding } from './embedding.js';
@@ -141,26 +138,20 @@ export function createMemory(data: {
     }
   }
 
-  // Compute initial importance using static scores.
-  const rec  = recencyScore(null, new Date().toISOString(), config.decayHalfLifeHours);
-  const freq = frequencyScore(0, config.frequencySaturationPoint);
+  // Compute initial importance using 3-factor formula (Phase 1).
+  // R=1.0 (brand new), F=0.0 (never recalled).
+  // I = caller-supplied impact (if explicit) or intrinsic type default.
+  const wR = config.weightRecency   ?? 0.35;
+  const wF = config.weightFrequency ?? 0.25;
+  const wI = config.weightIntrinsic ?? 0.40;
 
-  // Compute relevance against current sun context so new memories start at a
-  // position that reflects their relevance to current work, rather than 0.
-  const sunState = getSunState(data.project);
-  const sunText  = sunState
-    ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
-    : '';
-  const memoryText = data.content + ' ' + tags.join(' ');
-  const rel = keywordRelevance(memoryText, sunText);
+  // If caller passed an explicit impact value, use it as intrinsic override.
+  // This preserves backward-compat so existing callers with impact=X still work.
+  const hasExplicitImpact = data.impact !== undefined;
+  const I = hasExplicitImpact ? impact : (INTRINSIC_DEFAULTS[type] ?? 0.30);
+  const intrinsicOverride = hasExplicitImpact ? impact : null;
 
-  const total = Math.min(
-    1.0,
-    config.weights.recency   * rec    +
-    config.weights.frequency * freq   +
-    config.weights.impact    * impact +
-    config.weights.relevance * rel,
-  );
+  const total = Math.min(1.0, wR * 1.0 + wF * 0.0 + wI * I);
 
   const distance = importanceToDistance(total);
   const now      = new Date().toISOString();
@@ -183,6 +174,7 @@ export function createMemory(data: {
     created_at:      now,
     updated_at:      now,
     deleted_at:      null,
+    intrinsic:       intrinsicOverride,
   });
 
   // Background embedding: fire-and-forget so createMemory stays synchronous.
@@ -197,8 +189,8 @@ export function createMemory(data: {
     // Quality scoring is non-critical — don't block creation
   }
 
-  // If the new memory lands in the corona zone, cache it immediately.
-  if (memory.distance < 5.0) {
+  // If the new memory lands in the corona zone (< 15.0 AU), cache it immediately.
+  if (memory.distance < 15.0) {
     corona.upsert(memory);
   }
 
@@ -397,13 +389,11 @@ function hydrateVectorOnlyResults(
 // Tiered recall pipeline (Corona architecture)
 // ---------------------------------------------------------------------------
 
-/** Zone boost factors applied to search results by tier origin. */
+/** Zone boost factors applied to search results by tier origin (4-zone system). */
 const ZONE_BOOST = {
-  core: 1.2,
-  near: 1.1,
-  active: 1.0,
-  archive: 0.95,
-  fading: 0.85,
+  core:      1.2,
+  near:      1.1,
+  stored:    1.0,
   forgotten: 0.7,
 } as const;
 
@@ -445,16 +435,23 @@ export async function recallMemoriesAsync(
   // Pre-seed seenIds with exclusions (e.g., corona IDs already shown in Sun)
   const seenIds = new Set<string>(options?.excludeIds ?? []);
 
+  // Auto-warm the corona cache if it hasn't been initialized for this project.
+  // This ensures core+near zone memories are always reachable even in tests
+  // or contexts where ensureCorona() hasn't been called.
+  if (corona.getProject() !== project) {
+    corona.warmup(project);
+  }
+
   // ── Tier 1: Corona cache (in-memory, ~0ms) ─────────────────────────────
   const coronaResults = corona.search(query, limit * 2);
   for (let i = 0; i < coronaResults.length; i++) {
     const m = coronaResults[i];
-    const zoneBoost = m.distance < 1.0 ? ZONE_BOOST.core : ZONE_BOOST.near;
+    const zoneBoost = m.distance < 3.0 ? ZONE_BOOST.core : ZONE_BOOST.near;
     const rankScore = 1 / (1 + i);  // rank-based score
     scored.push({
       memory: m,
       score: rankScore * zoneBoost * TIER_PRIORITY.tier1,
-      tier: m.distance < 1.0 ? 'CORE' : 'NEAR',
+      tier: m.distance < 3.0 ? 'CORE' : 'NEAR',
     });
     seenIds.add(m.id);
   }
@@ -462,29 +459,29 @@ export async function recallMemoriesAsync(
   // Early exit: if corona filled the limit, skip DB searches
   const remaining = limit - scored.length;
 
-  // ── Tier 2: Active zone FTS5 (distance 5.0–15.0, ~1-5ms) ──────────────
+  // ── Tier 2: Near zone FTS5 (distance 15.0–60.0, ~1-5ms) ───────────────
   if (remaining > 0) {
-    const tier2Results = searchMemoriesInRange(project, query, 5.0, 15.0, remaining * 2);
+    const tier2Results = searchMemoriesInRange(project, query, 15.0, 60.0, remaining * 2);
     for (let i = 0; i < tier2Results.length; i++) {
       const m = tier2Results[i];
       if (seenIds.has(m.id)) continue;
       const rankScore = 1 / (1 + i);
       scored.push({
         memory: m,
-        score: rankScore * ZONE_BOOST.active * TIER_PRIORITY.tier2,
+        score: rankScore * ZONE_BOOST.stored * TIER_PRIORITY.tier2,
         tier: 'ACTIVE',
       });
       seenIds.add(m.id);
     }
   }
 
-  // ── Tier 3: Full hybrid FTS5 + vector (distance 15.0+, ~5-50ms) ───────
+  // ── Tier 3: Full hybrid FTS5 + vector (distance 60.0+, ~5-50ms) ────────
   const remaining3 = limit - scored.filter(s => s.score > 0).length;
   if (remaining3 > 0) {
     const fetchN = remaining3 * 3;
 
-    // FTS5 for far zone
-    const ftsResults = searchMemoriesInRange(project, query, 15.0, 100.0, fetchN);
+    // FTS5 for forgotten zone
+    const ftsResults = searchMemoriesInRange(project, query, 60.0, 100.0, fetchN);
 
     // Vector KNN search (async embedding)
     let vecIds: string[] = [];
@@ -601,10 +598,6 @@ export async function recallMemoriesAsync(
   const finalScored = filtered.slice(0, limit);
 
   // ── Access boost + orbit update ────────────────────────────────────────
-  const sunState = getSunState(project);
-  const sunText  = sunState
-    ? [sunState.current_work, ...sunState.recent_decisions, ...sunState.next_steps].join(' ')
-    : '';
   const config = getConfig();
 
   const results = withTransaction(() =>
@@ -621,7 +614,7 @@ export async function recallMemoriesAsync(
         last_accessed_at: new Date().toISOString(),
       };
 
-      const components = calculateImportance(updatedMemory, sunText, config);
+      const components = calculateImportance(updatedMemory, config);
       updateMemoryOrbit(memory.id, newDistance, components.total, velocity);
 
       insertOrbitLog({
@@ -636,8 +629,8 @@ export async function recallMemoriesAsync(
 
       const result = { ...updatedMemory, importance: components.total, velocity };
 
-      // If memory moved into the corona zone (< 5.0 AU), update cache
-      if (newDistance < 5.0) {
+      // If memory moved into the corona zone (< 15.0 AU), update cache
+      if (newDistance < 15.0) {
         corona.upsert(result);
       }
 

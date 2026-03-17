@@ -3,11 +3,19 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createStellarServer } from './mcp/server.js';
-import { initDatabase } from './storage/database.js';
+import { initDatabase, isReembedNeeded } from './storage/database.js';
 import { getConfig } from './utils/config.js';
 import { autoCommitOnClose } from './engine/sun.js';
 import { processConversation } from './engine/observation.js';
 import { switchProject, getCurrentProject } from './engine/multiproject.js';
+import { startReembedding } from './engine/reembed.js';
+import {
+  startSession,
+  endSession,
+  startCheckpointTimer,
+  stopCheckpointTimer,
+} from './engine/ledger.js';
+import { runSleepConsolidation } from './engine/sleep-consolidation.js';
 
 /**
  * Validate that the runtime environment meets Stellar Memory's requirements.
@@ -46,11 +54,21 @@ async function main(): Promise<void> {
   // Initialize SQLite database (creates schema on first run)
   initDatabase(config.dbPath);
 
+  // If the vec tables were dropped due to a dimension upgrade, start the
+  // background queue that re-embeds all memories with the new model.
+  if (isReembedNeeded()) {
+    startReembedding();
+  }
+
   // Auto-detect and switch to the project based on cwd/git repo
   if (config.defaultProject !== 'default') {
     switchProject(config.defaultProject);
     console.error(`[stellar-memory] Auto-detected project: ${config.defaultProject}`);
   }
+
+  // ── Session lifecycle ───────────────────────────────────────────────────
+  startSession(config.defaultProject);
+  startCheckpointTimer(config.defaultProject);
 
   // Create MCP server with all tools and resources registered
   const server = createStellarServer();
@@ -61,7 +79,22 @@ async function main(): Promise<void> {
   const onShutdown = (): void => {
     if (shutdownDone) return;
     shutdownDone = true;
-    autoCommitOnClose(getCurrentProject());
+
+    // Stop the checkpoint timer first (synchronous)
+    stopCheckpointTimer();
+
+    // End session and run sleep consolidation before auto-commit
+    const project = getCurrentProject();
+    const completedSession = endSession(project);
+    if (completedSession) {
+      try {
+        runSleepConsolidation(completedSession, project);
+      } catch {
+        // Non-fatal: sleep consolidation must never prevent shutdown
+      }
+    }
+
+    autoCommitOnClose(project);
   };
 
   process.on('exit', onShutdown);

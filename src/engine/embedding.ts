@@ -1,30 +1,40 @@
 /**
  * embedding.ts — Local text embedding using Transformers.js
  *
- * Uses the all-MiniLM-L6-v2 model (384 dimensions) for generating dense
- * vector representations of memory text. The model runs entirely in-process
- * via @xenova/transformers — no API key or network call required after the
- * initial model download (~90 MB, cached in ~/.cache/huggingface).
+ * Uses the BGE-M3 model (1024 dimensions) for generating dense vector
+ * representations of memory text. The model runs entirely in-process via
+ * @huggingface/transformers — no API key or network call required after the
+ * initial model download (~540 MB, cached in ~/.cache/huggingface).
  *
  * Design:
- *   - Singleton pipeline: the model is loaded once and reused.
+ *   - Lazy-loaded singleton pipeline (stays loaded for the process lifetime).
+ *   - CPU users: zero VRAM, ~500MB RAM. GPU users: ~6 GB VRAM (opted in).
  *   - generateEmbedding() returns a normalized Float32Array.
  *   - Supports Korean + English mixed text (multilingual tokenizer).
  *   - Input is capped at MAX_CHARS to avoid excessive tokenization.
+ *
+ * GPU notes (DirectML on Windows):
+ *   DirectML does NOT support int8-quantized (q8) models — the operators
+ *   DynamicQuantizeLinear and MatMulInteger fall back to CPU, making the
+ *   GPU 0% utilized. When device is 'dml', we use fp32 dtype instead so
+ *   all compute nodes actually run on the GPU. If DirectML initialization
+ *   fails, we fall back to CPU automatically.
  */
 
-// @xenova/transformers uses a dynamic import pattern that is CJS-compatible
-// when called from Node.js ESM. We import the type for the pipeline function
-// and load it lazily.
+const MODEL_NAME = 'Xenova/bge-m3';
+const MAX_CHARS = 4000; // roughly 512 tokens for mixed Korean/English text
 
-const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-const MAX_CHARS = 2000; // roughly 512 tokens for mixed Korean/English text
+/** Output dimensionality of BGE-M3 embeddings. Exported for vec.ts and tests. */
+export const EMBEDDING_DIM = 1024;
 
 // Lazily resolved singleton pipeline instance.
-// Typed as `unknown` to avoid pulling in the full @xenova/transformers types
-// at compile time (the package has non-standard type layouts that vary by version).
+// GPU users opted in to permanent VRAM usage, so the pipeline stays loaded.
+// CPU users have no VRAM cost, so it also stays loaded.
 let _pipeline: unknown = null;
 let _loading: Promise<unknown> | null = null;
+
+/** The device actually used after initialization (may differ from config if fallback occurred). */
+let _activeDevice = 'cpu';
 
 // ── Progress tracking ────────────────────────────────────────────────────────
 
@@ -60,7 +70,7 @@ function _onDownloadProgress(info: ProgressInfo): void {
   if (status === 'initiate') {
     if (_downloadStartTime === 0) {
       _downloadStartTime = Date.now();
-      console.error('[stellar-memory] Downloading embedding model (~90 MB, first run only)...');
+      console.error('[stellar-memory] Downloading embedding model (~540 MB, first run only)...');
       console.error('[stellar-memory] This will be cached for future sessions.');
     }
     // Reset per-file tracking when a new file starts
@@ -105,31 +115,86 @@ function _onDownloadProgress(info: ProgressInfo): void {
 }
 
 /**
+ * Select the optimal dtype for the given device.
+ *
+ * DirectML cannot execute int8 quantization operators (DynamicQuantizeLinear,
+ * MatMulInteger). When those operators are present in the ONNX graph, ORT
+ * reassigns them to CPU — so the GPU shows 0% utilization despite being
+ * "enabled." Using fp32 (or fp16) ensures all nodes run on the GPU.
+ *
+ * CUDA supports int8 operators natively, so q8 is fine there.
+ * CPU always supports q8 and benefits from the smaller model size.
+ */
+type DtypeOption = 'fp32' | 'fp16' | 'q8' | 'q4' | 'int8' | 'uint8' | 'bnb4' | 'q4f16' | 'auto';
+
+function selectDtype(device: string): DtypeOption {
+  switch (device) {
+    case 'dml':   return 'fp32'; // DirectML: must use float, not quantized
+    case 'cuda':  return 'q8';   // CUDA handles int8 natively
+    default:      return 'q8';   // CPU: q8 is smaller and fast enough
+  }
+}
+
+/**
  * Load and cache the feature-extraction pipeline.
  * Subsequent calls return the same promise / resolved value.
+ *
+ * If the requested GPU device fails (e.g., DirectML on a system without a
+ * compatible GPU), we automatically fall back to CPU and log a warning.
  */
 async function getPipeline(): Promise<unknown> {
   if (_pipeline) return _pipeline;
 
   if (!_loading) {
     _loading = (async () => {
-      // Dynamic import keeps this from failing at require()-time in environments
-      // where the model is not yet available (e.g., during unit tests that mock it).
-      const { pipeline, env } = await import('@xenova/transformers');
+      const { pipeline, env } = await import('@huggingface/transformers');
 
-      // Allow the model to be stored in the default HuggingFace cache directory.
-      // In CI/test environments TRANSFORMERS_CACHE can be set to override this.
       if (process.env['TRANSFORMERS_CACHE']) {
         env.cacheDir = process.env['TRANSFORMERS_CACHE'];
       }
 
-      const pipe = await pipeline('feature-extraction', MODEL_NAME, {
-        quantized: true,          // use the int8-quantized model for faster inference
-        progress_callback: _onDownloadProgress,
-      });
+      const { getConfig } = await import('../utils/config.js');
+      const configDevice = getConfig().embeddingDevice;
+      const modelName = process.env['STELLAR_EMBEDDING_MODEL'] ?? MODEL_NAME;
 
-      _pipeline = pipe;
-      return pipe;
+      // Try the configured device first; fall back to CPU on failure.
+      const devicesToTry: string[] =
+        configDevice !== 'cpu' ? [configDevice, 'cpu'] : ['cpu'];
+
+      for (const device of devicesToTry) {
+        const dtype = selectDtype(device);
+        try {
+          console.error(
+            `[stellar-memory] Loading embedding model (device=${device}, dtype=${dtype})...`
+          );
+
+          const pipe = await pipeline('feature-extraction', modelName, {
+            dtype,
+            device: device as 'cpu' | 'cuda' | 'dml',
+            progress_callback: _onDownloadProgress,
+          });
+
+          _activeDevice = device;
+          _pipeline = pipe;
+
+          if (device !== 'cpu') {
+            console.error(`[stellar-memory] GPU acceleration active (${device})`);
+          }
+
+          return pipe;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(
+            `[stellar-memory] Failed to initialize on ${device}: ${msg}`
+          );
+          if (device !== 'cpu') {
+            console.error('[stellar-memory] Falling back to CPU...');
+          }
+        }
+      }
+
+      // Should never reach here (CPU should always work), but just in case
+      throw new Error('Failed to initialize embedding pipeline on any device');
     })();
   }
 
@@ -143,22 +208,38 @@ async function getPipeline(): Promise<unknown> {
 export function _resetPipeline(): void {
   _pipeline = null;
   _loading = null;
+  _queryCacheSize = null;
 }
 
 /**
  * Inject a mock pipeline (for unit tests that don't want to download the model).
- * The mock must be callable: mock(text, options) → { data: Float32Array }
+ * The mock must be callable: mock(text, options) => { data: Float32Array }
  */
 export function _setPipelineForTest(mock: unknown): void {
   _pipeline = mock;
   _loading = null;
 }
 
+/** Returns the device the embedding pipeline is actually running on. */
+export function getActiveDevice(): string {
+  return _activeDevice;
+}
+
 // ---------------------------------------------------------------------------
 // Query embedding cache (LRU, avoids regenerating for repeated/similar queries)
 // ---------------------------------------------------------------------------
 
-const QUERY_CACHE_SIZE = 32;
+// Resolved lazily on first call so the config singleton is already initialised
+// (config.json has been read). We cache the resolved size to avoid repeated lookups.
+let _queryCacheSize: number | null = null;
+
+async function getQueryCacheSize(): Promise<number> {
+  if (_queryCacheSize !== null) return _queryCacheSize;
+  const { getConfig } = await import('../utils/config.js');
+  _queryCacheSize = getConfig().queryCacheSize ?? 128;
+  return _queryCacheSize;
+}
+
 const _queryCache = new Map<string, Float32Array>();
 
 function getCachedEmbedding(key: string): Float32Array | undefined {
@@ -171,8 +252,9 @@ function getCachedEmbedding(key: string): Float32Array | undefined {
   return cached;
 }
 
-function setCachedEmbedding(key: string, embedding: Float32Array): void {
-  if (_queryCache.size >= QUERY_CACHE_SIZE) {
+async function setCachedEmbedding(key: string, embedding: Float32Array): Promise<void> {
+  const maxSize = await getQueryCacheSize();
+  if (_queryCache.size >= maxSize) {
     // Evict oldest (first entry)
     const oldest = _queryCache.keys().next().value;
     if (oldest !== undefined) _queryCache.delete(oldest);
@@ -185,7 +267,7 @@ function setCachedEmbedding(key: string, embedding: Float32Array): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a 384-dimensional embedding vector for the given text.
+ * Generate a 1024-dimensional embedding vector for the given text.
  *
  * The returned Float32Array is L2-normalized so that cosine similarity
  * reduces to a simple dot product.
@@ -206,18 +288,73 @@ export async function generateEmbedding(text: string): Promise<Float32Array> {
 
   const pipe = await getPipeline();
 
-  // @xenova/transformers returns a Tensor-like object. We use mean pooling
+  // @huggingface/transformers returns a Tensor-like object. We use mean pooling
   // (pooling_mode: 'mean') and then L2-normalize to get a unit vector.
   const output = await (pipe as (
     text: string,
     opts: { pooling: string; normalize: boolean }
-  ) => Promise<{ data: Float32Array }>)(input, {
+  ) => Promise<{ data: Float32Array; dispose?: () => void }>)(input, {
     pooling: 'mean',
     normalize: true,
   });
 
+  // Copy data out before disposing the tensor to release ONNX Runtime buffers
   const embedding = new Float32Array(output.data);
-  setCachedEmbedding(input, embedding);
+
+  // Dispose the output tensor if the method exists (frees native memory)
+  if (typeof output.dispose === 'function') {
+    try { output.dispose(); } catch { /* ignore disposal errors */ }
+  }
+
+  await setCachedEmbedding(input, embedding);
+  return embedding;
+}
+
+/**
+ * Generate an embedding using a CPU-only pipeline.
+ * Used by re-embedding queue to avoid GPU TDR issues during batch processing.
+ * Creates a separate CPU pipeline instance (not the singleton GPU one).
+ */
+let _cpuPipeline: unknown = null;
+let _cpuLoading: Promise<unknown> | null = null;
+
+async function getCpuPipeline(): Promise<unknown> {
+  if (_cpuPipeline) return _cpuPipeline;
+  if (!_cpuLoading) {
+    _cpuLoading = (async () => {
+      const { pipeline, env } = await import('@huggingface/transformers');
+      if (process.env['TRANSFORMERS_CACHE']) {
+        env.cacheDir = process.env['TRANSFORMERS_CACHE'];
+      }
+      const modelName = process.env['STELLAR_EMBEDDING_MODEL'] ?? MODEL_NAME;
+      console.error('[stellar-memory] Loading CPU embedding pipeline for re-embedding (q8)...');
+      const pipe = await pipeline('feature-extraction', modelName, {
+        dtype: 'q8',
+        device: 'cpu',
+        progress_callback: _onDownloadProgress,
+      });
+      console.error('[stellar-memory] CPU embedding pipeline ready');
+      _cpuPipeline = pipe;
+      return pipe;
+    })();
+  }
+  return _cpuLoading;
+}
+
+export async function generateEmbeddingCpu(text: string): Promise<Float32Array> {
+  const input = preprocessText(text);
+  const pipe = await getCpuPipeline();
+  const output = await (pipe as (
+    text: string,
+    opts: { pooling: string; normalize: boolean }
+  ) => Promise<{ data: Float32Array; dispose?: () => void }>)(input, {
+    pooling: 'mean',
+    normalize: true,
+  });
+  const embedding = new Float32Array(output.data);
+  if (typeof output.dispose === 'function') {
+    try { output.dispose(); } catch { /* ignore */ }
+  }
   return embedding;
 }
 

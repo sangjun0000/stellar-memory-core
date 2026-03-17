@@ -16,7 +16,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { homedir } from 'node:os';
+import { homedir, totalmem, platform } from 'node:os';
 import { createInterface } from 'node:readline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -353,10 +353,14 @@ async function downloadModel(): Promise<boolean> {
 
   if (!scriptPath) {
     try {
-      const { pipeline, env } = await import('@xenova/transformers');
-      env.cacheDir = process.env['TRANSFORMERS_CACHE'] ?? undefined;
-      await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-        quantized: true,
+      const { pipeline, env } = await import('@huggingface/transformers');
+      if (process.env['TRANSFORMERS_CACHE']) {
+        env.cacheDir = process.env['TRANSFORMERS_CACHE'];
+      }
+      const modelName = process.env['STELLAR_EMBEDDING_MODEL'] ?? 'Xenova/bge-m3';
+      await pipeline('feature-extraction', modelName, {
+        dtype: 'q8',
+        device: (process.env['STELLAR_EMBEDDING_DEVICE'] ?? 'cpu') as 'cpu' | 'cuda' | 'webgpu',
         progress_callback: (info: { status: string; progress?: number }) => {
           if (info.status === 'progress' && info.progress != null) {
             const pct = Math.round(info.progress);
@@ -386,6 +390,73 @@ async function downloadModel(): Promise<boolean> {
 
   warn('Model download failed -- you can retry: npm run setup');
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Performance Settings — written to ~/.stellar-memory/config.json
+// ---------------------------------------------------------------------------
+
+interface UserConfig {
+  device: 'cpu' | 'gpu';
+  queryCacheSize: number;
+  ramPercent: number;
+}
+
+function saveUserConfig(cfg: UserConfig): void {
+  const dir = join(homedir(), '.stellar-memory');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'config.json'), JSON.stringify(cfg, null, 2));
+}
+
+async function configurePerformanceSettings(): Promise<void> {
+  const totalRamMb = Math.floor(totalmem() / (1024 * 1024));
+  const isWindows = platform() === 'win32';
+
+  log('');
+  log(`  ${BOLD}Performance Settings${RESET}`);
+  log(`  ${'─'.repeat(40)}`);
+  log('');
+
+  // ── [1] Embedding device ──────────────────────────────────────────────────
+  log(`  ${CYAN}[1]${RESET} Embedding device`);
+  log('      Choose how embeddings are generated:');
+  log(`      ${CYAN}[1]${RESET} CPU ${BOLD}(recommended)${RESET} — no VRAM usage, ~500ms per embedding`);
+  if (isWindows) {
+    log(`      ${CYAN}[2]${RESET} GPU (DirectML)    — uses ~6GB VRAM permanently, ~170ms per embedding`);
+  } else {
+    log(`      ${CYAN}[2]${RESET} GPU (CUDA)        — uses ~6GB VRAM permanently, ~170ms per embedding`);
+  }
+  log('');
+  const deviceAnswer = await prompt('      Enter 1 or 2 [1]: ');
+  const device: 'cpu' | 'gpu' = deviceAnswer.trim() === '2' ? 'gpu' : 'cpu';
+  log('');
+
+  // ── [2] Query cache size ──────────────────────────────────────────────────
+  log(`  ${CYAN}[2]${RESET} Query cache size`);
+  log('      Number of recent query embeddings kept in RAM (more = fewer re-computations)');
+  log('      Default: 128 (uses ~512KB RAM)');
+  log('');
+  const cacheAnswer = await prompt('      Enter cache size [128]: ');
+  const parsed = parseInt(cacheAnswer.trim(), 10);
+  const queryCacheSize = !isNaN(parsed) && parsed > 0 ? parsed : 128;
+  log('');
+
+  // ── [3] RAM allocation ────────────────────────────────────────────────────
+  const defaultRamMb = Math.floor(totalRamMb * 0.05);
+  log(`  ${CYAN}[3]${RESET} RAM allocation for memory cache`);
+  log('      Percentage of system RAM for the corona (in-memory) cache');
+  log(`      Default: 5% (= ~${defaultRamMb} MB on your system)`);
+  log('');
+  const ramAnswer = await prompt('      Enter percentage [5]: ');
+  const parsedRam = parseFloat(ramAnswer.trim());
+  const ramPercent = !isNaN(parsedRam) && parsedRam > 0 && parsedRam <= 100 ? parsedRam : 5;
+  log('');
+
+  saveUserConfig({ device, queryCacheSize, ramPercent });
+  success(`Performance settings saved (~/.stellar-memory/config.json)`);
+  log(`  Device: ${device === 'gpu' ? (isWindows ? 'GPU (DirectML)' : 'GPU (CUDA)') : 'CPU'}`);
+  log(`  Query cache: ${queryCacheSize} entries`);
+  log(`  RAM for cache: ${ramPercent}% (~${Math.floor(totalRamMb * ramPercent / 100)} MB)`);
 }
 
 async function main(): Promise<void> {
@@ -419,6 +490,19 @@ async function main(): Promise<void> {
     else if (answer === '4') clientTarget = 'all';
     else clientTarget = 'desktop';
     log('');
+  }
+
+  // Performance settings — interactive when TTY, silent (use defaults) otherwise
+  if (process.stdin.isTTY) {
+    await configurePerformanceSettings();
+  } else {
+    // Non-interactive: persist defaults silently so config.json always exists
+    const dir = join(homedir(), '.stellar-memory');
+    const cfgPath = join(dir, 'config.json');
+    if (!existsSync(cfgPath)) {
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(cfgPath, JSON.stringify({ device: 'cpu', queryCacheSize: 128, ramPercent: 5 }, null, 2));
+    }
   }
 
   if (!skipModel) {

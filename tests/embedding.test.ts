@@ -1,18 +1,16 @@
 /**
  * embedding.test.ts — Embedding generation unit tests
  *
- * These tests mock the @xenova/transformers pipeline so that no model
+ * These tests mock the @huggingface/transformers pipeline so that no model
  * download is required during CI. The mock returns deterministic float32
  * vectors of the correct dimension.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { _resetPipeline, _setPipelineForTest, generateEmbedding, preprocessText } from '../src/engine/embedding.js';
+import { _resetPipeline, _setPipelineForTest, generateEmbedding, preprocessText, EMBEDDING_DIM } from '../src/engine/embedding.js';
 
 // ---------------------------------------------------------------------------
 // Mock pipeline
 // ---------------------------------------------------------------------------
-
-const EMBEDDING_DIM = 384;
 
 /**
  * Create a deterministic mock pipeline function.
@@ -98,9 +96,9 @@ describe('preprocessText', () => {
     expect(preprocessText('hello   world\t\nfoo')).toBe('hello world foo');
   });
 
-  it('truncates to 2000 characters', () => {
-    const long = 'a'.repeat(3000);
-    expect(preprocessText(long).length).toBe(2000);
+  it('truncates to 4000 characters', () => {
+    const long = 'a'.repeat(5000);
+    expect(preprocessText(long).length).toBe(4000);
   });
 
   it('preserves Korean characters', () => {

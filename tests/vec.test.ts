@@ -4,8 +4,8 @@
  * These tests open a real in-memory SQLite DB with the sqlite-vec extension
  * loaded to verify the full vector CRUD pipeline.
  *
- * Note: the vec0 table is created with 384 dimensions (matching all-MiniLM-L6-v2).
- * Test vectors are 384-dim with deterministic values.
+ * Note: the vec0 table is created with 1024 dimensions (matching BGE-M3).
+ * Test vectors are 1024-dim with deterministic values.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
@@ -21,7 +21,7 @@ import {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-const DIM = 384;
+const DIM = 1024;
 
 /** Create a unit vector along axis `idx` (padded with zeros to DIM). */
 function unitVec(idx: number): Float32Array {

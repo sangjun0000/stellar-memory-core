@@ -1,28 +1,29 @@
 // Memory types
 export type MemoryType = 'decision' | 'observation' | 'task' | 'context' | 'error' | 'milestone' | 'procedural';
 
-// Orbit zones
+// Orbit zones — 4-zone system (Phase 1)
 export const ORBIT_ZONES = {
-  core:      { min: 0.1,  max: 1.0,  label: 'Core Memory' },
-  near:      { min: 1.0,  max: 5.0,  label: 'Recent Memory' },
-  active:    { min: 5.0,  max: 15.0, label: 'Active Memory' },
-  archive:   { min: 15.0, max: 40.0, label: 'Stored Memory' },
-  fading:    { min: 40.0, max: 70.0, label: 'Fading Memory' },
-  forgotten: { min: 70.0, max: 100.0, label: 'Forgotten Memory' },
+  core:      { min: 0.1,  max: 3.0,  label: 'Core Memory' },
+  near:      { min: 3.0,  max: 15.0, label: 'Recent Memory' },
+  stored:    { min: 15.0, max: 60.0, label: 'Stored Memory' },
+  forgotten: { min: 60.0, max: 100.0, label: 'Forgotten Memory' },
 } as const;
 
 export type OrbitZone = keyof typeof ORBIT_ZONES;
 
-// Default impact by memory type
-export const IMPACT_DEFAULTS: Record<MemoryType, number> = {
-  decision:    0.8,
-  milestone:   0.7,
-  error:       0.6,
-  task:        0.5,
-  context:     0.4,
-  observation: 0.3,
-  procedural:  0.5,
+// Intrinsic value defaults by memory type (Phase 1)
+export const INTRINSIC_DEFAULTS: Record<MemoryType, number> = {
+  procedural:  0.85,
+  decision:    0.80,
+  milestone:   0.70,
+  error:       0.65,
+  task:        0.50,
+  context:     0.40,
+  observation: 0.30,
 };
+
+// Deprecated alias — kept for backward compatibility
+export const IMPACT_DEFAULTS: Record<MemoryType, number> = INTRINSIC_DEFAULTS;
 
 export type MemoryValidityState = 'active' | 'future' | 'expired' | 'superseded';
 
@@ -48,6 +49,8 @@ export interface Memory {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // Phase 1: intrinsic value override (NULL = use INTRINSIC_DEFAULTS[type])
+  intrinsic?: number | null;
   // Phase 2: optional in-memory embedding (not persisted in memories table)
   embedding?: Float32Array;
   // Temporal awareness
@@ -87,21 +90,22 @@ export interface OrbitChange {
   trigger: 'decay' | 'access' | 'commit' | 'manual' | 'gravity' | 'forget';
 }
 
-// Importance scoring components
+// Importance scoring components (Phase 1 simplified)
 export interface ImportanceComponents {
-  // Sub-components
+  // Primary sub-components
   recency: number;
+  frequency: number;
+  intrinsic: number;
+  effectiveCount: number;
+  total: number;
+  // Deprecated aliases — kept for backward compatibility with callers
   frequencyFactor: number;
   effectiveHalflife: number;
-  // Composite scores
   activation: number;
   contentWeight: number;
   qualityModifier: number;
-  // Legacy aliases (kept for backward compatibility with callers)
-  frequency: number;
   impact: number;
   relevance: number;
-  total: number;
 }
 
 // Knowledge Graph -- Constellation
@@ -172,19 +176,25 @@ export interface StellarConfig {
   sunTokenBudget: number;
   decayHalfLifeHours: number;
   frequencySaturationPoint: number;
-  // ACT-R adaptive stability parameters
-  stabilityGrowth: number;       // exponent base for half-life growth per access (default 1.5)
-  maxStabilityHours: number;     // cap on effective half-life in hours (default 8760 = 1 year)
-  activationRecencyWeight: number;   // weight of recency in activation (default 0.6)
-  activationFrequencyWeight: number; // weight of frequency in activation (default 0.4)
+  // Phase 1: 3-factor formula weights
+  weightRecency: number;           // default 0.35
+  weightFrequency: number;         // default 0.25
+  weightIntrinsic: number;         // default 0.40
+  frequencyDecayHours: number;     // half-life for effective count (default 168h = 7 days)
+  cacheMb: number;                 // RAM allocation for corona cache in MB (default: auto 5% of system RAM)
   // Retrieval scoring weights (used during recall, separate from storage importance)
   retrievalSemanticWeight: number;   // weight of semantic similarity (default 0.55)
   retrievalKeywordWeight: number;    // weight of keyword overlap (default 0.25)
   retrievalProximityWeight: number;  // weight of orbital proximity bonus (default 0.20)
+  // Legacy weights object (deprecated, kept for backward compatibility)
   weights: {
     recency: number;
     frequency: number;
     impact: number;
     relevance: number;
   };
+  // Embedding configuration
+  embeddingDevice: string;   // 'cpu' | 'cuda' | 'dml' (default: 'cpu')
+  embeddingModel: string;    // model name (default: 'Xenova/bge-m3')
+  queryCacheSize: number;    // LRU cache size for query embeddings (default: 128)
 }

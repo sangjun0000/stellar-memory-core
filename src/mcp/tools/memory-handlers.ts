@@ -18,6 +18,7 @@ import { detectConflicts, formatConflictWarnings } from '../../engine/conflict.j
 import { detectSupersession, supersedeMemory, setTemporalBounds } from '../../engine/temporal.js';
 import { corona } from '../../engine/corona.js';
 import { noteRecall, noteRemember } from '../../engine/session-policy.js';
+import { addLedgerEntry } from '../../engine/ledger.js';
 import {
   type McpResponse,
   trackBgError,
@@ -51,6 +52,14 @@ export async function handleRemember(args: {
 
     // Track in session-policy for smart auto-commit
     noteRemember(proj, { type: memory.type, summary: memory.summary, content: memory.content });
+
+    // Record in session ledger (non-fatal)
+    addLedgerEntry({
+      tool_name: 'remember',
+      action:    `${memory.type}:${memory.summary.slice(0, 60)}`,
+      memory_id: memory.id,
+      project:   proj,
+    });
 
     // Background: auto-extract relationships with existing memories.
     // Fire-and-forget — does not block the response.
@@ -119,6 +128,13 @@ export async function handleRecall(args: {
 
     // Track in session-policy for smart auto-commit
     noteRecall(proj, args.query);
+
+    // Record in session ledger (non-fatal)
+    addLedgerEntry({
+      tool_name: 'recall',
+      action:    args.query.slice(0, 100),
+      project:   proj,
+    });
 
     const memoryType: MemoryType | undefined =
       args.type === 'all' || args.type === undefined ? undefined : (args.type as MemoryType);
@@ -200,6 +216,15 @@ export async function handleForget(args: {
     cleanupEdges(args.id);
 
     forgetMemory(args.id, effectiveMode);
+
+    // Record in session ledger (non-fatal)
+    const proj = resolveProject();
+    addLedgerEntry({
+      tool_name: 'forget',
+      action:    effectiveMode,
+      memory_id: args.id,
+      project:   proj,
+    });
 
     if (effectiveMode === 'delete') {
       return { content: [{ type: 'text' as const, text: `✗ Deleted memory ${args.id} (constellation edges removed).` }] };

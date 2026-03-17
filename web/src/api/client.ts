@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 export type MemoryType = 'decision' | 'observation' | 'task' | 'context' | 'error' | 'milestone' | 'procedural';
-export type OrbitZone = 'core' | 'near' | 'active' | 'archive' | 'fading' | 'forgotten';
+export type OrbitZone = 'core' | 'near' | 'stored' | 'forgotten';
 
 export interface Memory {
   id: string;

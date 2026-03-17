@@ -67,12 +67,10 @@ const en = {
 
   // ── Orbit zones ───────────────────────────────────────────────
   zones: {
-    core:      { name: 'Core',      description: 'Core memories — highest importance' },
-    near:      { name: 'Recent',    description: 'Recently important memories' },
-    active:    { name: 'Active',    description: 'Active working memories' },
-    archive:   { name: 'Stored',    description: 'Stored but rarely accessed' },
-    fading:    { name: 'Fading',    description: 'Gradually fading memories' },
-    forgotten: { name: 'Forgotten', description: 'Approaching extinction threshold' },
+    core:      { name: 'Core',      description: 'Core memories — highest importance (0.1–3 AU)' },
+    near:      { name: 'Near',      description: 'Recently accessed memories (3–15 AU)' },
+    stored:    { name: 'Stored',    description: 'Stored but rarely accessed (15–60 AU)' },
+    forgotten: { name: 'Forgotten', description: 'Approaching extinction threshold (60–100 AU)' },
   } as Record<string, { name: string; description: string }>,
 
   zoneLabels: {

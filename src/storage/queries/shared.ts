@@ -50,6 +50,7 @@ export interface RawMemoryRow {
   consolidated_into: string | null;
   quality_score: number | null;
   is_universal: number | null;
+  intrinsic: number | null;
 }
 
 export interface RawConstellationEdgeRow {
@@ -148,6 +149,7 @@ export function deserializeMemory(row: RawMemoryRow): Memory {
     consolidated_into: row.consolidated_into ?? undefined,
     quality_score: row.quality_score ?? undefined,
     is_universal: row.is_universal ? Boolean(row.is_universal) : undefined,
+    intrinsic: row.intrinsic ?? null,
   };
 }
 

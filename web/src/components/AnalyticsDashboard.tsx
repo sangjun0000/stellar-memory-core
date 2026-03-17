@@ -16,12 +16,10 @@ import { LineChart } from './charts/LineChart';
 // ── Color palettes ─────────────────────────────────────────────────────────
 
 const ZONE_COLORS: Record<string, string> = {
-  core:      '#f97316',
-  near:      '#eab308',
-  active:    '#22c55e',
-  archive:   '#3b82f6',
-  fading:    '#8b5cf6',
-  forgotten: '#6b7280',
+  core:      '#00e5ff',
+  near:      '#3b82f6',
+  stored:    '#6b7280',
+  forgotten: '#374151',
 };
 
 const MEMORY_COLORS: Record<string, string> = {
@@ -34,7 +32,7 @@ const MEMORY_COLORS: Record<string, string> = {
   procedural:  '#06b6d4',
 };
 
-const ZONE_ORDER: OrbitZone[] = ['core', 'near', 'active', 'archive', 'fading', 'forgotten'];
+const ZONE_ORDER: OrbitZone[] = ['core', 'near', 'stored', 'forgotten'];
 const TYPE_ORDER: MemoryType[] = ['decision', 'error', 'task', 'milestone', 'context', 'observation', 'procedural'];
 
 // ── Skeleton loader ────────────────────────────────────────────────────────

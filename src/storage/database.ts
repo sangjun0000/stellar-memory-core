@@ -1,5 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { loadVecExtension, VEC_DDL } from './vec.js';
+import { EMBEDDING_DIM } from '../engine/embedding.js';
+import { runMigrations } from './migration.js';
+import './migrations/index.js';
 
 // Singleton instance
 let _db: DatabaseSync | null = null;
@@ -281,6 +284,66 @@ function migrateFtsTokenizer(db: DatabaseSync): void {
   db.exec(`INSERT INTO memories_fts(memories_fts) VALUES ('rebuild');`);
 }
 
+// ---------------------------------------------------------------------------
+// Vec dimension migration
+// ---------------------------------------------------------------------------
+
+/** Set to true when the vec tables were dropped due to a dimension mismatch. */
+let _reembedNeeded = false;
+
+/** Returns true if vec tables were reset and all memories need re-embedding. */
+export function isReembedNeeded(): boolean {
+  return _reembedNeeded;
+}
+
+/**
+ * Detect whether the existing memory_embeddings vec0 table has a different
+ * dimension than the currently configured EMBEDDING_DIM.
+ *
+ * Strategy: attempt to INSERT a zero vector of EMBEDDING_DIM. If the table
+ * exists with a different dimension, sqlite-vec will throw. In that case:
+ *   1. Drop both vec tables.
+ *   2. Set _reembedNeeded so the entry point can start the re-embedding queue.
+ *   3. Let the main DDL block recreate the tables with the correct dimension.
+ *
+ * If the table does not yet exist (fresh install), this is a no-op.
+ */
+function migrateVecDimension(db: DatabaseSync): void {
+  // Check whether the vec table exists at all
+  const tableRow = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memory_embeddings'`
+  ).get() as { name: string } | undefined;
+
+  if (!tableRow) {
+    // Fresh install — main DDL will create it with the correct dimension.
+    return;
+  }
+
+  // Probe: try to insert a zero vector of the new dimension.
+  // If it succeeds, the table already has the right dimension — roll back.
+  // If it throws, the table has a different dimension — drop and recreate.
+  const zeroVec = new Float32Array(EMBEDDING_DIM);
+
+  try {
+    db.exec('BEGIN');
+    db.prepare('INSERT INTO memory_embeddings(embedding) VALUES (?)').run(zeroVec);
+    // Succeeded — dimension already matches; roll back the probe row.
+    db.exec('ROLLBACK');
+  } catch {
+    // Dimension mismatch — drop vec tables and flag for re-embedding.
+    try { db.exec('ROLLBACK'); } catch { /* nothing to roll back */ }
+
+    process.stderr.write(
+      `[stellar-memory] Embedding dimension changed to ${EMBEDDING_DIM}d — dropping old vec tables for re-embedding.\n`
+    );
+
+    db.exec('DROP TABLE IF EXISTS memory_embeddings;');
+    db.exec('DROP TABLE IF EXISTS memory_embedding_map;');
+
+    _reembedNeeded = true;
+  }
+}
+
 export function initDatabase(dbPath: string): DatabaseSync {
   // allowExtension is required for sqlite-vec to load its native module.
   const db = new DatabaseSync(dbPath, { allowExtension: true });
@@ -310,11 +373,32 @@ export function initDatabase(dbPath: string): DatabaseSync {
   // Migrate FTS5 table to trigram tokenizer if it was created with the old default
   try { migrateFtsTokenizer(db); } catch { /* ignore migration errors */ }
 
+  // Migrate vec dimension if the model was upgraded (must run before VEC_DDL)
+  try {
+    migrateVecDimension(db);
+  } catch {
+    // Non-fatal: if probe fails for any other reason, proceed normally.
+  }
+
   // Create vector tables (separated so they run after the extension loads)
   try {
     db.exec(VEC_DDL);
   } catch {
     // vec0 tables require the extension; skip silently if it wasn't loaded.
+  }
+
+  // Run versioned migrations (v1.1+)
+  try {
+    const applied = runMigrations(db, dbPath);
+    if (applied > 0) {
+      process.stderr.write(
+        `[stellar-memory] Applied ${applied} database migration(s)\n`,
+      );
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[stellar-memory] Migration error: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
   }
 
   _db = db;

@@ -1,6 +1,11 @@
 /**
  * content-weight.ts — Content-Based Value Evaluation
  *
+ * @deprecated Phase 1 (STM v1.1) replaced this with the intrinsic field and
+ * INTRINSIC_DEFAULTS in types.ts. The 3-factor formula (orbit.ts) uses
+ * memory.intrinsic directly and no longer calls calculateContentWeight.
+ * This module is kept for backward compatibility only.
+ *
  * Produces a multiplier in [0, 1] that reflects how *valuable* a memory's
  * content is, independent of how recent or frequently accessed it is.
  *

@@ -16,7 +16,7 @@ Stellar Memory is a persistent AI memory system using **celestial mechanics as m
 | Runtime | Node.js 22+ (required for `node:sqlite`) |
 | Language | TypeScript 5.9, ESM throughout |
 | Database | `node:sqlite` (built-in) + FTS5 + sqlite-vec |
-| Embeddings | `@xenova/transformers` (all-MiniLM-L6-v2, 384d, local) |
+| Embeddings | `@huggingface/transformers` (BGE-M3, 1024d, local, CPU/GPU) |
 | MCP | `@modelcontextprotocol/sdk` 1.27+ |
 | API | Hono + `@hono/node-server` |
 | Web | React 19 + D3 7 + Three.js + Tailwind CSS + Vite |
@@ -44,7 +44,7 @@ web/src/
 ├── i18n/            # context.tsx, en.ts, ko.ts (React Context 기반, 외부 라이브러리 없음)
 └── test/            # App.test.tsx, SearchBar.test.tsx
 
-tests/               # 15 test files, 252 tests
+tests/               # 22 test files, 340 tests
 electron/            # main.ts (Electron main process)
 ```
 
@@ -63,7 +63,7 @@ npm run build:web        # React → web/dist/
 npm run build:all        # All (backend + web + electron)
 
 # Test
-npm run test             # 252 tests
+npm run test             # 340 tests
 npm run test:watch       # Watch mode
 cd web && npm run test   # Web component tests (jsdom)
 
@@ -76,37 +76,43 @@ npm run electron:pack    # Build .exe → release/
 
 ### Importance Formula (`src/engine/orbit.ts`)
 ```
-importance = 0.30 × recency + 0.20 × frequency + 0.30 × impact + 0.20 × relevance
+importance = 0.35 × recency + 0.25 × frequency + 0.40 × intrinsic
 ```
-- **Recency**: exponential decay, half-life 72h (`0.5^(hours/72)`)
-- **Frequency**: log saturation (`log(1+count) / log(1+20)`)
-- **Impact**: type-based default (decision=0.8, milestone=0.7, error=0.6, task=0.5, context=0.4, observation=0.3)
-- **Relevance**: hybrid `0.7×vector + 0.3×keyword` similarity
+- **Recency**: 24h grace period, then type-specific linear decay (decision=29d, task=2d, observation=1d)
+- **Frequency**: temporally-decayed effective count (7-day half-life), log saturation
+- **Intrinsic**: type-based default (procedural=0.85, decision=0.80, milestone=0.70, error=0.65, task=0.50, context=0.40, observation=0.30)
+- Importance floor: 0.15 (auto-decay never goes below this)
 
-### Distance Mapping
+### Distance Mapping (segment-based, 4 zones)
 ```
-distance = 0.1 + (1 - importance)² × 99.9   // quadratic, range 0.1–100 AU
+Core      [0.80, 1.00] → [0.1,  3.0) AU
+Near      [0.50, 0.80) → [3.0,  15.0) AU
+Stored    [0.20, 0.50) → [15.0, 60.0) AU
+Forgotten [0.00, 0.20) → [60.0, 100.0] AU
 ```
 
 ### Orbital Zones
 | Zone | AU Range | Purpose |
 |------|----------|---------|
-| Core | 0.1–1.0 | Instant recall (System 1) |
-| Near | 1.0–5.0 | Recently accessed |
-| Active | 5.0–15.0 | In-context |
-| Archive | 15.0–40.0 | Older |
-| Fading | 40.0–70.0 | Losing relevance |
-| Forgotten | 70.0–100.0 | Soft-deleted (Oort cloud) |
+| Core | 0.1–3.0 | Instant recall (System 1) |
+| Near | 3.0–15.0 | Recently accessed |
+| Stored | 15.0–60.0 | Older, still searchable |
+| Forgotten | 60.0–100.0 | Oort cloud |
 
 ### Corona Cache (`src/engine/corona.ts`)
-- In-memory cache of up to 200 core+near memories
+- In-memory cache of core+near memories (RAM-based, auto 5% of system RAM)
 - Token-indexed for O(1) keyword lookup
 - Warmed on startup, invalidated on project switch
 
 ### Search: Hybrid Reciprocal Rank Fusion
-1. FTS5 keyword search
-2. sqlite-vec KNN vector search (384d embeddings)
-3. RRF merge + re-rank
+1. FTS5 keyword search (trigram tokenizer for CJK)
+2. sqlite-vec KNN vector search (1024d BGE-M3 embeddings)
+3. RRF merge + retrieval re-ranking (0.55×semantic + 0.25×keyword + 0.20×proximity)
+
+### Session Lifecycle
+- **Session Ledger**: tracks every tool invocation per session
+- **Sleep Consolidation**: 5-phase post-session pipeline (activity count, orbit recalc, dedup, summary, sun update)
+- **Adaptive token budget**: scales sun context by session gap (short=1.0x, extended=1.8x)
 
 ## Key Patterns & Gotchas
 
@@ -141,11 +147,13 @@ Auto-discovered behavioral patterns (3+ memories sharing tags). Impact 0.9, deca
 | `STELLAR_PROJECT` | `default` | Active project |
 | `STELLAR_API_PORT` | `21547` | REST API port |
 | `STELLAR_SUN_TOKEN_BUDGET` | `800` | Max tokens for sun context |
-| `STELLAR_DECAY_HALF_LIFE` | `72` | Hours for 50% decay |
-| `STELLAR_WEIGHT_RECENCY` | `0.30` | Importance weight |
-| `STELLAR_WEIGHT_FREQUENCY` | `0.20` | Importance weight |
-| `STELLAR_WEIGHT_IMPACT` | `0.30` | Importance weight |
-| `STELLAR_WEIGHT_RELEVANCE` | `0.20` | Importance weight |
+| `STELLAR_DECAY_HALF_LIFE` | `72` | Hours for recency decay fallback |
+| `STELLAR_WEIGHT_RECENCY_V2` | `0.35` | Importance weight (recency) |
+| `STELLAR_WEIGHT_FREQUENCY_V2` | `0.25` | Importance weight (frequency) |
+| `STELLAR_WEIGHT_INTRINSIC` | `0.40` | Importance weight (intrinsic) |
+| `STELLAR_CACHE_MB` | auto 5% | Corona cache RAM allocation |
+| `STELLAR_EMBEDDING_DEVICE` | `cpu` | `cpu` / `dml` / `cuda` |
+| `STELLAR_QUERY_CACHE_SIZE` | `128` | Query embedding LRU cache size |
 
 ## MCP Interface
 
@@ -157,12 +165,15 @@ Auto-discovered behavioral patterns (3+ memories sharing tags). Impact 0.9, deca
 
 ## Database Schema (Key Tables)
 
-- **memories** — id, project, content, summary, type, tags(JSON), distance, importance, impact, access_count, source_path, content_hash, quality_score, valid_from/until, is_universal
+- **memories** — id, project, content, summary, type, tags(JSON), distance, importance, impact, intrinsic, access_count, source_path, content_hash, quality_score, valid_from/until, is_universal
 - **sun_state** — Per-project working context (current_work, decisions, next_steps, errors, context)
-- **memories_fts** — FTS5 virtual table on content+summary+tags
+- **memories_fts** — FTS5 virtual table on content+summary+tags (trigram tokenizer)
 - **data_sources** — Registered scan paths with status tracking
 - **constellation_edges** — Knowledge graph relationships
 - **orbit_log** — Audit trail of distance/importance changes
+- **sessions** — Session lifecycle tracking (v1.1)
+- **session_ledger** — Tool invocation log per session (v1.1)
+- **schema_version** — Migration version tracking (v1.1)
 
 ## Web Dashboard
 

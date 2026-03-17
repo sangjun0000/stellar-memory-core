@@ -26,19 +26,25 @@ import {
   labelToZoneKey,
   formatMemoryLine,
 } from './shared.js';
+import { getReembeddingStatus } from '../../engine/reembed.js';
+import { addLedgerEntry } from '../../engine/ledger.js';
 
 // ---------------------------------------------------------------------------
 // status
 // ---------------------------------------------------------------------------
 
 export async function handleStatus(args: {
-  zone?: 'all' | 'core' | 'near' | 'active' | 'archive' | 'fading' | 'forgotten';
+  zone?: 'all' | 'core' | 'near' | 'stored' | 'forgotten';
   limit?: number;
   show?: 'memories' | 'sources' | 'all';
 }): Promise<McpResponse> {
   try {
     const proj          = resolveProject();
     ensureCorona();
+
+    // Record in session ledger (non-fatal, low priority)
+    addLedgerEntry({ tool_name: 'status', project: proj });
+
     const effectiveLimit = args.limit ?? 20;
     const effectiveZone  = args.zone  ?? 'all';
     const effectiveShow  = args.show  ?? 'memories';
@@ -64,7 +70,7 @@ export async function handleStatus(args: {
         bucket.push(m);
         byZone[zoneKey] = bucket;
       }
-      const zoneOrder: OrbitZone[] = ['core', 'near', 'active', 'archive', 'fading', 'forgotten'];
+      const zoneOrder: OrbitZone[] = ['core', 'near', 'stored', 'forgotten'];
 
       // Stats summary
       const unresolvedConflicts = getUnresolvedConflicts(proj);
@@ -94,6 +100,16 @@ export async function handleStatus(args: {
       const totalBgErrors = errors.embedding + errors.constellation + errors.consolidation;
       if (totalBgErrors > 0) statsLine.push(`bg errors: ${totalBgErrors}`);
       if (statsLine.length > 0) lines.push(`  ${statsLine.join('  |  ')}`);
+
+      // Re-embedding progress (shown when model upgrade is in progress)
+      const reembed = getReembeddingStatus();
+      if (reembed.running || reembed.done > 0) {
+        const pct = reembed.total > 0
+          ? Math.round((reembed.done / reembed.total) * 100)
+          : 100;
+        const label = reembed.running ? 'Re-embedding' : 'Re-embed done';
+        lines.push(`  ${label}: ${reembed.done}/${reembed.total} (${pct}%)${reembed.failed > 0 ? ` [${reembed.failed} failed]` : ''}`);
+      }
 
       if (filtered.length === 0) {
         lines.push(
@@ -163,6 +179,9 @@ export async function handleCommit(args: {
       errors:       args.errors     ?? [],
       context:      args.context    ?? '',
     });
+
+    // Record in session ledger (non-fatal)
+    addLedgerEntry({ tool_name: 'commit', project: proj });
 
     const changes: OrbitChange[] = recalculateOrbits(proj, config);
 

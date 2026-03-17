@@ -66,12 +66,10 @@ const ko: Translations = {
 
   // ── Orbit zones ───────────────────────────────────────────────
   zones: {
-    core:      { name: '핵심',   description: '핵심 기억 — 최고 중요도' },
-    near:      { name: '최근',   description: '최근에 중요했던 기억' },
-    active:    { name: '활성',   description: '현재 활용 중인 기억' },
-    archive:   { name: '보관',   description: '저장됨, 자주 안 꺼냄' },
-    fading:    { name: '흐린',   description: '점점 잊혀지는 기억' },
-    forgotten: { name: '잊힌',   description: '거의 소멸 직전의 기억' },
+    core:      { name: '핵심',       description: '핵심 기억 — 최고 중요도 (0.1–3 AU)' },
+    near:      { name: '근거리',     description: '최근에 접근된 기억 (3–15 AU)' },
+    stored:    { name: '저장된 기억', description: '저장됨, 자주 안 꺼냄 (15–60 AU)' },
+    forgotten: { name: '잊힌',       description: '거의 소멸 직전의 기억 (60–100 AU)' },
   } as Record<string, { name: string; description: string }>,
 
   zoneLabels: {
