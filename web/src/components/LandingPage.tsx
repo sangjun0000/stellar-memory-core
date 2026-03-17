@@ -44,23 +44,23 @@ const FEATURES = [
     glow: 'rgba(139,92,246,0.35)',
     title: 'Smart Search',
     description:
-      'Find memories by meaning, not just keywords. Ask naturally and get the most relevant results — all processed locally on your machine.',
+      'BGE-M3 1024d embeddings find memories by meaning, not just keywords. Three-tier search: instant cache, keyword, then deep vector — all local.',
   },
   {
     icon: '☀',
     color: '#fbbf24',
     glow: 'rgba(251,191,36,0.35)',
-    title: 'Visual Dashboard',
+    title: 'Session Continuity',
     description:
-      'See your memories as orbiting planets in an interactive 3D solar system. Drag them closer or let them drift — you\'re in control.',
+      'Session Ledger tracks every action. Sleep Consolidation processes memories between sessions. Resume exactly where you left off.',
   },
   {
     icon: '⬡',
     color: '#34d399',
     glow: 'rgba(52,211,153,0.35)',
-    title: 'Multi-Project',
+    title: 'Visual Dashboard',
     description:
-      'Each project has its own memory space. Share common preferences across all projects, or keep everything isolated.',
+      'See your memories as orbiting planets in an interactive 3D solar system. Four zones: Core, Near, Stored, and Forgotten.',
   },
 ] as const;
 
@@ -1104,7 +1104,7 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
             textAlign:           'left',
           }}>
             {[
-              { step: '01', title: 'Run one command',      desc: 'Creates config, SQLite database, and downloads the embedding model (~90MB)' },
+              { step: '01', title: 'Run one command',      desc: 'Choose CPU/GPU, configure cache, and download the BGE-M3 embedding model (~540MB)' },
               { step: '02', title: 'Restart your client',   desc: 'Claude Code or Claude Desktop — both supported out of the box' },
               { step: '03', title: 'Start remembering',     desc: 'Claude automatically stores decisions, errors, and milestones across sessions' },
             ].map((item) => (
@@ -1177,7 +1177,7 @@ export function LandingPage({ onNavigateDashboard }: { onNavigateDashboard: () =
             </button>
           </div>
           <p style={{ fontSize: '12px', color: '#334155', margin: 0 }}>
-            Stellar Memory v1.0 — Local-first AI memory. No cloud. No keys. Just physics.
+            Stellar Memory v1.1 — Local-first AI memory. No cloud. No keys. Just physics.
           </p>
         </footer>
       </div>
