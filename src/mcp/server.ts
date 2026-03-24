@@ -52,7 +52,7 @@ export function createStellarServer(): McpServer {
 
   const server = new McpServer({
     name: 'stellar-memory',
-    version: '1.0.4',
+    version: '1.1.1',
     description: MEMORY_PROTOCOL,
   });
 
@@ -134,6 +134,8 @@ export function createStellarServer(): McpServer {
         .describe('Active errors or blockers.'),
       context: z.string().optional()
         .describe('Additional project background.'),
+      project: z.string().optional()
+        .describe('Target project (default: auto-detected from cwd). Use when committing for a different project.'),
     },
     (args) => handleCommit(args)
   );
@@ -157,6 +159,8 @@ export function createStellarServer(): McpServer {
         .describe('Include universal memories from other projects.'),
       at: z.string().optional()
         .describe('ISO date — return memories active at this point in time instead.'),
+      project: z.string().optional()
+        .describe('Target project (default: auto-detected from cwd). Use when searching a different project.'),
     },
     async (args) => withSessionContext(await handleRecall(args))
   );
@@ -178,6 +182,8 @@ export function createStellarServer(): McpServer {
         .describe('Impact score 0.0–1.0.'),
       tags: z.array(z.string()).optional()
         .describe('Tags for search and categorization.'),
+      project: z.string().optional()
+        .describe('Target project (default: auto-detected from cwd). Use when storing memories for a different project.'),
     },
     (args) => handleRemember(args)
   );

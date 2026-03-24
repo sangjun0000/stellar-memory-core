@@ -167,9 +167,10 @@ export async function handleCommit(args: {
   next_steps?: string[];
   errors?: string[];
   context?: string;
+  project?: string;
 }): Promise<McpResponse> {
   try {
-    const proj   = resolveProject();
+    const proj   = args.project ?? resolveProject();
     const config = getConfig();
 
     commitToSun(proj, {

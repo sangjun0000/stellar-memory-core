@@ -37,9 +37,10 @@ export async function handleRemember(args: {
   type?: MemoryType;
   impact?: number;
   tags?: string[];
+  project?: string;
 }): Promise<McpResponse> {
   try {
-    const proj = resolveProject();
+    const proj = args.project ?? resolveProject();
 
     const memory: Memory = createMemory({
       project: proj,
@@ -120,9 +121,10 @@ export async function handleRecall(args: {
   limit?: number;
   include_universal?: boolean;
   at?: string;
+  project?: string;
 }): Promise<McpResponse> {
   try {
-    const proj = resolveProject();
+    const proj = args.project ?? resolveProject();
     const limit = args.limit ?? 10;
     ensureCorona();
 
