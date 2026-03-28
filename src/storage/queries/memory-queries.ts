@@ -27,8 +27,12 @@ export function insertMemory(memory: Partial<Memory>): Memory {
   const summary = memory.summary ?? '';
   const type = memory.type ?? 'observation';
   const tags = JSON.stringify(memory.tags ?? []);
-  const distance = memory.distance ?? 5.0;
-  const importance = memory.importance ?? 0.5;
+  // Use nullish coalescing first, then guard against NaN — SQLite stores NaN as
+  // NULL and the NOT NULL constraint on memories.distance will reject it.
+  const distanceRaw = memory.distance ?? 5.0;
+  const distance = isNaN(distanceRaw) || !isFinite(distanceRaw) ? 5.0 : distanceRaw;
+  const importanceRaw = memory.importance ?? 0.5;
+  const importance = isNaN(importanceRaw) || !isFinite(importanceRaw) ? 0.5 : importanceRaw;
   const velocity = memory.velocity ?? 0.0;
   const impact = memory.impact ?? 0.5;
   const access_count = memory.access_count ?? 0;
@@ -210,6 +214,38 @@ export function updateMemoryContent(id: string, content: string): void {
   db.prepare(`
     UPDATE memories SET content = ?, updated_at = ? WHERE id = ?
   `).run(content, now, id);
+}
+
+export function updateMemoryFields(
+  id: string,
+  fields: {
+    content?: string;
+    summary?: string;
+    type?: string;
+    tags?: string[];
+    impact?: number;
+  },
+): void {
+  const db = getDatabase();
+  const updates: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const values: any[] = [];
+
+  if (fields.content !== undefined) { updates.push('content = ?'); values.push(fields.content); }
+  if (fields.summary !== undefined) { updates.push('summary = ?'); values.push(fields.summary); }
+  if (fields.type    !== undefined) { updates.push('type = ?');    values.push(fields.type); }
+  if (fields.tags    !== undefined) { updates.push('tags = ?');    values.push(JSON.stringify(fields.tags)); }
+  if (fields.impact  !== undefined) { updates.push('impact = ?'); values.push(fields.impact); }
+
+  if (updates.length === 0) return;
+
+  updates.push('updated_at = ?');
+  values.push(new Date().toISOString());
+  values.push(id);
+
+  db.prepare(
+    `UPDATE memories SET ${updates.join(', ')} WHERE id = ? AND deleted_at IS NULL`
+  ).run(...values);
 }
 
 export function updateQualityScore(memoryId: string, score: number): void {

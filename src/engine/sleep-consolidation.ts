@@ -183,10 +183,15 @@ export function runSleepConsolidation(
         kept.push(sessionSummary);
         const newContext = kept.join('\n');
 
+        const MAX_CONTEXT_LENGTH = 500;
+        const trimmedContext = newContext.length > MAX_CONTEXT_LENGTH
+          ? newContext.slice(-MAX_CONTEXT_LENGTH)
+          : newContext;
+
         const now = new Date().toISOString();
         upsertSunState({
           ...existing,
-          project_context: newContext,
+          project_context: trimmedContext,
           updated_at:      now,
         });
       }

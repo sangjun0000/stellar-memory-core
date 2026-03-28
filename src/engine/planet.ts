@@ -151,7 +151,12 @@ export function createMemory(data: {
   const I = hasExplicitImpact ? impact : (INTRINSIC_DEFAULTS[type] ?? 0.30);
   const intrinsicOverride = hasExplicitImpact ? impact : null;
 
-  const total = Math.min(1.0, wR * 1.0 + wF * 0.0 + wI * I);
+  let total = Math.min(1.0, wR * 1.0 + wF * 0.0 + wI * I);
+  // Guard: if any weight is non-finite (e.g. NaN from a corrupt config), fall
+  // back to the type's intrinsic default so the INSERT always has a valid value.
+  if (!isFinite(total) || isNaN(total)) {
+    total = INTRINSIC_DEFAULTS[type] ?? 0.30;
+  }
 
   const distance = importanceToDistance(total);
   const now      = new Date().toISOString();

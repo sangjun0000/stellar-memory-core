@@ -10,8 +10,12 @@ import type { Memory } from '../../engine/types.js';
 import type { MemoryType } from '../../engine/types.js';
 import { createMemory, recallMemoriesAsync, forgetMemory } from '../../engine/planet.js';
 import { getOrbitZone } from '../../engine/orbit.js';
-import { getMemoriesByProject } from '../../storage/queries.js';
+import { getMemoriesByProject, getMemoryById, updateMemoryFields } from '../../storage/queries.js';
 import { extractRelationships, findRelatedMemories } from '../../engine/constellation.js';
+import { createHash } from 'node:crypto';
+import { getDatabase } from '../../storage/database.js';
+import { generateEmbedding } from '../../engine/embedding.js';
+import { insertEmbedding, deleteEmbedding } from '../../storage/vec.js';
 import { getUniversalContext } from '../../engine/multiproject.js';
 import { calculateQuality, getQualityFeedback } from '../../engine/quality.js';
 import { detectConflicts, formatConflictWarnings } from '../../engine/conflict.js';
@@ -244,5 +248,75 @@ export async function handleForget(args: {
   } catch (err) {
     if (err instanceof McpError) throw err;
     throw new McpError(ErrorCode.InternalError, `forget failed: ${String(err)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// update
+// ---------------------------------------------------------------------------
+
+export async function handleUpdate(args: {
+  id: string;
+  content?: string;
+  summary?: string;
+  type?: string;
+  tags?: string[];
+  impact?: number;
+  project?: string;
+}): Promise<McpResponse> {
+  try {
+    const memory = getMemoryById(args.id);
+    if (!memory) {
+      throw new McpError(ErrorCode.InvalidRequest, `Memory not found: ${args.id}`);
+    }
+
+    updateMemoryFields(args.id, {
+      content: args.content,
+      summary: args.summary,
+      type:    args.type,
+      tags:    args.tags,
+      impact:  args.impact,
+    });
+
+    // If content changed, update content_hash and re-embed in background
+    if (args.content !== undefined) {
+      const newHash = createHash('sha256').update(args.content).digest('hex');
+      const db = getDatabase();
+      db.prepare('UPDATE memories SET content_hash = ? WHERE id = ?').run(newHash, args.id);
+
+      const embeddingText = args.content + ' ' + (args.summary ?? memory.summary);
+      generateEmbedding(embeddingText).then((emb) => {
+        try {
+          const db2 = getDatabase();
+          deleteEmbedding(db2, args.id);
+          insertEmbedding(db2, args.id, emb);
+        } catch { /* non-fatal — embedding is best-effort */ }
+      }).catch(() => { trackBgError('embedding'); });
+    }
+
+    // Evict from corona cache so next access reads fresh data
+    corona.evict(args.id);
+
+    // Record in session ledger (non-fatal)
+    const proj = args.project ?? resolveProject();
+    addLedgerEntry({
+      tool_name: 'update',
+      action:    `updated:${args.id.slice(0, 8)}`,
+      memory_id: args.id,
+      project:   proj,
+    });
+
+    const updated = (['content', 'summary', 'type', 'tags', 'impact'] as const)
+      .filter((k) => args[k] !== undefined);
+
+    return {
+      content: [{
+        type: 'text' as const,
+        text: `✦ Updated memory ${args.id.slice(0, 8)} — fields: ${updated.join(', ')}`,
+      }],
+    };
+  } catch (err) {
+    if (err instanceof McpError) throw err;
+    throw new McpError(ErrorCode.InternalError, `update failed: ${String(err)}`);
   }
 }

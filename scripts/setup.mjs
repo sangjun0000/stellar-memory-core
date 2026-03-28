@@ -107,8 +107,11 @@ const device = process.env['STELLAR_EMBEDDING_DEVICE'] ?? 'cpu';
 const setupPromise = (async () => {
   const { pipeline, env } = await import('@huggingface/transformers');
 
-  // Respect custom cache dir if set, otherwise use HuggingFace default
-  env.cacheDir = process.env['TRANSFORMERS_CACHE'] ?? undefined;
+  // Respect custom cache dir if set, otherwise leave as HuggingFace default (do not set undefined)
+  const customCache = process.env['TRANSFORMERS_CACHE'];
+  if (customCache) {
+    env.cacheDir = customCache;
+  }
 
   const pipe = await pipeline('feature-extraction', MODEL_NAME, {
     dtype: 'q8',

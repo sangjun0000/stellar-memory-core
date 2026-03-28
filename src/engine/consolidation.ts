@@ -241,17 +241,22 @@ export function enrichMemory(existing: Memory, newContent: string): Memory {
   const combined          = deduplicateSentences([...existingSentences, ...newSentences]);
   const mergedContent     = combined.join(' ');
 
-  // Only update if the merged content is actually richer
-  if (mergedContent === existing.content) return existing;
+  const MAX_CONTENT_LENGTH = 2000;
+  const finalContent = mergedContent.length > MAX_CONTENT_LENGTH
+    ? mergedContent.slice(0, MAX_CONTENT_LENGTH).trimEnd() + '…'
+    : mergedContent;
 
-  updateMemoryContent(existing.id, mergedContent);
+  // Only update if the merged content is actually richer
+  if (finalContent === existing.content) return existing;
+
+  updateMemoryContent(existing.id, finalContent);
   log.debug('Enriched existing memory with new content', {
     id:       existing.id,
     before:   existing.content.length,
-    after:    mergedContent.length,
+    after:    finalContent.length,
   });
 
-  return { ...existing, content: mergedContent };
+  return { ...existing, content: finalContent };
 }
 
 // ---------------------------------------------------------------------------

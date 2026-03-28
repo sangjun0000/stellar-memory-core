@@ -29,6 +29,7 @@ import {
 import { corona } from './corona.js';
 import type { MemoryType } from './types.js';
 import { getMemoryValidityState } from './validity.js';
+import { qualityOrbitAdjustment } from './quality.js';
 
 // ---------------------------------------------------------------------------
 // Type-specific decay horizons (hours after 24h grace period)
@@ -233,6 +234,10 @@ export function calculateImportance(
  *   Forgotten [0.00, 0.20) → [60.0, 100.0]
  */
 export function importanceToDistance(importance: number): number {
+  // Guard: NaN or non-finite importance maps to the middle of the Stored zone
+  // rather than propagating NaN into the DB (which SQLite stores as NULL and
+  // then rejects due to the NOT NULL constraint on memories.distance).
+  if (!isFinite(importance) || isNaN(importance)) return 30.0;
   const clamped = Math.min(1.0, Math.max(0.0, importance));
 
   if (clamped >= 0.80) return 0.1  + (1.0  - clamped) / 0.20 * 2.9;
@@ -303,7 +308,9 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
     const components    = calculateImportance(memory, config);
     const newImportance = components.total;
     const newDistance   = importanceToDistance(newImportance);
-    const velocity      = newDistance - memory.distance;
+    const qualityMult   = qualityOrbitAdjustment(memory.quality_score ?? 0.5);
+    const adjustedDistance = Math.min(100.0, newDistance * qualityMult);
+    const velocity      = adjustedDistance - memory.distance;
 
     if (Math.abs(velocity) <= 0.01) {
       continue;
@@ -313,13 +320,13 @@ export function recalculateOrbits(project: string, config: StellarConfig): Orbit
       memory_id:      memory.id,
       project,
       old_distance:   memory.distance,
-      new_distance:   newDistance,
+      new_distance:   adjustedDistance,
       old_importance: memory.importance,
       new_importance: newImportance,
       trigger:        'decay',
     };
 
-    updateMemoryOrbit(memory.id, newDistance, newImportance, velocity);
+    updateMemoryOrbit(memory.id, adjustedDistance, newImportance, velocity);
     insertOrbitLog(change);
     changes.push(change);
   }

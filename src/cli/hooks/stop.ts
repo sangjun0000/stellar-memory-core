@@ -22,7 +22,20 @@ async function main(): Promise<void> {
   for await (const chunk of process.stdin) {
     chunks.push(chunk as Buffer);
   }
-  const text = Buffer.concat(chunks).toString('utf-8').trim();
+  const raw = Buffer.concat(chunks).toString('utf-8').trim();
+
+  // Claude Code stop hook sends a JSON payload — extract only the assistant's message.
+  // Fall back to raw text if stdin is not JSON (backward compatibility).
+  let text = raw;
+  try {
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const msg = payload['last_assistant_message'];
+    if (typeof msg === 'string') {
+      text = msg.trim();
+    }
+  } catch {
+    // Not JSON — use raw text as-is.
+  }
 
   if (text.length < MIN_LENGTH) {
     process.exit(0);

@@ -14,16 +14,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { handleStatus, handleCommit, handleOrbit, handleExport } from './tools/system-handlers.js';
-import { handleRemember, handleRecall, handleForget } from './tools/memory-handlers.js';
-import { handleConstellation, handleResolveConflict } from './tools/graph-handlers.js';
-import { handleAnalytics, handleGalaxy } from './tools/analytics-handlers.js';
-import { handleObserve, handleConsolidate } from './tools/observation-handlers.js';
-import { handleTemporal } from './tools/temporal-handlers.js';
+import { handleStatus, handleCommit } from './tools/system-handlers.js';
+import { handleRemember, handleRecall, handleForget, handleUpdate } from './tools/memory-handlers.js';
 import { handleSunResource } from './tools/sun-handler.js';
 import { trackBgError } from './tools/shared.js';
-import { handleScan } from './tools/ingestion-tools.js';
-import { handleDaemon } from './tools/daemon-tool.js';
 import { getSunContent } from '../engine/sun.js';
 import { getCurrentProject } from '../engine/multiproject.js';
 import { setErrorReporter } from '../engine/planet.js';
@@ -188,15 +182,6 @@ export function createStellarServer(): McpServer {
     (args) => handleRemember(args)
   );
 
-  // ── Tool: orbit ───────────────────────────────────────────────────────────
-
-  server.tool(
-    'orbit',
-    'Recalculate all memory positions based on current importance.',
-    {},
-    () => handleOrbit({} as Record<string, never>)
-  );
-
   // ── Tool: forget ──────────────────────────────────────────────────────────
 
   server.tool(
@@ -211,176 +196,28 @@ export function createStellarServer(): McpServer {
     (args) => handleForget(args)
   );
 
-  // ── Tool: scan ────────────────────────────────────────────────────────────
+  // ── Tool: update ──────────────────────────────────────────────────────────
 
   server.tool(
-    'scan',
-    'Register and scan local data sources.',
-    {
-      path: z.string().min(1)
-        .describe('Directory path to scan.'),
-      recursive: z.boolean().optional()
-        .describe('Recurse into subdirectories.'),
-      git: z.boolean().optional()
-        .describe('Also import git commit history.'),
-      max_kb: z.number().int().min(1).max(10240).optional()
-        .describe('Max file size in KB to process.'),
-    },
-    (args) => handleScan(args)
-  );
-
-  // ── Tool: daemon ──────────────────────────────────────────────────────────
-
-  server.tool(
-    'daemon',
-    'Start or stop the background scheduler.',
-    {
-      action: z.enum(['status', 'start', 'stop'])
-        .describe('Action to perform.'),
-    },
-    (args) => handleDaemon(args)
-  );
-
-  // ── Tool: constellation ───────────────────────────────────────────────────
-
-  server.tool(
-    'constellation',
-    'Explore the knowledge graph between memories.',
+    'update',
+    'Edit an existing memory\'s content, summary, type, tags, or impact. ID and history are preserved.',
     {
       id: z.string().min(1)
-        .describe('Memory ID to explore.'),
-      action: z.enum(['graph', 'related', 'extract']).optional()
-        .describe('"graph" (default), "related", or "extract".'),
-      depth: z.number().int().min(1).max(3).optional()
-        .describe('Graph traversal depth.'),
-      limit: z.number().int().min(1).max(50).optional()
-        .describe('Max related memories to return.'),
-    },
-    (args) => handleConstellation(args)
-  );
-
-  // ── Tool: export ──────────────────────────────────────────────────────────
-
-  server.tool(
-    'export',
-    'Export memories as JSON or Markdown.',
-    {
-      type: z.enum(['all', 'decision', 'observation', 'task', 'context', 'error', 'milestone'])
-        .optional()
-        .describe('Filter by memory type.'),
-      zone: z.enum(['all', 'core', 'near', 'stored', 'forgotten'])
-        .optional()
-        .describe('Filter by orbital zone.'),
-      format: z.enum(['json', 'markdown']).optional()
-        .describe('Output format.'),
-    },
-    (args) => handleExport(args)
-  );
-
-  // ── Tool: galaxy ───────────────────────────────────────────────────────────
-
-  server.tool(
-    'galaxy',
-    'Manage projects: switch, list, create, stats, or universal memories.',
-    {
-      action: z.enum(['switch', 'list', 'create', 'stats', 'mark_universal', 'universal_context', 'candidates'])
-        .describe('Action to perform.'),
+        .describe('Memory ID to update (first 8 chars OK).'),
+      content: z.string().optional()
+        .describe('New content.'),
+      summary: z.string().optional()
+        .describe('New one-line summary.'),
+      type: z.enum(['decision', 'observation', 'task', 'context', 'error', 'milestone']).optional()
+        .describe('New type.'),
+      tags: z.array(z.string()).optional()
+        .describe('New tags (replaces existing).'),
+      impact: z.number().min(0).max(1).optional()
+        .describe('New impact score 0.0–1.0.'),
       project: z.string().optional()
-        .describe('Project name (required for switch/create).'),
-      memory_id: z.string().optional()
-        .describe('Memory ID (required for mark_universal).'),
-      is_universal: z.boolean().optional()
-        .describe('Mark as universal (true) or project-specific (false).'),
-      limit: z.number().int().min(1).max(100).optional()
-        .describe('Max results for universal_context.'),
+        .describe('Target project (default: auto-detected from cwd).'),
     },
-    (args) => handleGalaxy(args)
-  );
-
-  // ── Tool: analytics ───────────────────────────────────────────────────────
-
-  server.tool(
-    'analytics',
-    'Memory analytics: health, topics, survival, or movements.',
-    {
-      report: z.enum(['summary', 'health', 'topics', 'survival', 'movements', 'full'])
-        .describe('Report type.'),
-      project: z.string().optional()
-        .describe('Project to analyse.'),
-      days: z.number().int().min(1).max(365).optional()
-        .describe('Lookback window in days (for movements report).'),
-    },
-    (args) => handleAnalytics(args)
-  );
-
-  // ── Tool: observe ─────────────────────────────────────────────────────────
-
-  server.tool(
-    'observe',
-    'Extract memories from conversation text automatically.',
-    {
-      conversation: z.string().min(1)
-        .describe('Conversation text to extract memories from.'),
-      project: z.string().optional()
-        .describe('Target project.'),
-    },
-    (args) => handleObserve(args)
-  );
-
-  // ── Tool: consolidate ─────────────────────────────────────────────────────
-
-  server.tool(
-    'consolidate',
-    'Merge similar memories to reduce noise.',
-    {
-      project: z.string().optional()
-        .describe('Target project.'),
-      dry_run: z.boolean().optional()
-        .describe('Preview candidates without merging.'),
-    },
-    (args) => handleConsolidate(args)
-  );
-
-  // ── Tool: resolve_conflict ────────────────────────────────────────────────
-
-  server.tool(
-    'resolve_conflict',
-    'List, resolve, or dismiss memory conflicts.',
-    {
-      action: z.enum(['list', 'resolve', 'dismiss'])
-        .describe('Action to perform.'),
-      conflict_id: z.string().optional()
-        .describe('Conflict ID (required for resolve/dismiss).'),
-      resolution: z.string().optional()
-        .describe('How the conflict was resolved.'),
-      resolve_action: z.enum(['supersede', 'dismiss', 'keep_both']).optional()
-        .describe('"supersede", "dismiss", or "keep_both".'),
-      project: z.string().optional()
-        .describe('Target project.'),
-    },
-    (args) => handleResolveConflict(args)
-  );
-
-  // ── Tool: temporal ────────────────────────────────────────────────────────
-
-  server.tool(
-    'temporal',
-    'Time-based queries: point-in-time recall, evolution chains, or bounds.',
-    {
-      action: z.enum(['at', 'chain', 'summary', 'set_bounds'])
-        .describe('Action to perform.'),
-      timestamp: z.string().optional()
-        .describe('ISO date (required for action="at").'),
-      memory_id: z.string().optional()
-        .describe('Memory ID (required for chain/set_bounds).'),
-      valid_from: z.string().optional()
-        .describe('ISO date — when the memory became valid.'),
-      valid_until: z.string().optional()
-        .describe('ISO date — when the memory stopped being valid.'),
-      project: z.string().optional()
-        .describe('Target project.'),
-    },
-    (args) => handleTemporal(args)
+    (args) => handleUpdate(args)
   );
 
   return server;
